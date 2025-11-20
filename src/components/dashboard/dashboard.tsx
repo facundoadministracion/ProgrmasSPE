@@ -11,11 +11,12 @@ import {
   collection,
   getCountFromServer,
   getDocs,
+  FirestoreError,
 } from 'firebase/firestore';
 import { Participant, ProgramName } from '@/lib/types';
 import { PROGRAMAS } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/alerts';
-import { useFirebase } from '@/firebase';
+import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useEffect, useState } from 'react';
 
 type DashboardData = {
@@ -53,37 +54,59 @@ export function Dashboard() {
         'payments'
       );
 
-      const participantsSnapshot = await getDocs(participantsColl);
-      const participants = participantsSnapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as Participant)
-      );
+      try {
+        const participantsSnapshot = await getDocs(participantsColl);
+        const participants = participantsSnapshot.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() } as Participant)
+        );
 
-      const paymentsCountSnapshot = await getCountFromServer(paymentsColl);
-      const paymentsCount = paymentsCountSnapshot.data().count;
+        const paymentsCountSnapshot = await getCountFromServer(paymentsColl);
+        const paymentsCount = paymentsCountSnapshot.data().count;
 
-      const alerts = (
-        await Promise.all(participants.map((p) => getAlertStatus(p)))
-      ).filter((status) => status.type === 'red' || status.type === 'yellow');
+        const alerts = (
+          await Promise.all(participants.map((p) => getAlertStatus(p)))
+        ).filter((status) => status.type === 'red' || status.type === 'yellow');
 
-      const programCounts = {
-        [PROGRAMAS.TUTORIAS]: participants.filter(
-          (p) => p.programa === PROGRAMAS.TUTORIAS
-        ).length,
-        [PROGRAMAS.JOVEN]: participants.filter(
-          (p) => p.programa === PROGRAMAS.JOVEN
-        ).length,
-        [PROGRAMAS.TECNO]: participants.filter(
-          (p) => p.programa === PROGRAMAS.TECNO
-        ).length,
-      };
+        const programCounts = {
+          [PROGRAMAS.TUTORIAS]: participants.filter(
+            (p) => p.programa === PROGRAMAS.TUTORIAS
+          ).length,
+          [PROGRAMAS.JOVEN]: participants.filter(
+            (p) => p.programa === PROGRAMAS.JOVEN
+          ).length,
+          [PROGRAMAS.TECNO]: participants.filter(
+            (p) => p.programa === PROGRAMAS.TECNO
+          ).length,
+        };
 
-      setData({
-        totalParticipants: participants.length,
-        totalAlerts: alerts.length,
-        totalPayments: paymentsCount,
-        programCounts,
-      });
-      setLoading(false);
+        setData({
+          totalParticipants: participants.length,
+          totalAlerts: alerts.length,
+          totalPayments: paymentsCount,
+          programCounts,
+        });
+      } catch (error) {
+        if (error instanceof FirestoreError && error.code === 'permission-denied') {
+            const participantsError = new FirestorePermissionError({
+                path: participantsColl.path,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', participantsError);
+
+            // Also check payments collection if participants failed
+            getDocs(paymentsColl).catch((paymentsError) => {
+                if (paymentsError instanceof FirestoreError && paymentsError.code === 'permission-denied') {
+                    const paymentsPermError = new FirestorePermissionError({
+                        path: paymentsColl.path,
+                        operation: 'list',
+                    });
+                    errorEmitter.emit('permission-error', paymentsPermError);
+                }
+            });
+        }
+      } finally {
+        setLoading(false);
+      }
     }
 
     getDashboardData();
