@@ -1,0 +1,275 @@
+{
+  "entities": {
+    "Participant": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Participant",
+      "type": "object",
+      "description": "Represents a participant in the LR Manager application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Participant entity."
+        },
+        "nombre": {
+          "type": "string",
+          "description": "The participant's full name."
+        },
+        "dni": {
+          "type": "string",
+          "description": "The participant's document number."
+        },
+        "fechaNacimiento": {
+          "type": "string",
+          "description": "The participant's date of birth.",
+          "format": "date"
+        },
+        "actoAdministrativo": {
+          "type": "string",
+          "description": "The administrative act number related to the participant (e.g., resolution number)."
+        },
+        "programa": {
+          "type": "string",
+          "description": "The program the participant is enrolled in."
+        },
+        "fechaIngreso": {
+          "type": "string",
+          "description": "The date the participant joined the program.",
+          "format": "date"
+        },
+        "departamento": {
+          "type": "string",
+          "description": "The department the participant belongs to."
+        },
+        "categoria": {
+          "type": "string",
+          "description": "The category of the participant (e.g., Senior, Estandar, Junior)."
+        },
+        "lugarTrabajo": {
+          "type": "string",
+          "description": "The participant's place of work or area."
+        },
+        "email": {
+          "type": "string",
+          "description": "The participant's email address.",
+          "format": "email"
+        },
+        "telefono": {
+          "type": "string",
+          "description": "The participant's phone number."
+        },
+        "esEquipoTecnico": {
+          "type": "boolean",
+          "description": "Indicates if the participant is part of the technical team (staff)."
+        },
+        "pagosAcumulados": {
+          "type": "number",
+          "description": "The number of payments accumulated by the participant."
+        },
+        "fechaAlta": {
+          "type": "string",
+          "description": "The date the participant was registered.",
+          "format": "date-time"
+        },
+        "activo": {
+          "type": "boolean",
+          "description": "Indicates if the participant is currently active."
+        },
+        "ultimoPago": {
+          "type": "string",
+          "description": "Date of last payment made to the participant."
+        }
+      },
+      "required": [
+        "id",
+        "nombre",
+        "dni",
+        "fechaNacimiento",
+        "programa",
+        "fechaIngreso",
+        "departamento"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Represents a payment made to a participant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "participantId": {
+          "type": "string",
+          "description": "Reference to Participant. (Relationship: Participant 1:N Payment)"
+        },
+        "participantName": {
+          "type": "string",
+          "description": "The name of the participant receiving the payment."
+        },
+        "dni": {
+          "type": "string",
+          "description": "The document number of the participant receiving the payment."
+        },
+        "monto": {
+          "type": "number",
+          "description": "The amount of the payment."
+        },
+        "mes": {
+          "type": "string",
+          "description": "The month the payment corresponds to."
+        },
+        "anio": {
+          "type": "string",
+          "description": "The year the payment corresponds to."
+        },
+        "fechaCarga": {
+          "type": "string",
+          "description": "The date the payment was uploaded to the system.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "participantId",
+        "participantName",
+        "dni",
+        "monto",
+        "mes",
+        "anio"
+      ]
+    },
+    "Novedad": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Novedad",
+      "type": "object",
+      "description": "Represents a piece of news or an update related to a participant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Novedad entity."
+        },
+        "participantId": {
+          "type": "string",
+          "description": "Reference to Participant. (Relationship: Participant 1:N Novedad)"
+        },
+        "participantName": {
+          "type": "string",
+          "description": "The name of the participant related to the news."
+        },
+        "descripcion": {
+          "type": "string",
+          "description": "The description of the news or update."
+        },
+        "fecha": {
+          "type": "string",
+          "description": "The date of the news.",
+          "format": "date"
+        },
+        "fechaRealCarga": {
+          "type": "string",
+          "description": "The date the news was uploaded to the system.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "participantId",
+        "participantName",
+        "descripcion",
+        "fecha"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "artifacts/{appId}/public/data/participants/{participantId}",
+        "definition": {
+          "entityName": "Participant",
+          "schema": {
+            "$ref": "#/backend/entities/Participant"
+          },
+          "description": "Stores participant data. Includes denormalized fields for program, and department for authorization independence.",
+          "params": [
+            {
+              "name": "appId",
+              "description": "The application ID."
+            },
+            {
+              "name": "participantId",
+              "description": "The unique identifier of the participant."
+            }
+          ]
+        }
+      },
+      {
+        "path": "artifacts/{appId}/public/data/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Stores payment data related to participants. Includes denormalized 'participantName' and 'dni' for authorization independence.",
+          "params": [
+            {
+              "name": "appId",
+              "description": "The application ID."
+            },
+            {
+              "name": "paymentId",
+              "description": "The unique identifier of the payment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "artifacts/{appId}/public/data/novedades/{novedadId}",
+        "definition": {
+          "entityName": "Novedad",
+          "schema": {
+            "$ref": "#/backend/entities/Novedad"
+          },
+          "description": "Stores news items related to participants. Includes denormalized 'participantName' for authorization independence.",
+          "params": [
+            {
+              "name": "appId",
+              "description": "The application ID."
+            },
+            {
+              "name": "novedadId",
+              "description": "The unique identifier of the news item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "artifacts/{appId}/public/data/config/{configId}",
+        "definition": {
+          "entityName": "config",
+          "schema": {
+            "$ref": "#/backend/entities/config"
+          },
+          "description": "Stores configuration settings for the application.",
+          "params": [
+            {
+              "name": "appId",
+              "description": "The application ID."
+            },
+            {
+              "name": "configId",
+              "description": "The unique identifier of the configuration."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to provide a secure, scalable, and debuggable solution for the LR Manager application, adhering to the core design principles and strategy mandates. It focuses on authorization independence via denormalization, structural segregation, and consistent access modeling.  \n\n**Authorization Independence:**  Authorization Independence is achieved by avoiding hierarchical authorization dependencies (no `get()` calls in rules). Instead, necessary authorization data, such as program name, and department are stored directly within each document. For example, the `payments` and `novedades` subcollections denormalize participant name and dni, removing the necessity to query the parent `participants` document to apply security rules. This ensures atomic operations (transactions/batches) are not broken and debugging is simplified.\n\n**Structural Segregation:** The database structure segregates data based on access patterns and security needs, ensuring that all documents within a single collection share the same security requirements.  This is achieved, for instance, by storing participants, payments and novedades in a common 'public' collection and using the document's `appId` attribute to scope the security rule. This approach avoids mixing data with differing access needs within the same collection, thereby simplifying security rules.\n\n**Access Modeling:**\n*   **Path-Based Ownership:** While there isn't strict user-owned data in this specific scenario (given anonymous auth and a single role), the `artifacts/{appId}/public/data/{collection}` pattern is used to namespace data by `appId`, and authorization can be attached to the presence of the user being authenticated, or to roles documents.\n\n**QAPs (Rules are not Filters):**\n*   The structure enables secure `list` operations by leveraging structural segregation. For example, listing participants requires no filtering based on user role within the rule itself, due to the assumption that all participants listed within the `participants` collection are accessible to the authenticated user.\n\n**Invariants:**\n*   The structure supports data integrity by storing timestamps (`fechaAlta`, `fechaRealCarga`) directly within documents, enabling rules to enforce their immutability. Ownership is implicitly managed through the document structure and the app ID."
+  }
+}

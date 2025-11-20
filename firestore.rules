@@ -1,0 +1,127 @@
+/**
+ * Core Philosophy: This ruleset enforces an "Authenticated Read, Restricted Write" security model.
+ * All authenticated users, including those signed in anonymously, are granted read-only access
+ * to the application's public data collections (participants, payments, etc.). All write
+ * operations (create, update, delete) are currently disabled by default because the data
+ * models lack explicit ownership fields (e.g., 'creatorId' or 'ownerId'). This is a
+ * critical security measure to prevent unauthorized data modification. To enable writes,
+ * the corresponding data entities must be updated to include an ownership field, which can
+ * then be validated in these rules.
+ *
+ * Data Structure: All application data is organized under the path `/artifacts/{appId}/public/data`,
+ * where `{appId}` serves as a top-level namespace for a specific application instance. This
+ * structure ensures that data for different application instances is cleanly segregated. Core
+ * collections like 'participants', 'payments', and 'novedades' reside within this path.
+ *
+ * Key Security Decisions:
+ * - Default Deny: All access is denied by default.
+ * - Authenticated Reads: Any user with a valid authentication token (request.auth != null),
+ *   including anonymous users, can read data from any of the main collections.
+ * - Writes Disabled: All write operations are explicitly set to `if false;`. This is a
+ *   deliberate choice to enforce security until a clear ownership model is defined in the
+ *   application's data schemas.
+ * - No User Listing: There is no top-level `/users` collection, so listing users is not applicable.
+ *
+ * Denormalization for Authorization: The data model is designed to be authorization-independent,
+ * meaning documents do not require cross-document reads (`get()` calls) to determine access.
+ * This ruleset relies on that principle, leading to simpler, more performant, and more secure rules.
+ * For example, when write rules are eventually implemented, they will validate an ownership field
+ * directly on the document being modified.
+ *
+ * Structural Segregation: Data is segregated by collection under a common path, ensuring all
+ * documents within a collection share the same security profile. This avoids mixing public and
+ * private data and simplifies rules for list operations.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    /**
+     * @description Checks if the user is authenticated (not null). This supports
+     * both standard and anonymous sign-in providers.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Enforces an Authenticated Read, Restricted Write access model.
+     * All authenticated users can view participant data, but all write operations are
+     * disabled until an ownership model is implemented in the schema.
+     * @path /artifacts/{appId}/public/data/participants/{participantId}
+     * @allow An authenticated user can read a participant's document.
+     *        (get) auth: { uid: 'some_user_id' }
+     * @deny An unauthenticated user attempts to read a participant's document.
+     *       (get) auth: null
+     * @principle Grants read access to authenticated users while defaulting to secure (denied) writes.
+     */
+    match /artifacts/{appId}/public/data/participants/{participantId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // CRITICAL: Cannot implement owner-only writes. The 'Participant' entity is missing an 'ownerId' or 'creatorId' field.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Enforces an Authenticated Read, Restricted Write access model for payments.
+     * All authenticated users can view payment data, but all write operations are
+     * disabled until an ownership model is implemented in the schema.
+     * @path /artifacts/{appId}/public/data/payments/{paymentId}
+     * @allow An authenticated user can list all payment documents.
+     *        (list) auth: { uid: 'some_user_id' }
+     * @deny An unauthenticated user attempts to list payments.
+     *       (list) auth: null
+     * @principle Grants read access to authenticated users while defaulting to secure (denied) writes.
+     */
+    match /artifacts/{appId}/public/data/payments/{paymentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // CRITICAL: Cannot implement owner-only writes. The 'Payment' entity is missing an 'ownerId' or 'creatorId' field.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Enforces an Authenticated Read, Restricted Write access model for news/updates.
+     * All authenticated users can view 'novedades', but all write operations are
+     * disabled until an ownership model is implemented in the schema.
+     * @path /artifacts/{appId}/public/data/novedades/{novedadId}
+     * @allow An authenticated user can read a 'novedad' document.
+     *        (get) auth: { uid: 'some_user_id' }
+     * @deny Any user (authenticated or not) attempts to create a 'novedad'.
+     *       (create) auth: { uid: 'some_user_id' }
+     * @principle Grants read access to authenticated users while defaulting to secure (denied) writes.
+     */
+    match /artifacts/{appId}/public/data/novedades/{novedadId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // CRITICAL: Cannot implement owner-only writes. The 'Novedad' entity is missing an 'ownerId' or 'creatorId' field.
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Secures application configuration data. This data is readable by any
+     * authenticated user but is not writable from the client to prevent tampering.
+     * Changes to this collection should be made via a trusted server environment.
+     * @path /artifacts/{appId}/public/data/config/{configId}
+     * @allow An authenticated user can read a configuration document.
+     *        (get) auth: { uid: 'some_user_id' }
+     * @deny Any user attempts to modify a configuration document.
+     *       (update) auth: { uid: 'some_user_id' }
+     * @principle Protects critical configuration data by making it read-only for all clients.
+     */
+    match /artifacts/{appId}/public/data/config/{configId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
