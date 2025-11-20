@@ -77,6 +77,10 @@
         "ultimoPago": {
           "type": "string",
           "description": "Date of last payment made to the participant."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The ID of the user who owns this document."
         }
       },
       "required": [
