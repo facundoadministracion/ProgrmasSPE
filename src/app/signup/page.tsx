@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useUser } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, getDocs, collection, query } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,23 +17,6 @@ import {
 import { Briefcase } from 'lucide-react';
 import Link from 'next/link';
 
-// NOTE: This is a placeholder for a real server-side user creation function.
-// In a production app, an admin should not create users from the client
-// as it would require signing them out. This should be a Cloud Function.
-async function createDataEntryUser(email: string, pass: string) {
-    alert(`Simulación Exitosa: Se crearía un nuevo usuario para ${email}.
-Rol asignado: data_entry.
-En producción, esto se haría en el servidor para no desloguear al admin.`);
-
-    console.log('--- USER CREATION (SIMULATED) ---');
-    console.log('Action: Admin creating a new user.');
-    console.log('Email:', email);
-    console.log('Assigned Role: data_entry');
-    console.log('This would be a server-side operation.');
-    console.log('---------------------------------');
-}
-
-
 export default function SignUpPage() {
   const { auth, firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
@@ -43,76 +27,107 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+  const [isFirstUser, setIsFirstUser] = useState(false);
 
   useEffect(() => {
-    // If there is a user, check if they are an admin.
-    if (user && firestore) {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      getDoc(userDocRef).then(userDoc => {
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          setIsAdmin(true);
-        } else {
+    if (isUserLoading) return;
+    
+    const checkAdminAndFirstUser = async () => {
+      if (!firestore) return;
+      
+      // Check if there are any users in the users collection
+      const usersQuery = query(collection(firestore, 'users'));
+      const usersSnapshot = await getDocs(usersQuery);
+      const isDbEmpty = usersSnapshot.empty;
+      setIsFirstUser(isDbEmpty);
+
+      // Check if current user is admin
+      if (user) {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        try {
+          const userDoc = await getDoc(userDocRef);
+          setIsAdmin(userDoc.exists() && userDoc.data().role === 'admin');
+        } catch (err) {
+          console.error("Error checking admin status:", err);
           setIsAdmin(false);
         }
-        setIsCheckingAdmin(false);
-      }).catch(err => {
-        console.error("Error checking admin status:", err);
+      } else {
         setIsAdmin(false);
-        setIsCheckingAdmin(false);
-      });
-    } else if (!isUserLoading) {
-      // If there's no user and loading is finished, they are not an admin.
-      setIsAdmin(false);
+      }
       setIsCheckingAdmin(false);
-    }
+    };
+
+    checkAdminAndFirstUser();
   }, [user, isUserLoading, firestore]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) {
+    setError(null);
+
+    // Allow creation if it's the very first user OR if the creator is an admin.
+    if (!isFirstUser && !isAdmin) {
       setError('Solo los administradores pueden crear nuevos usuarios.');
       return;
     }
-    setError(null);
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden.');
       return;
     }
-
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
 
     try {
-      await createDataEntryUser(email, password);
-      // Clear form on success
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
+      // If an admin is creating a user, we don't want to sign them out.
+      // This part of the logic remains complex and is best handled by a server-side function.
+      // For now, we focus on the first-user registration flow.
+      if (isAdmin && !isFirstUser) {
+          alert(`Simulación Exitosa: Se crearía un nuevo usuario para ${email} con rol 'data_entry'. En producción, esto se haría en el servidor.`);
+          console.log(`Admin ${user?.email} is creating user ${email}`);
+          setEmail('');
+          setPassword('');
+          setConfirmPassword('');
+          return;
+      }
+      
+      // Logic for the first user registration
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const newUser = userCredential.user;
+      
+      const assignedRole = isFirstUser ? 'admin' : 'data_entry';
+      
+      // Create user role document in Firestore
+      await setDoc(doc(firestore, 'users', newUser.uid), {
+        uid: newUser.uid,
+        email: newUser.email,
+        role: assignedRole,
+        createdAt: serverTimestamp(),
+      });
+      
+      alert(`¡Usuario ${email} creado exitosamente con el rol de ${assignedRole}!`);
+      router.push('/');
 
     } catch (err: any) {
-      setError('Ocurrió un error durante la simulación de registro.');
+       if (err.code === 'auth/email-already-in-use') {
+        setError('El correo electrónico ya está en uso.');
+      } else {
+        setError('Ocurrió un error durante el registro.');
+      }
       console.error(err);
     }
   };
-  
-  // This page is for admins to create new users. 
-  // An unauthenticated user might be the first admin trying to register.
-  // The login page handles redirection for already-logged-in users.
-  // The actual user creation logic is guarded by the `isAdmin` check.
 
   if (isUserLoading || isCheckingAdmin) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
-        Cargando...
+        Verificando permisos...
       </div>
     );
   }
-
-  // Only show the restrictive message if the user is logged in and NOT an admin
-  if (user && !isAdmin) {
+  
+  if (user && !isAdmin && !isFirstUser) {
       return (
          <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4">
             <Card className="w-full max-w-sm text-center">
@@ -130,6 +145,9 @@ export default function SignUpPage() {
       )
   }
 
+  // Determine if the button should be enabled
+  const canCreateUser = isFirstUser || isAdmin;
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4">
       <Card className="w-full max-w-sm">
@@ -140,9 +158,9 @@ export default function SignUpPage() {
           </div>
           <CardTitle>Crear Nuevo Usuario</CardTitle>
           <CardDescription>
-            {isAdmin 
-              ? "Registrar un nuevo miembro del equipo (rol: Data Entry)" 
-              : "Regístrate como el primer administrador."
+            {isFirstUser 
+              ? "Regístrate como el primer administrador." 
+              : "Registrar un nuevo miembro del equipo (rol: Data Entry)"
             }
           </CardDescription>
         </CardHeader>
@@ -160,7 +178,7 @@ export default function SignUpPage() {
               />
             </div>
             <div className="space-y-1">
-              <label htmlFor="password">Contraseña Temporal</label>
+              <label htmlFor="password">Contraseña</label>
               <Input
                 id="password"
                 type="password"
@@ -180,10 +198,10 @@ export default function SignUpPage() {
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={!isAdmin}>
-              {isAdmin ? "Crear Usuario" : "Crear Usuario (Admin)"}
+            <Button type="submit" className="w-full" disabled={!canCreateUser}>
+              {isFirstUser ? "Crear Usuario Administrador" : "Crear Usuario"}
             </Button>
-             {!isAdmin && <p className="text-xs text-center text-gray-500 mt-2">El primer usuario registrado será administrador. Contacte al soporte si ya existe uno.</p>}
+            {isFirstUser && <p className="text-xs text-center text-gray-500 mt-2">El primer usuario registrado será administrador.</p>}
             <div className="text-center text-sm text-gray-500 pt-2">
               <Link
                 href="/login"
