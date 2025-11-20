@@ -50,27 +50,24 @@ service cloud.firestore {
      * role from the /users/{userId} document.
      */
     function isAdmin() {
+      // Important: This rule assumes that a user trying to prove they are an admin
+      // is doing so by using their own UID.
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     /**
      * @description Rules for the user roles collection.
      * @path /users/{userId}
-     * @allow A user can read their own role document.
-     *        (get) auth: { uid: 'user_id' }
-     * @allow An admin can read any user's role document.
-     *        (get) auth: { uid: 'admin_id' }
-     * @deny A non-admin user attempts to read another user's role document.
-     *       (get) auth: { uid: 'other_user_id' }
-     * @allow Anyone can create their own user document upon signup.
-     *        (create) auth: { uid: 'new_user_id' }
-     * @deny A user attempts to update another user's role.
-     *       (update) auth: { uid: 'some_user_id' }
      */
      match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // A user can read their own role document.
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      // Admins can read any user's role document.
+      allow read: if isSignedIn() && isAdmin();
+      // New users can create their own document upon signup.
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow write: if isAdmin(); // Only admins can modify roles
+      // Only admins can modify user documents (e.g., change roles).
+      allow write: if isSignedIn() && isAdmin();
     }
 
 
@@ -120,6 +117,13 @@ service cloud.firestore {
     match /artifacts/{appId}/public/data/novedades/{novedadId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
+    }
+    
+    /**
+     * @description Rules for the 'asistencias' collection.
+     */
+    match /artifacts/{appId}/public/data/asistencias/{asistenciaId} {
+      allow read, write: if isSignedIn();
     }
 
     /**

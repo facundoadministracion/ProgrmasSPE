@@ -65,6 +65,7 @@ import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import { DashboardCard } from '@/components/app/DashboardCard';
+import Link from 'next/link';
 
 export default function App() {
   const { auth, isUserLoading } = useFirebase();
@@ -104,19 +105,27 @@ export default function App() {
     if (user && firestore) {
       const fetchRole = async () => {
         const userDocRef = doc(firestore, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as UserRole;
-          setRole(userData.role);
-          if(userData.role === 'data_entry') {
+        try {
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data() as UserRole;
+              setRole(userData.role);
+              if(userData.role === 'data_entry') {
+                setActiveTab('attendance');
+              } else {
+                setActiveTab('dashboard');
+              }
+            } else {
+              // This can happen if the user document hasn't been created yet after signup.
+              // We'll set a default role and wait for the listener to catch the update.
+              setRole('data_entry'); 
+              setActiveTab('attendance');
+            }
+        } catch (error) {
+            console.error("Error fetching user role:", error);
+            // Handle permission errors or other issues
+            setRole('data_entry'); // Default to a restricted role on error
             setActiveTab('attendance');
-          } else {
-            setActiveTab('dashboard');
-          }
-        } else {
-          // Default to a restricted role if not found, or handle as an error
-          setRole('data_entry');
-          setActiveTab('attendance');
         }
       };
       fetchRole();
@@ -308,6 +317,11 @@ export default function App() {
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href="/signup"><PlusCircle size={16} />Nuevo Usuario</Link>
+                    </SidebarMenuButton>
                 </SidebarMenuItem>
               </>
             )}
