@@ -1,6 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  useFirebase,
+  useCollection,
+  useUser,
+  useMemoFirebase,
+  useFirestore,
+} from '@/firebase';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, getDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 import {
   Users,
   DollarSign,
@@ -13,27 +23,42 @@ import {
   UserCheck,
   PlusCircle,
 } from 'lucide-react';
-import {
-  useFirebase,
-  useCollection,
-  useUser,
-  useMemoFirebase,
-} from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
-
-import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
-import type { Participant, Payment, Novedad, AppConfig } from '@/lib/types';
+import type { Participant, Payment, Novedad, AppConfig, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
+import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
+
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+  SidebarInset,
+} from '@/components/ui/sidebar';
 
 import ParticipantDetail from '@/components/app/ParticipantDetail';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
@@ -41,14 +66,15 @@ import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import { DashboardCard } from '@/components/app/DashboardCard';
 
-
 export default function App() {
-  const { auth, firestore, isUserLoading } = useFirebase();
+  const { auth, isUserLoading } = useFirebase();
   const { user } = useUser();
-  const [role, setRole] = useState('admin');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const firestore = useFirestore();
+  const router = useRouter();
   
-  const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null); 
+  const [role, setRole] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
 
   const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
 
@@ -67,6 +93,35 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [isUserLoading, user, router]);
+
+  useEffect(() => {
+    if (user && firestore) {
+      const fetchRole = async () => {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserRole;
+          setRole(userData.role);
+          if(userData.role === 'data_entry') {
+            setActiveTab('attendance');
+          } else {
+            setActiveTab('dashboard');
+          }
+        } else {
+          // Default to a restricted role if not found, or handle as an error
+          setRole('data_entry');
+          setActiveTab('attendance');
+        }
+      };
+      fetchRole();
+    }
+  }, [user, firestore]);
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,7 +145,6 @@ export default function App() {
   const handleUpdateConfig = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if(!firestore || !configData?.[0]?.id) {
-        // if no config, create one
         if(firestore) {
             const formData = new FormData(e.currentTarget);
             const data = {
@@ -122,7 +176,7 @@ export default function App() {
     alert("Montos actualizados");
   };
   
-  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || isUserLoading;
+  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || isUserLoading || !role;
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
@@ -260,13 +314,12 @@ export default function App() {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-            <div className="text-xs text-center text-muted-foreground">Simular Rol</div>
-             <div className="flex gap-2">
-                 <Button size="sm" onClick={() => { setRole('admin'); setActiveTab('dashboard'); setSelectedProgramDetail(null); }} variant={role === 'admin' ? 'default' : 'secondary'} className="flex-1">Admin</Button>
-                 <Button size="sm" onClick={() => { setRole('data_entry'); setActiveTab('attendance'); }} variant={role === 'data_entry' ? 'default' : 'secondary'} className="flex-1">Data</Button>
-             </div>
              {user && (
-                 <Button variant="outline" size="sm" onClick={() => signOut(auth)}>Cerrar Sesión</Button>
+                 <div className="text-center p-2 border-t border-sidebar-border">
+                    <p className="text-sm text-sidebar-foreground">{user.email}</p>
+                    <Badge variant="outline" className="mt-1">{role}</Badge>
+                    <Button variant="ghost" size="sm" onClick={() => signOut(auth)} className="w-full mt-2">Cerrar Sesión</Button>
+                 </div>
              )}
         </SidebarFooter>
       </Sidebar>

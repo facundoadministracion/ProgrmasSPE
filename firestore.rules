@@ -46,6 +46,35 @@ service cloud.firestore {
     }
 
     /**
+     * @description Checks if the user has the 'admin' role. It reads the user's
+     * role from the /users/{userId} document.
+     */
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    /**
+     * @description Rules for the user roles collection.
+     * @path /users/{userId}
+     * @allow A user can read their own role document.
+     *        (get) auth: { uid: 'user_id' }
+     * @allow An admin can read any user's role document.
+     *        (get) auth: { uid: 'admin_id' }
+     * @deny A non-admin user attempts to read another user's role document.
+     *       (get) auth: { uid: 'other_user_id' }
+     * @allow Anyone can create their own user document upon signup.
+     *        (create) auth: { uid: 'new_user_id' }
+     * @deny A user attempts to update another user's role.
+     *       (update) auth: { uid: 'some_user_id' }
+     */
+     match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isAdmin(); // Only admins can modify roles
+    }
+
+
+    /**
      * @description Enforces an Authenticated Read, Restricted Write access model.
      * All authenticated users can view participant data, but all write operations are
      * disabled until an ownership model is implemented in the schema.

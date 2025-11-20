@@ -55,3 +55,10 @@ export interface AppConfig {
     monto: number;
   };
 }
+
+export interface UserRole {
+  uid: string;
+  email: string;
+  role: 'admin' | 'data_entry';
+  createdAt: string;
+}
