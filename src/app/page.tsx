@@ -26,7 +26,7 @@ import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
 import type { Participant, Payment, Novedad, AppConfig } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -303,6 +303,9 @@ export default function App() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Nuevo Participante</DialogTitle>
+            <DialogDescription>
+              Complete el formulario para agregar un nuevo participante al sistema.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddParticipant} className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -346,6 +349,9 @@ export default function App() {
         <DialogContent className="max-w-4xl">
            <DialogHeader>
              <DialogTitle>Legajo Personal</DialogTitle>
+             <DialogDescription>
+              Visualice y gestione la información del participante, incluyendo datos generales, pagos y novedades.
+            </DialogDescription>
            </DialogHeader>
           {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant} payments={payments || []} />}
         </DialogContent>
@@ -355,6 +361,9 @@ export default function App() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Carga Masiva de Pagos</DialogTitle>
+             <DialogDescription>
+              Siga los pasos para cargar y procesar un archivo CSV con los datos de pago.
+            </DialogDescription>
           </DialogHeader>
           <PaymentUploadWizard participants={participants || []} onClose={() => setIsUploadModalOpen(false)} />
         </DialogContent>
