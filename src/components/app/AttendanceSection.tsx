@@ -1,6 +1,6 @@
 'use client';
 import React, { useMemo, useState } from 'react';
-import { Participant, Novedad } from '@/lib/types';
+import { Participant } from '@/lib/types';
 import { MONTHS } from '@/lib/constants';
 import { getPaymentStatus } from '@/lib/logic';
 import { useFirebase, useUser } from '@/firebase';
@@ -147,7 +147,7 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                                   <div>
                                       <div className="flex items-center gap-2">
                                         <p className="font-bold text-gray-800">{p.nombre}</p>
-                                        <Badge variant={status.type}>{status.text}</Badge>
+                                        <Badge variant={status.type as any}>{status.text}</Badge>
                                       </div>
                                       <p className="text-sm text-gray-500">{p.dni} - {p.departamento}</p>
                                   </div>
@@ -210,16 +210,16 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="text-sm font-medium text-gray-600 block mb-1">Mes</label>
-                              <Select value={formData.mes.toString()} onValueChange={v => setFormData({...formData, mes: parseInt(v)})}>
+                              <Select value={String(formData.mes)} onValueChange={v => setFormData({...formData, mes: parseInt(v)})}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={i.toString()}>{m}</SelectItem>)}</SelectContent>
+                                <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
                               </Select>
                           </div>
                           <div>
                               <label className="text-sm font-medium text-gray-600 block mb-1">Año</label>
-                              <Select value={formData.anio.toString()} onValueChange={v => setFormData({...formData, anio: parseInt(v)})}>
+                              <Select value={String(formData.anio)} onValueChange={v => setFormData({...formData, anio: parseInt(v)})}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+                                <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                               </Select>
                           </div>
                       </div>

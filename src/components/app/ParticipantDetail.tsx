@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Novedad } from '@/lib/types';
+import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
 import { calculateAge } from '@/lib/utils';
 import {
@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PROGRAMAS } from '@/lib/constants';
 
-const ParticipantDetail = ({ participant, payments }) => {
+const ParticipantDetail = ({ participant, payments }: { participant: Participant, payments: Payment[]}) => {
   const { firestore } = useFirebase();
   const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
   
@@ -31,7 +31,7 @@ const ParticipantDetail = ({ participant, payments }) => {
 
   const [newNovedad, setNewNovedad] = useState({ descripcion: '', fecha: new Date().toISOString().split('T')[0] });
 
-  const handleAddNovedad = async (e) => {
+  const handleAddNovedad = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNovedad.descripcion || !firestore) return;
     await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades'), {
@@ -61,7 +61,7 @@ const ParticipantDetail = ({ participant, payments }) => {
           <div className="flex gap-2 mt-1">
             <Badge variant="blue">{participant.programa}</Badge>
             {participant.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}
-            <Badge variant={paymentStatus.type}>{paymentStatus.text}</Badge>
+            <Badge variant={paymentStatus.type as any}>{paymentStatus.text}</Badge>
           </div>
         </div>
       </div>
@@ -130,16 +130,16 @@ const ParticipantDetail = ({ participant, payments }) => {
             </TabsContent>
             <TabsContent value="novedades">
               <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg border">
+                <form onSubmit={handleAddNovedad} className="bg-gray-50 p-4 rounded-lg border">
                   <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2"><PlusCircle size={16} /> Nueva Novedad</h4>
                   <div className="flex flex-col gap-2">
                     <div className="flex gap-2">
                        <div className="w-1/3"><label className="text-xs text-gray-500">Fecha</label><Input type="date" className="text-sm" value={newNovedad.fecha} onChange={(e) => setNewNovedad({...newNovedad, fecha: e.target.value})} /></div>
                        <div className="flex-1"><label className="text-xs text-gray-500">Descripción</label><Input type="text" placeholder="Ej: Baja, Licencia..." className="text-sm" value={newNovedad.descripcion} onChange={(e) => setNewNovedad({...newNovedad, descripcion: e.target.value})} /></div>
                     </div>
-                    <Button onClick={handleAddNovedad} disabled={!newNovedad.descripcion} className="self-end" size="sm">Agregar</Button>
+                    <Button type="submit" disabled={!newNovedad.descripcion} className="self-end" size="sm">Agregar</Button>
                   </div>
-                </div>
+                </form>
                 <div className="space-y-3 max-h-60 overflow-y-auto">
                    {(novedades || []).map(nov => (
                      <div key={nov.id} className="border-l-2 border-blue-400 pl-3 py-1">

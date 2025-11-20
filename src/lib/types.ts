@@ -42,6 +42,7 @@ export interface Novedad {
 }
 
 export interface AppConfig {
+  id: string;
   tutorias: {
     senior: number;
     estandar: number;

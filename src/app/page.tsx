@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   DollarSign,
@@ -11,18 +11,7 @@ import {
   Briefcase,
   Settings,
   UserCheck,
-  FileText,
   PlusCircle,
-  ArrowLeft,
-  BarChart3,
-  UserMinus,
-  UserPlus,
-  Wrench,
-  FileSignature,
-  Save,
-  LogOut,
-  RefreshCw,
-  Home,
 } from 'lucide-react';
 import {
   useFirebase,
@@ -30,24 +19,20 @@ import {
   useUser,
   useMemoFirebase,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, where, writeBatch, getDocs } from 'firebase/firestore';
-import { signOut, signInAnonymously } from 'firebase/auth';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
-import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, MONTHS } from '@/lib/constants';
+import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
 import type { Participant, Payment, Novedad, AppConfig } from '@/lib/types';
-import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
-import { cn } from '@/lib/utils';
+import { getAlertStatus } from '@/lib/logic';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import ParticipantDetail from '@/components/app/ParticipantDetail';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
@@ -55,11 +40,11 @@ import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 
-const DashboardCard = ({ title, value, icon: Icon, color = "blue", subtitle, onClick, actionText }) => (
+const DashboardCard = ({ title, value, icon: Icon, subtitle, onClick, actionText, color = 'blue' }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, onClick?: () => void, actionText?: string, color?: string }) => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-4 w-4 text-muted-foreground text-${color}`} />
+        <Icon className={`h-4 w-4 text-muted-foreground text-${color}-500`} />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
@@ -79,7 +64,7 @@ export default function App() {
   const [role, setRole] = useState('admin');
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  const [selectedProgramDetail, setSelectedProgramDetail] = useState(null); 
+  const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null); 
 
   const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
 
@@ -99,15 +84,9 @@ export default function App() {
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      signInAnonymously(auth);
-    }
-  }, [isUserLoading, user, auth]);
-
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !user) return;
     const formData = new FormData(e.currentTarget);
     const esEquipoTecnico = formData.get('esEquipoTecnico') === 'on';
     const data = Object.fromEntries(formData.entries());
@@ -118,7 +97,7 @@ export default function App() {
       pagosAcumulados: 0, 
       fechaAlta: new Date().toISOString(), 
       activo: true,
-      ownerId: user?.uid
+      ownerId: user.uid
     });
     alert("Participante agregado");
     setSelectedParticipant(null);
@@ -127,7 +106,21 @@ export default function App() {
   const handleUpdateConfig = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if(!firestore || !configData?.[0]?.id) {
-        alert("Configuración no encontrada, no se puede actualizar.");
+        // if no config, create one
+        if(firestore) {
+            const formData = new FormData(e.currentTarget);
+            const data = {
+              tutorias: {
+                senior: parseFloat(formData.get('senior') as string || '0'),
+                estandar: parseFloat(formData.get('estandar') as string || '0'),
+                junior: parseFloat(formData.get('junior') as string || '0'),
+              },
+              joven: { monto: parseFloat(formData.get('joven') as string || '0') },
+              tecno: { monto: parseFloat(formData.get('tecno') as string || '0') }
+            };
+            await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'config'), { ...data, timestamp: serverTimestamp() });
+            alert("Configuración creada");
+        }
         return;
     }
     const formData = new FormData(e.currentTarget);
@@ -167,7 +160,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {Object.values(PROGRAMAS).map(prog => {
                     const count = (participants || []).filter(p => p.programa === prog).length;
-                    return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} color="indigo" subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" />;
+                    return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo"/>;
                 })}
             </div>
         </div>
@@ -206,7 +199,7 @@ export default function App() {
                                 <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
                                 <TableCell><span className="block text-sm">{p.programa}</span>{p.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}{!p.esEquipoTecnico && <span className="text-xs text-gray-400">{p.categoria}</span>}</TableCell>
                                 <TableCell>{p.departamento}</TableCell>
-                                <TableCell>{alert ? <Badge variant={alert.type}>{alert.msg}</Badge> : <Badge variant="green">Activo</Badge>}</TableCell>
+                                <TableCell>{alert ? <Badge variant={alert.type as any}>{alert.msg}</Badge> : <Badge variant="green">Activo</Badge>}</TableCell>
                                 <TableCell><Button variant="link" onClick={() => setSelectedParticipant(p)}>Ver Legajo</Button></TableCell>
                             </TableRow>
                         )
@@ -260,7 +253,7 @@ export default function App() {
             {role === 'admin' && (
               <>
                 <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => { setActiveTab('dashboard'); setSelectedProgramDetail(null); }} isActive={activeTab === 'dashboard'}><Home size={16} />Resumen Gral.</SidebarMenuButton>
+                    <SidebarMenuButton onClick={() => { setActiveTab('dashboard'); setSelectedProgramDetail(null); }} isActive={activeTab === 'dashboard'}><Users size={16} />Resumen Gral.</SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setActiveTab('participants')} isActive={activeTab === 'participants'}><UserCheck size={16} />Participantes</SidebarMenuButton>
@@ -289,7 +282,7 @@ export default function App() {
                  <Button size="sm" onClick={() => { setRole('data_entry'); setActiveTab('attendance'); }} variant={role === 'data_entry' ? 'default' : 'secondary'} className="flex-1">Data</Button>
              </div>
              {user && (
-                 <Button variant="outline" size="sm" onClick={() => signOut(auth)}><LogOut size={14}/>Cerrar Sesión</Button>
+                 <Button variant="outline" size="sm" onClick={() => signOut(auth)}>Cerrar Sesión</Button>
              )}
         </SidebarFooter>
       </Sidebar>

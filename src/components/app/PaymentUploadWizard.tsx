@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { Participant } from '@/lib/types';
+import type { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { useFirebase, useUser } from '@/firebase';
 import { parseCSV } from '@/lib/utils';
@@ -18,7 +18,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
   const { user } = useUser();
   const [step, setStep] = useState(1); 
   const [config, setConfig] = useState({
-    programa: PROGRAMAS.TUTORIAS,
+    programa: Object.values(PROGRAMAS)[0],
     mes: new Date().getMonth(),
     anio: new Date().getFullYear()
   });
@@ -92,7 +92,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
             }
 
             const partRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'participants', item.participant.id);
-            batch.update(partRef, updates);
+            batch.update(partRef, updates as any);
             count++;
         });
 
@@ -134,22 +134,22 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
         {step === 1 && (
             <div className="space-y-4">
                 <div><label className="block text-sm font-bold mb-1">Programa</label>
-                  <Select value={config.programa} onValueChange={(v) => setConfig({...config, programa: v})}>
+                  <Select value={config.programa} onValueChange={(v) => setConfig({...config, programa: v as any})}>
                     <SelectTrigger><SelectValue/></SelectTrigger>
                     <SelectContent>{Object.values(PROGRAMAS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-sm font-bold mb-1">Mes</label>
-                      <Select value={config.mes.toString()} onValueChange={(v) => setConfig({...config, mes: parseInt(v)})}>
+                      <Select value={String(config.mes)} onValueChange={(v) => setConfig({...config, mes: parseInt(v)})}>
                         <SelectTrigger><SelectValue/></SelectTrigger>
-                        <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={i.toString()}>{m}</SelectItem>)}</SelectContent>
+                        <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div><label className="block text-sm font-bold mb-1">Año</label>
-                      <Select value={config.anio.toString()} onValueChange={(v) => setConfig({...config, anio: parseInt(v)})}>
+                      <Select value={String(config.anio)} onValueChange={(v) => setConfig({...config, anio: parseInt(v)})}>
                         <SelectTrigger><SelectValue/></SelectTrigger>
-                        <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+                        <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                 </div>

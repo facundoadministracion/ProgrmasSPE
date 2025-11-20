@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-const Card = ({ title, value, icon: Icon, subtitle }) => (
+const Card = ({ title, value, icon: Icon, subtitle }: { title: string, value: string | number, icon: React.ElementType, subtitle: string }) => (
     <UICard>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -23,8 +23,8 @@ const Card = ({ title, value, icon: Icon, subtitle }) => (
 );
 
 const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: { programName: string; participants: Participant[]; allNovedades: Novedad[]; onBack: () => void; }) => {
-  const [month, setMonth] = useState(new Date().getMonth().toString());
-  const [year, setYear] = useState(new Date().getFullYear().toString());
+  const [month, setMonth] = useState(String(new Date().getMonth()));
+  const [year, setYear] = useState(String(new Date().getFullYear()));
 
   const analytics = useMemo(() => {
     const programParticipants = participants.filter(p => p.programa === programName);
@@ -32,9 +32,15 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
     const y = parseInt(year);
     
     const getRefDate = (p: Participant): Date | null => {
-        if (p.fechaIngreso) return new Date(p.fechaIngreso);
-        if (typeof p.fechaAlta === 'string') return new Date(p.fechaAlta);
-        if (p.fechaAlta && 'seconds' in p.fechaAlta) return new Date(p.fechaAlta.seconds * 1000);
+        if (p.fechaIngreso) {
+            // Handle Firebase Timestamp or string date
+            if (typeof p.fechaIngreso === 'string') return new Date(p.fechaIngreso);
+            if ('seconds' in p.fechaIngreso) return new Date((p.fechaIngreso as any).seconds * 1000);
+        }
+        if (p.fechaAlta) {
+            if (typeof p.fechaAlta === 'string') return new Date(p.fechaAlta);
+            if ('seconds' in p.fechaAlta) return new Date((p.fechaAlta as any).seconds * 1000);
+        }
         return null; 
     };
 
@@ -60,7 +66,7 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
 
     const equipoTecnico = programParticipants.filter(p => p.esEquipoTecnico).length;
     
-    const categorias = {};
+    const categorias: { [key: string]: number } = {};
     if(programName === PROGRAMAS.TUTORIAS) {
         activos.forEach(p => {
             const cat = p.categoria || 'Sin Categoría';
@@ -75,12 +81,13 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
         <div className="flex items-center justify-between">
             <Button variant="ghost" onClick={onBack}><ArrowLeft size={20} className="mr-2" /> Volver al Resumen</Button>
             <div className="flex gap-4">
-                <Select value={month} onValueChange={setMonth}>{
+                <Select value={month} onValueChange={setMonth}>
                     <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                }<SelectContent>{MONTHS.map((m, i) => <SelectItem key={m} value={i.toString()}>{m}</SelectItem>)}</SelectContent></Select>
+                    <SelectContent>{MONTHS.map((m, i) => <SelectItem key={m} value={String(i)}>{m}</SelectItem>)}</SelectContent>
+                </Select>
                 <Select value={year} onValueChange={setYear}>
                     <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>{[2023, 2024, 2025].map(y => <option key={y} value={y.toString()}>{y}</option>)}</SelectContent>
+                    <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                 </Select>
             </div>
         </div>
@@ -120,7 +127,7 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{p.fechaIngreso || (p.fechaAlta && new Date(typeof p.fechaAlta === 'string' ? p.fechaAlta : p.fechaAlta.seconds * 1000).toLocaleDateString()) || '-'}</TableCell></TableRow>))}
+                                {analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{p.fechaIngreso ? new Date(p.fechaIngreso).toLocaleDateString() : (p.fechaAlta && new Date(typeof p.fechaAlta === 'string' ? p.fechaAlta : (p.fechaAlta as any).seconds * 1000).toLocaleDateString()) || '-'}</TableCell></TableRow>))}
                                 {analytics.bajasNovedades.map(n => (<TableRow key={'baja-'+n.id}><TableCell><Badge variant="destructive">Baja</Badge></TableCell><TableCell className="font-medium">{n.participantName}</TableCell><TableCell className="text-muted-foreground">{n.descripcion}</TableCell><TableCell>{new Date(n.fecha).toLocaleDateString()}</TableCell></TableRow>))}
                                 {analytics.altas.length === 0 && analytics.bajasNovedades.length === 0 && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400">Sin movimientos este mes</TableCell></TableRow>}
                             </TableBody>

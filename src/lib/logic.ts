@@ -1,5 +1,5 @@
 import { PROGRAMAS } from './constants';
-import { Participant } from './types';
+import type { Participant } from './types';
 import { calculateAge } from './utils';
 
 export const getAlertStatus = (participant: Participant) => {
