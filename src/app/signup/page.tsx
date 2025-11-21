@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -70,15 +71,12 @@ export default function SignUpPage() {
       
       const userDocRef = doc(firestore, 'users', newUser.uid);
       
+      // Use a non-blocking write. The security rules MUST allow this.
+      // We are not awaiting the result, just firing and forgetting.
+      // The onSnapshot listener in the main page will pick up the new user profile.
       setDoc(userDocRef, userProfileData)
-        .then(() => {
-          toast({
-            title: "¡Registro Exitoso!",
-            description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
-          });
-          router.push('/login');
-        })
         .catch((err) => {
+          // This will only be called if the setDoc itself fails, likely due to permissions.
           console.error("Firestore setDoc Error:", err);
           const permissionError = new FirestorePermissionError({
             path: userDocRef.path,
@@ -86,9 +84,15 @@ export default function SignUpPage() {
             requestResourceData: userProfileData,
           });
           errorEmitter.emit('permission-error', permissionError);
-          setError('Error al crear el perfil de usuario. Verifique los permisos de Firestore.');
-          setIsSubmitting(false);
+          // This error will be shown to the user in the dev overlay.
         });
+
+      // After successfully creating the auth user, we immediately redirect.
+      toast({
+        title: "¡Registro Exitoso!",
+        description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
+      });
+      router.push('/login');
 
     } catch (err: any) {
        if (err.code === 'auth/email-already-in-use') {

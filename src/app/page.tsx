@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -84,7 +85,6 @@ export default function App() {
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
 
   // --- Data Fetching ---
-  // Ensure queries are only created when the user is fully loaded and authenticated
   const participantsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'participants')) : null, [firestore, user]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
@@ -108,11 +108,9 @@ export default function App() {
 
   // Effect for handling authentication state
   useEffect(() => {
-    // Wait until the initial user loading is complete
     if (isUserLoading) {
-      return; // Do nothing while we're waiting for auth status
+      return; 
     }
-    // If loading is done and there's no user, redirect to login
     if (!user) {
       router.push('/login');
     }
@@ -120,42 +118,37 @@ export default function App() {
 
   // Effect for fetching the user's specific profile role
   useEffect(() => {
-    // Only run if we have a user and a firestore instance
-    if (user && firestore) {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      const unsubscribe = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          const userData = doc.data() as UserRole;
-          setUserProfile(userData);
-          // Adjust tab based on role, but don't prevent admin from seeing other tabs
-          if (userData.role === 'data_entry' && activeTab !== 'attendance') {
-            setActiveTab('attendance');
-          }
-        } else {
-          // This can happen briefly on first login if Firestore is slow.
-          console.warn("User profile not found for UID:", user.uid);
-        }
-      }, (error) => {
-        const permissionError = new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'get',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-
-        // We can still inform the user, but the primary error is now the contextual one.
-        toast({
-            variant: "destructive",
-            title: "Error de Permisos",
-            description: "No se pudo cargar su perfil de usuario.",
-        });
-
-        if (auth) {
-            signOut(auth);
-        }
-      });
-
-      return () => unsubscribe();
+    if (!user || !firestore) {
+      return;
     }
+    const userDocRef = doc(firestore, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (doc) => {
+      if (doc.exists()) {
+        const userData = doc.data() as UserRole;
+        setUserProfile(userData);
+        if (userData.role === 'data_entry' && activeTab !== 'attendance') {
+          setActiveTab('attendance');
+        }
+      } else {
+         console.warn("User profile document not found for UID:", user.uid, "This can happen on first login. It should be created shortly.");
+      }
+    }, (error) => {
+      const permissionError = new FirestorePermissionError({
+          path: userDocRef.path,
+          operation: 'get',
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      toast({
+          variant: "destructive",
+          title: "Error de Permisos",
+          description: "No se pudo cargar su perfil de usuario.",
+      });
+      if (auth) {
+          signOut(auth);
+      }
+    });
+
+    return () => unsubscribe();
   }, [user, firestore, auth, activeTab, toast]);
 
 
@@ -196,11 +189,9 @@ export default function App() {
 
   
     if (!configData || configData.length === 0) {
-      // Create new config document
       await addDoc(configCollectionRef, { ...data, timestamp: serverTimestamp() });
       alert("Configuración creada");
     } else {
-      // Update existing config document
       const configDocRef = doc(configCollectionRef, configData[0].id);
       await updateDoc(configDocRef, { ...data, timestamp: serverTimestamp() });
       alert("Montos actualizados");
@@ -230,14 +221,10 @@ export default function App() {
   const role = userProfile?.role;
   const anyDataLoading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading;
 
-  // --- STRONG LOADING BARRIER ---
-  // While authenticating, or if not authenticated, or profile is not loaded, show a loading screen.
-  // This prevents any components from trying to render with incomplete data.
   if (isUserLoading || !user || !userProfile) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
   }
   
-  // Now we know we have a user and a profile, but we might still be fetching collection data
   const loading = anyDataLoading;
 
 

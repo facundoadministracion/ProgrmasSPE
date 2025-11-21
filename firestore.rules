@@ -4,13 +4,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ========== Helper Function (sólo para autenticación básica) ==========
+    // ========== Helper Function ==========
     function isSignedIn() {
       return request.auth != null;
     }
 
     // ========== Root Level - Default Deny ==========
-    // Por defecto, se deniega todo para máxima seguridad.
     match /{path=**} {
       allow read, write: if false;
     }
@@ -18,56 +17,56 @@ service cloud.firestore {
     // ========== User Profiles ==========
     // Path: /users/{userId}
     match /users/{userId} {
-      // CUALQUIER usuario autenticado puede CREAR su PROPIO perfil.
+      // ANY signed-in user can CREATE their OWN profile document.
+      // This is crucial for the signup process to work.
       allow create: if isSignedIn() && request.auth.uid == userId;
       
-      // Un usuario puede LEER su propio perfil.
-      // El admin (definido por email) puede LEER CUALQUIER perfil.
+      // A user can READ their own profile.
+      // The admin (defined by email) can READ ANY profile.
       allow read: if isSignedIn() && (request.auth.uid == userId || request.auth.token.email == "crnunezfacundo@gmail.com");
       
-      // Un usuario puede ACTUALIZAR su propio perfil.
-      // El admin puede ACTUALIZAR CUALQUIER perfil.
+      // A user can UPDATE their own profile.
+      // The admin can UPDATE ANY profile.
       allow update: if isSignedIn() && (request.auth.uid == userId || request.auth.token.email == "crnunezfacundo@gmail.com");
 
-      // Solo el admin puede BORRAR perfiles.
+      // Only the admin can DELETE profiles.
       allow delete: if request.auth.token.email == "crnunezfacundo@gmail.com";
     }
 
     // ========== Participants, Payments, Config, Novedades, Asistencias ==========
-    // Reglas para el resto de las colecciones.
+    // These collections require the user to be an admin for any write operation,
+    // but any signed-in user can read them.
     
-    function isAdmin() {
-        return request.auth.token.email == "crnunezfacundo@gmail.com";
-    }
-
     // Path: /participants/{participantId}
     match /participants/{participantId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin(); // create, update, delete
+      allow write: if request.auth.token.email == "crnunezfacundo@gmail.com"; 
     }
 
     // Path: /payments/{paymentId}
     match /payments/{paymentId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin(); // create, update, delete
+      allow write: if request.auth.token.email == "crnunezfacundo@gmail.com";
     }
     
     // Path: /config/{configId}
     match /config/{configId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin(); // create, update, delete
+      allow write: if request.auth.token.email == "crnunezfacundo@gmail.com";
     }
     
     // Path: /novedades/{novedadId}
+    // Any signed-in user can create/read, but only admin can update/delete.
     match /novedades/{novedadId} {
       allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update, delete: if request.auth.token.email == "crnunezfacundo@gmail.com";
     }
     
     // Path: /asistencias/{asistenciaId}
+    // Any signed-in user can create/read, but only admin can update/delete.
     match /asistencias/{asistenciaId} {
       allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update, delete: if request.auth.token.email == "crnunezfacundo@gmail.com";
     }
   }
 }
