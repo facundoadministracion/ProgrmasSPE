@@ -83,19 +83,19 @@ export default function App() {
 
   const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
 
-  const participantsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'participants')) : null, [firestore, appId]);
+  const participantsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'participants')) : null, [firestore, user, appId]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  const paymentsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'payments')) : null, [firestore, appId]);
+  const paymentsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'payments')) : null, [firestore, user, appId]);
   const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
   
-  const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades')) : null, [firestore, appId]);
+  const novedadesRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades')) : null, [firestore, user, appId]);
   const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   
-  const configRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'config')) : null, [firestore, appId]);
+  const configRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'config')) : null, [firestore, user, appId]);
   const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
 
-  const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'users')) : null, [firestore, appId]);
+  const usersRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'users')) : null, [firestore, user, appId]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -213,7 +213,7 @@ export default function App() {
   
   
   const role = userProfile?.role;
-  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading || isUserLoading || !userProfile;
+  const loading = isUserLoading || !userProfile || (!!user && (participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading));
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
