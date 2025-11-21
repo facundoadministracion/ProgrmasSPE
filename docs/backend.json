@@ -183,6 +183,20 @@
         "descripcion",
         "fecha"
       ]
+    },
+    "UserRole": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserRole",
+      "type": "object",
+      "description": "Defines a user's role in the application.",
+      "properties": {
+        "uid": { "type": "string", "description": "The user's unique ID." },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "data_entry"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "role", "createdAt"]
     }
   },
   "auth": {
@@ -194,22 +208,30 @@
   "firestore": {
     "structure": [
       {
+        "path": "artifacts/{appId}/public/data/users/{userId}",
+        "definition": {
+          "entityName": "UserRole",
+          "schema": {
+            "$ref": "#/entities/UserRole"
+          },
+          "description": "Stores user profiles and roles.",
+          "params": [
+            { "name": "appId", "description": "The application ID." },
+            { "name": "userId", "description": "The user's unique identifier." }
+          ]
+        }
+      },
+      {
         "path": "artifacts/{appId}/public/data/participants/{participantId}",
         "definition": {
           "entityName": "Participant",
           "schema": {
-            "$ref": "#/backend/entities/Participant"
+            "$ref": "#/entities/Participant"
           },
-          "description": "Stores participant data. Includes denormalized fields for program, and department for authorization independence.",
+          "description": "Stores participant data.",
           "params": [
-            {
-              "name": "appId",
-              "description": "The application ID."
-            },
-            {
-              "name": "participantId",
-              "description": "The unique identifier of the participant."
-            }
+            { "name": "appId", "description": "The application ID." },
+            { "name": "participantId", "description": "The unique identifier of the participant." }
           ]
         }
       },
@@ -218,18 +240,12 @@
         "definition": {
           "entityName": "Payment",
           "schema": {
-            "$ref": "#/backend/entities/Payment"
+            "$ref": "#/entities/Payment"
           },
-          "description": "Stores payment data related to participants. Includes denormalized 'participantName' and 'dni' for authorization independence.",
+          "description": "Stores payment data.",
           "params": [
-            {
-              "name": "appId",
-              "description": "The application ID."
-            },
-            {
-              "name": "paymentId",
-              "description": "The unique identifier of the payment."
-            }
+            { "name": "appId", "description": "The application ID." },
+            { "name": "paymentId", "description": "The unique identifier of the payment." }
           ]
         }
       },
@@ -238,18 +254,12 @@
         "definition": {
           "entityName": "Novedad",
           "schema": {
-            "$ref": "#/backend/entities/Novedad"
+            "$ref": "#/entities/Novedad"
           },
-          "description": "Stores news items related to participants. Includes denormalized 'participantName' for authorization independence.",
+          "description": "Stores news items.",
           "params": [
-            {
-              "name": "appId",
-              "description": "The application ID."
-            },
-            {
-              "name": "novedadId",
-              "description": "The unique identifier of the news item."
-            }
+            { "name": "appId", "description": "The application ID." },
+            { "name": "novedadId", "description": "The unique identifier of the news item." }
           ]
         }
       },
@@ -258,22 +268,16 @@
         "definition": {
           "entityName": "config",
           "schema": {
-            "$ref": "#/backend/entities/config"
+            "$ref": "#/entities/config"
           },
-          "description": "Stores configuration settings for the application.",
+          "description": "Stores configuration settings.",
           "params": [
-            {
-              "name": "appId",
-              "description": "The application ID."
-            },
-            {
-              "name": "configId",
-              "description": "The unique identifier of the configuration."
-            }
+            { "name": "appId", "description": "The application ID." },
+            { "name": "configId", "description": "The unique identifier of the configuration." }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to provide a secure, scalable, and debuggable solution for the LR Manager application, adhering to the core design principles and strategy mandates. It focuses on authorization independence via denormalization, structural segregation, and consistent access modeling.  \n\n**Authorization Independence:**  Authorization Independence is achieved by avoiding hierarchical authorization dependencies (no `get()` calls in rules). Instead, necessary authorization data, such as program name, and department are stored directly within each document. For example, the `payments` and `novedades` subcollections denormalize participant name and dni, removing the necessity to query the parent `participants` document to apply security rules. This ensures atomic operations (transactions/batches) are not broken and debugging is simplified.\n\n**Structural Segregation:** The database structure segregates data based on access patterns and security needs, ensuring that all documents within a single collection share the same security requirements.  This is achieved, for instance, by storing participants, payments and novedades in a common 'public' collection and using the document's `appId` attribute to scope the security rule. This approach avoids mixing data with differing access needs within the same collection, thereby simplifying security rules.\n\n**Access Modeling:**\n*   **Path-Based Ownership:** While there isn't strict user-owned data in this specific scenario (given anonymous auth and a single role), the `artifacts/{appId}/public/data/{collection}` pattern is used to namespace data by `appId`, and authorization can be attached to the presence of the user being authenticated, or to roles documents.\n\n**QAPs (Rules are not Filters):**\n*   The structure enables secure `list` operations by leveraging structural segregation. For example, listing participants requires no filtering based on user role within the rule itself, due to the assumption that all participants listed within the `participants` collection are accessible to the authenticated user.\n\n**Invariants:**\n*   The structure supports data integrity by storing timestamps (`fechaAlta`, `fechaRealCarga`) directly within documents, enabling rules to enforce their immutability. Ownership is implicitly managed through the document structure and the app ID."
+    "reasoning": "The Firestore structure is designed for consistency and security. All application data, including user profiles, is stored under a unified path `artifacts/{appId}/public/data/{collection}`. This simplifies security rules, as a single set of wildcard rules can govern the entire data hierarchy. This structure ensures that all data is namespaced by the application ID, and security can be uniformly applied and managed."
   }
 }

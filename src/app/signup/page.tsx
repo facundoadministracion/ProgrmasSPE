@@ -28,6 +28,8 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
+
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,66 +59,48 @@ export default function SignUpPage() {
     }
 
     try {
-      // Step 1: Create the user in Firebase Auth. This part can still throw its own errors.
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Step 2: Define the user data to be saved in Firestore.
       const userProfileData = {
         uid: newUser.uid,
         name: name,
         email: newUser.email,
-        role: 'data_entry',
+        role: 'data_entry', // All new users start as data_entry
         createdAt: serverTimestamp(),
+        appId: appId // Include appId for consistent rule checking
       };
       
-      // Step 3: Create the user document in Firestore using a non-blocking call with contextual error handling.
-      const userDocRef = doc(firestore, 'users', newUser.uid);
+      const userDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'users', newUser.uid);
       
       setDoc(userDocRef, userProfileData)
         .then(() => {
-          // This runs on successful creation of the Firestore document.
           toast({
             title: "¡Registro Exitoso!",
             description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
           });
-          // Redirect to login after successful signup and Firestore write.
           router.push('/login');
         })
         .catch((err) => {
-           // This catches Firestore-specific errors, especially permission errors.
           console.error("Firestore setDoc Error:", err);
-          
-          // Create the detailed, contextual error.
           const permissionError = new FirestorePermissionError({
             path: userDocRef.path,
             operation: 'create',
             requestResourceData: userProfileData,
           });
-
-          // Emit the error for the global listener to catch and display.
           errorEmitter.emit('permission-error', permissionError);
-
-          // We don't set local state error here, as the global listener will handle it.
-          // This avoids showing duplicate error messages.
+          setError('Error al crear el perfil de usuario. Verifique los permisos de Firestore.');
+          setIsSubmitting(false);
         });
 
     } catch (err: any) {
-       // This block now primarily catches Authentication errors.
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
       } else {
         console.error("Auth Signup Error:", err.code, err.message);
         setError(`Ocurrió un error de autenticación: ${err.message}`);
       }
-    } finally {
-      // Because the Firestore operation is now non-blocking, we need to carefully manage the submitting state.
-      // For this flow, we'll let the success toast and redirect handle the "end" of submission.
-      // If there's an auth error, we set it back to false.
-      if (error) {
-        setIsSubmitting(false);
-      }
-      // Note: In a more complex scenario, you might want to keep `isSubmitting` true until the `setDoc` promise resolves.
+      setIsSubmitting(false);
     }
   };
 

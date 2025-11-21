@@ -95,7 +95,7 @@ export default function App() {
   const configRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'config')) : null, [firestore, appId]);
   const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
 
-  const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+  const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'users')) : null, [firestore, appId]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,7 +110,7 @@ export default function App() {
 
   useEffect(() => {
     if (user && firestore) {
-      const userDocRef = doc(firestore, 'users', user.uid);
+      const userDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'users', user.uid);
       const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           const userData = doc.data() as UserRole;
@@ -125,8 +125,7 @@ export default function App() {
           }
         } else {
           // This can happen briefly on first login if Firestore is slow.
-          // Don't sign out immediately. Give it a moment.
-          console.warn("User profile not found for UID:", user.uid, "Waiting for creation...");
+          console.warn("User profile not found for UID:", user.uid, "Attempting to create...");
         }
       }, (error) => {
         console.error("Error fetching user profile:", error);
@@ -135,12 +134,14 @@ export default function App() {
             title: "Error de Permisos",
             description: "No se pudo cargar su perfil. Es posible que no tenga permisos. " + error.message,
         });
-        signOut(auth);
+        if (auth) {
+            signOut(auth);
+        }
       });
 
       return () => unsubscribe();
     }
-  }, [user, firestore, auth, activeTab, toast]);
+  }, [user, firestore, auth, activeTab, toast, appId]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -200,7 +201,7 @@ export default function App() {
         toast({ variant: 'destructive', title: 'Acción no permitida', description: 'No puede cambiar su propio rol.' });
         return;
     }
-    const userDocRef = doc(firestore, 'users', uid);
+    const userDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'users', uid);
     try {
       await updateDoc(userDocRef, { role: newRole });
       toast({ title: 'Rol actualizado', description: `El rol del usuario ha sido cambiado a ${newRole}.` });
@@ -363,7 +364,7 @@ export default function App() {
                     <p className="text-sm font-semibold text-sidebar-foreground">{userProfile.name}</p>
                     <p className="text-xs text-sidebar-foreground/70">{userProfile.email}</p>
                     <Badge variant="outline" className="mt-2">{userProfile.role}</Badge>
-                    <Button variant="ghost" size="sm" onClick={() => signOut(auth)} className="w-full mt-2">Cerrar Sesión</Button>
+                    <Button variant="ghost" size="sm" onClick={() => auth && signOut(auth)} className="w-full mt-2">Cerrar Sesión</Button>
                  </div>
              )}
         </SidebarFooter>
