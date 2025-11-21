@@ -44,7 +44,8 @@ service cloud.firestore {
      * @path /users/{userId}
      */
      match /users/{userId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow create: if isSignedIn();
+        allow read, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     /**
