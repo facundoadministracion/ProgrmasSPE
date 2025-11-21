@@ -65,10 +65,9 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
 
         // A user can create their own document (e.g., on signup or first login).
-        allow create: if isSignedIn() && request.auth.uid == userId;
-
-        // Only admins can modify user documents (e.g., change roles).
-        allow write: if isSignedIn() && isAdmin();
+        // Admins can create other user documents via the signup page.
+        // Admins can update any user document (e.g., change roles).
+        allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
 
