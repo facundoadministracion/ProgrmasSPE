@@ -9,13 +9,13 @@ service cloud.firestore {
                request.auth.token.email == "crnunezfacundo@gmail.com";
       }
 
-      // Un usuario puede leer y actualizar su propio documento.
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-
       // CUALQUIER usuario autenticado puede CREAR su propio documento.
       // Esto es crucial para el flujo de registro.
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
 
+      // Un usuario puede leer y actualizar su propio documento.
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      
       // Solo el admin puede borrar documentos de usuario.
       allow delete: if isAdmin();
 
