@@ -1,138 +1,17 @@
-/**
- * Core Philosophy: This ruleset enforces an "Authenticated Read, Restricted Write" security model.
- * All authenticated users, including those signed in anonymously, are granted read-only access
- * to the application's public data collections (participants, payments, etc.). All write
- * operations (create, update, delete) are currently disabled by default because the data
- * models lack explicit ownership fields (e.g., 'creatorId' or 'ownerId'). This is a
- * critical security measure to prevent unauthorized data modification. To enable writes,
- * the corresponding data entities must be updated to include an ownership field, which can
- * then be validated in these rules.
- *
- * Data Structure: All application data is organized under the path `/artifacts/{appId}/public/data`,
- * where `{appId}` serves as a top-level namespace for a specific application instance. This
- * structure ensures that data for different application instances is cleanly segregated. Core
- * collections like 'participants', 'payments', and 'novedades' reside within this path.
- *
- * Key Security Decisions:
- * - Default Deny: All access is denied by default.
- * - Authenticated Reads: Any user with a valid authentication token (request.auth != null),
- *   including anonymous users, can read data from any of the main collections.
- * - Writes Disabled: All write operations are explicitly set to `if false;`. This is a
- *   deliberate choice to enforce security until a clear ownership model is defined in the
- *   application's data schemas.
- * - No User Listing: There is no top-level `/users` collection, so listing users is not applicable.
- *
- * Denormalization for Authorization: The data model is designed to be authorization-independent,
- * meaning documents do not require cross-document reads (`get()` calls) to determine access.
- * This ruleset relies on that principle, leading to simpler, more performant, and more secure rules.
- * For example, when write rules are eventually implemented, they will validate an ownership field
- * directly on the document being modified.
- *
- * Structural Segregation: Data is segregated by collection under a common path, ensuring all
- * documents within a collection share the same security profile. This avoids mixing public and
- * private data and simplifies rules for list operations.
- */
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
-    /**
-     * @description Checks if the user is authenticated (not null). This supports
-     * both standard and anonymous sign-in providers.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the user has the 'admin' role. It reads the user's
-     * role from the /users/{userId} document. Returns false if the doc doesn't exist.
-     */
-    function isAdmin() {
-      // Use exists() to prevent errors on non-existent documents.
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    /**
-     * @description Rules for the user roles collection.
-     * A user can ALWAYS create their own profile after signing up.
-     * A user can ALWAYS read or write their OWN document.
-     * An admin can read or write ANY document. This breaks the circular dependency.
-     * @path /users/{userId}
-     */
-     match /users/{userId} {
-        allow create: if isSignedIn();
-        allow read, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-    }
-
-
-    /**
-     * @description Enforces an Authenticated Read, Restricted Write access model.
-     * All authenticated users can view participant data, but all write operations are
-     * disabled until an ownership model is implemented in the schema.
-     * @path /artifacts/{appId}/public/data/participants/{participantId}
-     * @allow An authenticated user can read a participant's document.
-     *        (get) auth: { uid: 'some_user_id' }
-     * @deny An unauthenticated user attempts to read a participant's document.
-     *       (get) auth: null
-     * @principle Grants read access to authenticated users while defaulting to secure (denied) writes.
-     */
-    match /artifacts/{appId}/public/data/participants/{participantId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    /**
-     * @description Enforces an Authenticated Read, Restricted Write access model for payments.
-     * All authenticated users can view payment data, but all write operations are
-     * disabled until an ownership model is implemented in the schema.
-     * @path /artifacts/{appId}/public/data/payments/{paymentId}
-     * @allow An authenticated user can list all payment documents.
-     *        (list) auth: { uid: 'some_user_id' }
-     * @deny An unauthenticated user attempts to list payments.
-     *       (list) auth: null
-     * @principle Grants read access to authenticated users while defaulting to secure (denied) writes.
-     */
-    match /artifacts/{appId}/public/data/payments/{paymentId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    /**
-     * @description Enforces an Authenticated Read, Restricted Write access model for news/updates.
-     * All authenticated users can view 'novedades', but all write operations are
-     * disabled until an ownership model is implemented in the schema.
-     * @path /artifacts/{appId}/public/data/novedades/{novedadId}
-     * @allow An authenticated user can read a 'novedad' document.
-     *        (get) auth: { uid: 'some_user_id' }
-     * @deny Any user (authenticated or not) attempts to create a 'novedad'.
-     *       (create) auth: { uid: 'some_user_id' }
-     * @principle Grants read access to authenticated users while defaulting to secure (denied) writes.
-     */
-    match /artifacts/{appId}/public/data/novedades/{novedadId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-    
-    /**
-     * @description Rules for the 'asistencias' collection.
-     */
-    match /artifacts/{appId}/public/data/asistencias/{asistenciaId} {
+    // Regla general y permisiva para toda la data de la app
+    // Permite a cualquier usuario autenticado leer y escribir en las colecciones.
+    // Esto es para facilitar la configuración inicial.
+    match /artifacts/{appId}/public/data/{collection}/{docId} {
       allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Secures application configuration data. This data is readable by any
-     * authenticated user but is only writable by an admin.
-     * @path /artifacts/{appId}/public/data/config/{configId}
-     */
-    match /artifacts/{appId}/public/data/config/{configId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create, update: if isAdmin();
-      allow delete: if false;
     }
   }
 }
