@@ -22,6 +22,7 @@ import {
   Settings,
   UserCheck,
   PlusCircle,
+  Users2,
 } from 'lucide-react';
 import type { Participant, Payment, Novedad, AppConfig, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
@@ -65,6 +66,7 @@ import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import { DashboardCard } from '@/components/app/DashboardCard';
+import UserManagement from '@/components/app/UserManagement';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -93,6 +95,9 @@ export default function App() {
   const configRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'config')) : null, [firestore, appId]);
   const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
 
+  const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+  const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -113,18 +118,15 @@ export default function App() {
           // Adjust tab based on role, but don't prevent admin from seeing other tabs
           if (userData.role === 'data_entry' && activeTab !== 'attendance') {
             setActiveTab('attendance');
+          } else if (userData.role === 'admin' && activeTab === 'users') {
+             // allow user mgmt
           } else if (userData.role === 'admin' && activeTab !== 'participants' && activeTab !== 'config' && activeTab !== 'attendance' && activeTab !== 'dashboard') {
              setActiveTab('dashboard');
           }
         } else {
-          console.warn("User profile not found for UID:", user.uid, "This should have been created at signup.");
-          // Don't create the user here. The user must sign up again if the doc is missing.
-          toast({
-            variant: "destructive",
-            title: "Error de Perfil",
-            description: "No se encontró su perfil de usuario. Por favor, contacte a un administrador o intente registrarse de nuevo.",
-          });
-          signOut(auth);
+          // This can happen briefly on first login if Firestore is slow.
+          // Don't sign out immediately. Give it a moment.
+          console.warn("User profile not found for UID:", user.uid, "Waiting for creation...");
         }
       }, (error) => {
         console.error("Error fetching user profile:", error);
@@ -188,10 +190,29 @@ export default function App() {
       alert("Montos actualizados");
     }
   };
+
+  const handleUpdateUserRole = async (uid: string, newRole: 'admin' | 'data_entry') => {
+    if (!firestore || userProfile?.role !== 'admin') {
+      toast({ variant: 'destructive', title: 'Permiso denegado' });
+      return;
+    }
+    if (uid === user?.uid) {
+        toast({ variant: 'destructive', title: 'Acción no permitida', description: 'No puede cambiar su propio rol.' });
+        return;
+    }
+    const userDocRef = doc(firestore, 'users', uid);
+    try {
+      await updateDoc(userDocRef, { role: newRole });
+      toast({ title: 'Rol actualizado', description: `El rol del usuario ha sido cambiado a ${newRole}.` });
+    } catch (error: any) {
+      console.error('Error updating user role:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el rol del usuario.' });
+    }
+  };
   
   
   const role = userProfile?.role;
-  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || isUserLoading || !userProfile;
+  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading || isUserLoading || !userProfile;
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
@@ -321,6 +342,9 @@ export default function App() {
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setIsUploadModalOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton>
                 </SidebarMenuItem>
+                 <SidebarMenuItem>
+                    <SidebarMenuButton onClick={() => setActiveTab('users')} isActive={activeTab === 'users'}><Users2 size={16} />Usuarios</SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton>
                 </SidebarMenuItem>
@@ -353,6 +377,7 @@ export default function App() {
             {activeTab === 'dashboard' && role === 'admin' && renderDashboard()}
             {activeTab === 'participants' && role === 'admin' && renderParticipants()}
             {activeTab === 'attendance' && <AttendanceSection participants={participants || []} />}
+            {activeTab === 'users' && role === 'admin' && <UserManagement users={allUsers || []} onUpdateRole={handleUpdateUserRole} currentUser={user} />}
             {activeTab === 'config' && role === 'admin' && renderConfig()}
         </main>
       </SidebarInset>
