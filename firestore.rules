@@ -4,54 +4,59 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Function ---
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
     function isAdmin() {
-      // Un usuario es admin si su email verificado es el especificado.
-      return request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
+      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
 
     // --- Reglas para la colección de Usuarios ---
     match /users/{userId} {
-      // REGLA DE ESCRITURA:
-      // - PERMITIR CREAR (create): si el usuario está autenticado y el UID coincide con el del documento.
-      //   Esto rompe el "círculo vicioso" del registro.
-      // - PERMITIR ACTUALIZAR (update): si el usuario es el dueño del documento O es un admin.
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      
-      // REGLA DE LECTURA:
-      // - PERMITIR LEER (get): si el usuario es el dueño del documento O es un admin.
-      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      // REGLA DE CREACIÓN:
+      // Un usuario autenticado puede CREAR su propio documento de perfil.
+      // Esta es la regla clave que rompe el "círculo vicioso" del registro.
+      allow create: if isSignedIn() && request.auth.uid == userId;
 
-      // REGLA DE LISTADO Y BORRADO:
-      // - PERMITIR LISTAR (list) Y BORRAR (delete): SOLO si es un admin.
-      allow list, delete: if isAdmin();
+      // REGLAS DE LECTURA Y ACTUALIZACIÓN:
+      // Un usuario puede LEER y ACTUALIZAR su propio documento.
+      allow read, update: if isSignedIn() && request.auth.uid == userId;
+      
+      // REGLA DE BORRADO:
+      // Solo un admin puede borrar perfiles.
+      allow delete: if isAdmin();
+      
+      // EXCEPCIÓN PARA ADMIN:
+      // Un admin puede leer y escribir CUALQUIER perfil, anulando las reglas anteriores.
+      allow read, write: if isAdmin();
     }
     
     // --- Reglas para el resto de las colecciones ---
 
     match /participants/{participantId} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
     match /payments/{paymentId} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
     
     match /config/{configId} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
     match /novedades/{novedadId} {
-      allow read, create: if request.auth != null;
+      allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
     
     match /asistencias/{asistenciaId} {
-      allow read, create: if request.auth != null;
+      allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
   }
