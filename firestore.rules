@@ -6,14 +6,16 @@ service cloud.firestore {
     // Colección de usuarios
     match /users/{userId} {
       
-      // ADMIN EMAIL
       function isAdmin() {
         return request.auth != null &&
                request.auth.token.email == "crnunezfacundo@gmail.com";
       }
 
       // Un usuario puede leer y escribir solo su propio documento
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+
+      // Un usuario puede crear su propio documento.
+      allow create: if request.auth != null && request.auth.uid == userId;
 
       // El admin puede leer y escribir todo
       allow read, write: if isAdmin();
