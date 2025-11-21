@@ -103,39 +103,40 @@ export default function App() {
 
   useEffect(() => {
     if (user && firestore) {
-      const fetchRole = async () => {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        try {
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-              const userData = userDoc.data() as UserRole;
-              setUserProfile(userData);
-              if(userData.role === 'data_entry') {
-                setActiveTab('attendance');
-              } else {
-                setActiveTab('dashboard');
-              }
-            } else {
-              console.log("User profile not found, creating one...");
-              const newUserProfile: UserRole = { 
-                uid: user.uid, 
-                email: user.email || '', 
-                name: user.displayName || 'Usuario', 
-                role: 'data_entry', // Default role
-                createdAt: new Date().toISOString() 
-              };
-              await setDoc(userDocRef, newUserProfile);
-              setUserProfile(newUserProfile);
-              setActiveTab('attendance');
-            }
-        } catch (error) {
-            console.error("Error fetching or creating user role:", error);
-            // Fallback for safety, maybe redirect to an error page or show a toast
+      const userDocRef = doc(firestore, 'users', user.uid);
+      const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data() as UserRole;
+          setUserProfile(userData);
+          if (userData.role === 'data_entry') {
+            setActiveTab('attendance');
+          } else if (activeTab !== 'participants' && activeTab !== 'config' && activeTab !== 'attendance' && activeTab !== 'dashboard' ) {
+            setActiveTab('dashboard');
+          }
+        } else {
+          // The user document should have been created on signup.
+          // If it's missing, they might have an auth account but no profile.
+          // We can log them out to force a re-signup or just treat them as a limited user.
+          console.warn("User profile not found in Firestore for UID:", user.uid);
+          // For now, let's treat them as if they have no role.
+          setUserProfile({
+            uid: user.uid,
+            email: user.email || '',
+            name: user.displayName || 'Usuario Desconocido',
+            role: 'data_entry', // Fallback role
+            createdAt: new Date().toISOString()
+          });
+          setActiveTab('attendance');
         }
-      };
-      fetchRole();
+      }, (error) => {
+        console.error("Error fetching user profile:", error);
+        // Maybe sign out the user if their profile is inaccessible
+        signOut(auth);
+      });
+
+      return () => unsubscribe();
     }
-  }, [user, firestore]);
+  }, [user, firestore, auth]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
