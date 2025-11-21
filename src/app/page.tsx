@@ -121,7 +121,7 @@ export default function App() {
                 uid: user.uid, 
                 email: user.email || '', 
                 name: user.displayName || 'Usuario', 
-                role: 'data_entry',
+                role: 'data_entry', // Default role
                 createdAt: new Date().toISOString() 
               };
               await setDoc(userDocRef, newUserProfile);
@@ -130,16 +130,7 @@ export default function App() {
             }
         } catch (error) {
             console.error("Error fetching or creating user role:", error);
-            // Fallback for safety, e.g. permission errors on initial check
-            // This might happen if rules are not set up correctly.
-             setUserProfile({ 
-                uid: user.uid, 
-                email: user.email || '', 
-                name: user.displayName || 'Usuario', 
-                role: 'data_entry', 
-                createdAt: new Date().toISOString()
-            });
-            setActiveTab('attendance');
+            // Fallback for safety, maybe redirect to an error page or show a toast
         }
       };
       fetchRole();
@@ -180,14 +171,16 @@ export default function App() {
       joven: { monto: parseFloat(formData.get('joven') as string || '0') },
       tecno: { monto: parseFloat(formData.get('tecno') as string || '0') }
     };
+    const configCollectionRef = collection(firestore, 'artifacts', appId, 'public', 'data', 'config');
+
   
-    if (!configData?.[0]?.id) {
+    if (!configData || configData.length === 0) {
       // Create new config document
-      await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'config'), { ...data, timestamp: serverTimestamp() });
+      await addDoc(configCollectionRef, { ...data, timestamp: serverTimestamp() });
       alert("Configuración creada");
     } else {
       // Update existing config document
-      const configDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'config', configData[0].id);
+      const configDocRef = doc(configCollectionRef, configData[0].id);
       await updateDoc(configDocRef, { ...data, timestamp: serverTimestamp() });
       alert("Montos actualizados");
     }

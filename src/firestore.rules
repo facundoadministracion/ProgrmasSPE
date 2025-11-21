@@ -60,11 +60,9 @@ service cloud.firestore {
      * @path /users/{userId}
      */
      match /users/{userId} {
-        // A user can read their own document. An admin can read any user document.
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        
-        // A user can create or update their own document. An admin can also write to any user doc.
-        allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        // A user can read/write their own document. An admin can also read/write any user document.
+        // This rule is critical for allowing a user to create their own profile upon first login.
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
 
@@ -125,20 +123,13 @@ service cloud.firestore {
 
     /**
      * @description Secures application configuration data. This data is readable by any
-     * authenticated user but is not writable from the client to prevent tampering.
-     * Changes to this collection should be made via a trusted server environment.
+     * authenticated user but is only writable by an admin.
      * @path /artifacts/{appId}/public/data/config/{configId}
-     * @allow An authenticated user can read a configuration document.
-     *        (get) auth: { uid: 'some_user_id' }
-     * @deny Any user attempts to modify a configuration document.
-     *       (update) auth: { uid: 'some_user_id' }
-     * @principle Protects critical configuration data by making it read-only for all clients.
      */
     match /artifacts/{appId}/public/data/config/{configId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
   }
