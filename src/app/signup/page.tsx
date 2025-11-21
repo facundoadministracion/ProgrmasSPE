@@ -21,6 +21,7 @@ export default function SignUpPage() {
   const { auth, firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -64,7 +65,6 @@ export default function SignUpPage() {
     e.preventDefault();
     setError(null);
 
-    // Allow creation if it's the very first user OR if the creator is an admin.
     if (!isFirstUser && !isAdmin) {
       setError('Solo los administradores pueden crear nuevos usuarios.');
       return;
@@ -78,29 +78,20 @@ export default function SignUpPage() {
       setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
+    if (!name.trim()) {
+      setError('Por favor, ingrese su nombre y apellido.');
+      return;
+    }
 
     try {
-      // If an admin is creating a user, we don't want to sign them out.
-      // This part of the logic remains complex and is best handled by a server-side function.
-      // For now, we focus on the first-user registration flow.
-      if (isAdmin && !isFirstUser) {
-          alert(`Simulación Exitosa: Se crearía un nuevo usuario para ${email} con rol 'data_entry'. En producción, esto se haría en el servidor.`);
-          console.log(`Admin ${user?.email} is creating user ${email}`);
-          setEmail('');
-          setPassword('');
-          setConfirmPassword('');
-          return;
-      }
-      
-      // Logic for the first user registration
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
       
       const assignedRole = isFirstUser ? 'admin' : 'data_entry';
       
-      // Create user role document in Firestore
       await setDoc(doc(firestore, 'users', newUser.uid), {
         uid: newUser.uid,
+        name: name,
         email: newUser.email,
         role: assignedRole,
         createdAt: serverTimestamp(),
@@ -145,7 +136,6 @@ export default function SignUpPage() {
       )
   }
 
-  // Determine if the button should be enabled
   const canCreateUser = isFirstUser || isAdmin;
 
   return (
@@ -166,6 +156,17 @@ export default function SignUpPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp} className="space-y-4">
+            <div className="space-y-1">
+              <label htmlFor="name">Nombre y Apellido</label>
+              <Input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Juan Pérez"
+                required
+              />
+            </div>
             <div className="space-y-1">
               <label htmlFor="email">Email del Nuevo Usuario</label>
               <Input

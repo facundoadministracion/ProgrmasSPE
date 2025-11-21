@@ -73,7 +73,7 @@ export default function App() {
   const firestore = useFirestore();
   const router = useRouter();
   
-  const [role, setRole] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
 
@@ -109,7 +109,7 @@ export default function App() {
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
               const userData = userDoc.data() as UserRole;
-              setRole(userData.role);
+              setUserProfile(userData);
               if(userData.role === 'data_entry') {
                 setActiveTab('attendance');
               } else {
@@ -118,13 +118,13 @@ export default function App() {
             } else {
               // This can happen if the user document hasn't been created yet after signup.
               // We'll set a default role and wait for the listener to catch the update.
-              setRole('data_entry'); 
+              setUserProfile({ uid: user.uid, email: user.email || '', name: 'Usuario', role: 'data_entry', createdAt: new Date().toISOString()}); 
               setActiveTab('attendance');
             }
         } catch (error) {
             console.error("Error fetching user role:", error);
             // Handle permission errors or other issues
-            setRole('data_entry'); // Default to a restricted role on error
+            setUserProfile({ uid: user.uid, email: user.email || '', name: 'Usuario', role: 'data_entry', createdAt: new Date().toISOString()});
             setActiveTab('attendance');
         }
       };
@@ -185,7 +185,8 @@ export default function App() {
     alert("Montos actualizados");
   };
   
-  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || isUserLoading || !role;
+  const role = userProfile?.role;
+  const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || isUserLoading || !userProfile;
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
@@ -328,10 +329,11 @@ export default function App() {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-             {user && (
+             {userProfile && (
                  <div className="text-center p-2 border-t border-sidebar-border">
-                    <p className="text-sm text-sidebar-foreground">{user.email}</p>
-                    <Badge variant="outline" className="mt-1">{role}</Badge>
+                    <p className="text-sm font-semibold text-sidebar-foreground">{userProfile.name}</p>
+                    <p className="text-xs text-sidebar-foreground/70">{userProfile.email}</p>
+                    <Badge variant="outline" className="mt-2">{userProfile.role}</Badge>
                     <Button variant="ghost" size="sm" onClick={() => signOut(auth)} className="w-full mt-2">Cerrar Sesión</Button>
                  </div>
              )}

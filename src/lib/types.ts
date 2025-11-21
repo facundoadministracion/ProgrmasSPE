@@ -59,6 +59,7 @@ export interface AppConfig {
 export interface UserRole {
   uid: string;
   email: string;
+  name: string;
   role: 'admin' | 'data_entry';
   createdAt: string;
 }
