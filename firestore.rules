@@ -1,25 +1,9 @@
-/**
- * Core Philosophy: This ruleset enforces a robust security model where users
- * have explicit control over their own data, and administrators have broader
- * access.
- *
- * Key Security Decisions:
- * - Default Deny: All access is denied by default.
- * - User-Owned Documents: Users can always read and write their own profile
- *   document in the `/users` collection. This is critical for the app to function
- *   and breaks any potential circular dependencies in rules.
- * - Admin Privileges: A user with `role == 'admin'` in their user document
- *   can read and write data across most collections, enabling administrative
- *   functions. The `isAdmin()` function is now robust, checking for document
- *   existence before reading.
- * - Authenticated Access: Most collections require the user to be signed in
- *   (`isSignedIn()`).
- */
+
 rules_version = '2';
 service cloud.firestore {
-  match /databases/progrmas-spe/documents {
+  match /databases/{database}/documents {
 
-    // Helper Functions
+    // ========== Helper Functions ==========
     /**
      * @description Checks if the user is authenticated (not null).
      */
@@ -37,10 +21,13 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // ========== Collection Rules ==========
+
     /**
      * @description Rules for the user roles collection.
-     * This is the definitive fix: A user can ALWAYS read or write their OWN document.
-     * An admin can read or write ANY document. This breaks the circular dependency.
+     * This is the definitive fix: A user can ALWAYS create their own profile on signup.
+     * A user can ALWAYS read or write their OWN document.
+     * An admin can read or write ANY document. This breaks circular dependencies.
      * @path /users/{userId}
      */
      match /users/{userId} {
