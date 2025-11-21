@@ -28,8 +28,6 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
-
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,10 +66,9 @@ export default function SignUpPage() {
         email: newUser.email,
         role: 'data_entry', // All new users start as data_entry
         createdAt: serverTimestamp(),
-        appId: appId // Include appId for consistent rule checking
       };
       
-      const userDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'users', newUser.uid);
+      const userDocRef = doc(firestore, 'users', newUser.uid);
       
       setDoc(userDocRef, userProfileData)
         .then(() => {

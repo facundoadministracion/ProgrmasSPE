@@ -63,14 +63,13 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
   const handleExecute = async () => {
     if(!analysis || !firestore) return;
     setProcessing(true);
-    const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
     
     try {
         const batch = writeBatch(firestore);
         let count = 0;
         
         analysis.matched.forEach(item => {
-            const payRef = doc(collection(firestore, 'artifacts', appId, 'public', 'data', 'payments'));
+            const payRef = doc(collection(firestore, 'payments'));
             batch.set(payRef, {
                 participantId: item.participant.id,
                 participantName: item.participant.nombre,
@@ -91,14 +90,14 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
                 updates.actoAdministrativo = altaResolution;
             }
 
-            const partRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'participants', item.participant.id);
+            const partRef = doc(firestore, 'participants', item.participant.id);
             batch.update(partRef, updates as any);
             count++;
         });
 
         if(flagMissing && analysis.missing.length > 0) {
             analysis.missing.forEach(p => {
-                const novRef = doc(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades'));
+                const novRef = doc(collection(firestore, 'novedades'));
                 batch.set(novRef, {
                     participantId: p.id,
                     participantName: p.nombre,

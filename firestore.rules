@@ -1,5 +1,6 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -7,86 +8,74 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-
-    // Function to get the role of a user from the consistent data path.
-    function getRole(uid) {
-      return get(/databases/$(database)/documents/artifacts/$(request.resource.data.appId)/public/data/users/$(uid)).data.role;
-    }
-
-    // This is a simplified check for read operations where we don't have resource context.
-    // It's less secure and should be used cautiously. It's better to pass appId from the client.
-    // For this ruleset, we will rely on client-provided appId or direct ownership.
-    function isAdminByPath(appId) {
-        // This is tricky without knowing the appId. For a robust solution, the client should provide the appId in queries.
-        // As a fallback for this ruleset, we will use a more direct rule on the user's path.
-        // The isAdmin() function below is more robust.
-        return false; // Deprecating this in favor of a more direct check.
-    }
-     
-    // Secure way to check if the requesting user is an admin.
-    // It reads the role from the user's own profile document.
+    
     function isAdmin() {
-        // This path needs to be constructed carefully. Since we don't know the AppID on reads,
-        // this function is best used in `write` rules where we can get it from `request.resource.data`.
-        // A more robust way for reads would be a custom claim, but for now, we'll make admin writes very specific.
-        // Let's adjust the logic in the rules themselves.
-        return get(/databases/$(database)/documents/artifacts/default-app-id/public/data/users/$(request.auth.uid)).data.role == 'admin';
+      // The user is an admin if their email is the one specified.
+      return request.auth.token.email == "crnunezfacundo@gmail.com";
+    }
+
+    function isOwner(userId) {
+      // The user is the owner of the document if their UID matches.
+      return request.auth.uid == userId;
     }
 
     // ========== Root Level - Default Deny ==========
-    // Deny all reads and writes at the root level.
+    // By default, deny all reads and writes to prevent unauthorized access.
     match /{path=**} {
       allow read, write: if false;
     }
-    
-    // ========== Unified Data Structure Rules ==========
-    match /artifacts/{appId}/public/data/{collection}/{docId} {
-        // DEFAULT DENY for any unspecified collections
-        allow read, write: if false;
-    }
 
     // ========== User Profiles ==========
-    match /artifacts/{appId}/public/data/users/{userId} {
-      // ANY authenticated user can create THEIR OWN user profile document upon signup.
-      allow create: if isSignedIn() && request.auth.uid == userId;
+    // Path: /users/{userId}
+    match /users/{userId} {
+      // ANY signed-in user can CREATE their OWN user profile document upon signup.
+      allow create: if isSignedIn() && isOwner(userId);
       
-      // Users can read their own profile. Admins can read any profile.
-      allow read: if isSignedIn() && (request.auth.uid == userId || get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin');
+      // Users can READ their own profile. Admins can read ANY profile.
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
       
-      // Users can update their own profile. Admins can update any profile.
-      allow update: if isSignedIn() && (request.auth.uid == userId || get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin');
+      // Users can UPDATE their own profile. Admins can update ANY profile.
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
 
-      // Only admins can delete users (for now, set to false for safety).
-      allow delete: if false;
+      // Only admins can delete users.
+      allow delete: if isAdmin();
     }
 
     // ========== Participants, Payments, Config ==========
-    // These collections are readable by any authenticated user, but only writable by an admin.
-    match /artifacts/{appId}/public/data/participants/{participantId} {
+    // These collections are readable by any signed-in user, but only writable by an admin.
+    
+    // Path: /participants/{participantId}
+    match /participants/{participantId} {
       allow read: if isSignedIn();
-      allow write: if get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if isAdmin(); // create, update, delete
     }
 
-    match /artifacts/{appId}/public/data/payments/{paymentId} {
+    // Path: /payments/{paymentId}
+    match /payments/{paymentId} {
       allow read: if isSignedIn();
-      allow write: if get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if isAdmin(); // create, update, delete
     }
     
-    match /artifacts/{appId}/public/data/config/{configId} {
+    // Path: /config/{configId}
+    match /config/{configId} {
       allow read: if isSignedIn();
-      allow write: if get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if isAdmin(); // create, update, delete
     }
 
     // ========== Novedades & Asistencias ==========
-    // These can be created by any authenticated user (data_entry or admin), but only modified by an admin.
-    match /artifacts/{appId}/public/data/novedades/{novedadId} {
+    // These can be read and created by any signed-in user (allowing data_entry role to work).
+    // Only admins can modify or delete them.
+    
+    // Path: /novedades/{novedadId}
+    match /novedades/{novedadId} {
       allow read, create: if isSignedIn();
-      allow update, delete: if get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin';
+      allow update, delete: if isAdmin();
     }
     
-    match /artifacts/{appId}/public/data/asistencias/{asistenciaId} {
+    // Path: /asistencias/{asistenciaId}
+    match /asistencias/{asistenciaId} {
       allow read, create: if isSignedIn();
-      allow update, delete: if get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'admin';
+      allow update, delete: if isAdmin();
     }
   }
 }

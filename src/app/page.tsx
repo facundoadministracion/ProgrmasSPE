@@ -83,21 +83,19 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
 
-  const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
-
-  const participantsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'participants')) : null, [firestore, user, appId]);
+  const participantsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'participants')) : null, [firestore, user]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  const paymentsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'payments')) : null, [firestore, user, appId]);
+  const paymentsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'payments')) : null, [firestore, user]);
   const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
   
-  const novedadesRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades')) : null, [firestore, user, appId]);
+  const novedadesRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'novedades')) : null, [firestore, user]);
   const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   
-  const configRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'config')) : null, [firestore, user, appId]);
+  const configRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'config')) : null, [firestore, user]);
   const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
 
-  const usersRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'users')) : null, [firestore, user, appId]);
+  const usersRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users')) : null, [firestore, user]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,7 +110,7 @@ export default function App() {
 
   useEffect(() => {
     if (user && firestore) {
-      const userDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+      const userDocRef = doc(firestore, 'users', user.uid);
       const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           const userData = doc.data() as UserRole;
@@ -150,7 +148,7 @@ export default function App() {
 
       return () => unsubscribe();
     }
-  }, [user, firestore, auth, activeTab, toast, appId]);
+  }, [user, firestore, auth, activeTab, toast]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -160,7 +158,7 @@ export default function App() {
     const esEquipoTecnico = formData.get('esEquipoTecnico') === 'on';
     const data = Object.fromEntries(formData.entries());
     
-    await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'participants'), {
+    await addDoc(collection(firestore, 'participants'), {
       ...data, 
       esEquipoTecnico,
       pagosAcumulados: 0, 
@@ -186,7 +184,7 @@ export default function App() {
       joven: { monto: parseFloat(formData.get('joven') as string || '0') },
       tecno: { monto: parseFloat(formData.get('tecno') as string || '0') }
     };
-    const configCollectionRef = collection(firestore, 'artifacts', appId, 'public', 'data', 'config');
+    const configCollectionRef = collection(firestore, 'config');
 
   
     if (!configData || configData.length === 0) {
@@ -210,7 +208,7 @@ export default function App() {
         toast({ variant: 'destructive', title: 'Acción no permitida', description: 'No puede cambiar su propio rol.' });
         return;
     }
-    const userDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'users', uid);
+    const userDocRef = doc(firestore, 'users', uid);
     try {
       await updateDoc(userDocRef, { role: newRole });
       toast({ title: 'Rol actualizado', description: `El rol del usuario ha sido cambiado a ${newRole}.` });

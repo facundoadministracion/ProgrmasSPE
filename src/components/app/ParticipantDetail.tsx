@@ -23,9 +23,8 @@ import { PROGRAMAS } from '@/lib/constants';
 
 const ParticipantDetail = ({ participant, payments }: { participant: Participant, payments: Payment[]}) => {
   const { firestore } = useFirebase();
-  const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
   
-  const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades'), where('participantId', '==', participant.id)) : null, [firestore, participant.id, appId]);
+  const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades'), where('participantId', '==', participant.id)) : null, [firestore, participant.id]);
   const { data: novedadesData } = useCollection<Novedad>(novedadesRef);
   const novedades = useMemo(() => (novedadesData || []).sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [novedadesData]);
 
@@ -34,7 +33,7 @@ const ParticipantDetail = ({ participant, payments }: { participant: Participant
   const handleAddNovedad = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNovedad.descripcion || !firestore) return;
-    await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades'), {
+    await addDoc(collection(firestore, 'novedades'), {
       participantId: participant.id,
       participantName: participant.nombre,
       descripcion: newNovedad.descripcion,

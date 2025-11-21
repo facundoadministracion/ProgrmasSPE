@@ -208,76 +208,56 @@
   "firestore": {
     "structure": [
       {
-        "path": "artifacts/{appId}/public/data/users/{userId}",
+        "path": "users/{userId}",
         "definition": {
           "entityName": "UserRole",
           "schema": {
             "$ref": "#/entities/UserRole"
           },
-          "description": "Stores user profiles and roles.",
-          "params": [
-            { "name": "appId", "description": "The application ID." },
-            { "name": "userId", "description": "The user's unique identifier." }
-          ]
+          "description": "Stores user profiles and roles."
         }
       },
       {
-        "path": "artifacts/{appId}/public/data/participants/{participantId}",
+        "path": "participants/{participantId}",
         "definition": {
           "entityName": "Participant",
           "schema": {
             "$ref": "#/entities/Participant"
           },
-          "description": "Stores participant data.",
-          "params": [
-            { "name": "appId", "description": "The application ID." },
-            { "name": "participantId", "description": "The unique identifier of the participant." }
-          ]
+          "description": "Stores participant data."
         }
       },
       {
-        "path": "artifacts/{appId}/public/data/payments/{paymentId}",
+        "path": "payments/{paymentId}",
         "definition": {
           "entityName": "Payment",
           "schema": {
             "$ref": "#/entities/Payment"
           },
-          "description": "Stores payment data.",
-          "params": [
-            { "name": "appId", "description": "The application ID." },
-            { "name": "paymentId", "description": "The unique identifier of the payment." }
-          ]
+          "description": "Stores payment data."
         }
       },
       {
-        "path": "artifacts/{appId}/public/data/novedades/{novedadId}",
+        "path": "novedades/{novedadId}",
         "definition": {
           "entityName": "Novedad",
           "schema": {
             "$ref": "#/entities/Novedad"
           },
-          "description": "Stores news items.",
-          "params": [
-            { "name": "appId", "description": "The application ID." },
-            { "name": "novedadId", "description": "The unique identifier of the news item." }
-          ]
+          "description": "Stores news items."
         }
       },
       {
-        "path": "artifacts/{appId}/public/data/config/{configId}",
+        "path": "config/{configId}",
         "definition": {
           "entityName": "config",
           "schema": {
             "$ref": "#/entities/config"
           },
-          "description": "Stores configuration settings.",
-          "params": [
-            { "name": "appId", "description": "The application ID." },
-            { "name": "configId", "description": "The unique identifier of the configuration." }
-          ]
+          "description": "Stores configuration settings."
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed for consistency and security. All application data, including user profiles, is stored under a unified path `artifacts/{appId}/public/data/{collection}`. This simplifies security rules, as a single set of wildcard rules can govern the entire data hierarchy. This structure ensures that all data is namespaced by the application ID, and security can be uniformly applied and managed."
+    "reasoning": "A simple, flat Firestore structure is used. Each main entity type has its own root-level collection. This is easy to understand, manage, and secure with straightforward rules."
   }
 }

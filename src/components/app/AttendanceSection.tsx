@@ -58,10 +58,9 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
           observaciones: '',
           actualizarArea: false
       });
-      const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
 
       const q = query(
-          collection(firestore, 'artifacts', appId, 'public', 'data', 'asistencias'),
+          collection(firestore, 'asistencias'),
           where('participantId', '==', p.id),
           where('mes', '==', new Date().getMonth()),
           where('anio', '==', new Date().getFullYear())
@@ -79,10 +78,8 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
           alert("Falta completar Lugar de Trabajo o Responsable.");
           return;
       }
-      const appId = process.env.NEXT_PUBLIC_APP_ID || 'default-app-id';
-
       const batch = writeBatch(firestore);
-      const asisRef = doc(collection(firestore, 'artifacts', appId, 'public', 'data', 'asistencias'));
+      const asisRef = doc(collection(firestore, 'asistencias'));
       batch.set(asisRef, {
           participantId: selectedPerson.id,
           participantName: selectedPerson.nombre,
@@ -93,9 +90,9 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
       });
 
       if(formData.actualizarArea && formData.lugarTrabajo !== selectedPerson.lugarTrabajo) {
-          const partRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'participants', selectedPerson.id);
+          const partRef = doc(firestore, 'participants', selectedPerson.id);
           batch.update(partRef, { lugarTrabajo: formData.lugarTrabajo });
-          const novRef = doc(collection(firestore, 'artifacts', appId, 'public', 'data', 'novedades'));
+          const novRef = doc(collection(firestore, 'novedades'));
           batch.set(novRef, {
               participantId: selectedPerson.id,
               participantName: selectedPerson.nombre,
