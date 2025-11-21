@@ -1,70 +1,61 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
+    // --- Helper Function ---
     function isAdmin() {
-      // El administrador se define por un email específico.
-      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
-    }
-
-    function isOwner(userId) {
-      // El usuario es el dueño del documento.
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
 
     // --- User Profiles Collection ---
     match /users/{userId} {
-      
       // CREATE: Un usuario autenticado puede crear su PROPIO perfil.
       // Esto rompe el círculo vicioso del registro.
-      allow create: if isOwner(userId);
+      allow create: if request.auth != null && request.auth.uid == userId;
       
       // READ, UPDATE: Un usuario puede leer/actualizar su PROPIO perfil. El admin puede hacerlo con cualquiera.
-      allow read, update: if isOwner(userId) || isAdmin();
+      allow read, update: if (request.auth != null && request.auth.uid == userId) || isAdmin();
       
       // DELETE: Solo el admin puede borrar perfiles.
       allow delete: if isAdmin();
     }
     
-    // --- Participants, Payments, Config ---
-    // Legible por cualquier usuario autenticado, pero solo escribible por un administrador.
+    // --- Participants, Payments, Novedades, Asistencias, Config ---
+    // Todas las demás colecciones son de solo lectura para usuarios autenticados,
+    // pero solo un administrador puede escribir en ellas, excepto para Novedades y Asistencias,
+    // donde cualquier usuario autenticado puede crear.
+    
     match /participants/{participantId} {
-      allow read: if isSignedIn();
+      allow read: if request.auth != null;
       allow write: if isAdmin();
     }
 
     match /payments/{paymentId} {
-      allow read: if isSignedIn();
+      allow read: if request.auth != null;
       allow write: if isAdmin();
     }
     
     match /config/{configId} {
-      allow read: if isSignedIn();
+      allow read: if request.auth != null;
       allow write: if isAdmin();
     }
 
-    // --- Novedades & Asistencias ---
-    // Cualquier usuario autenticado (incluyendo 'data_entry') puede crearlos.
-    // Solo un admin puede modificar o borrar.
     match /novedades/{novedadId} {
-      allow read, create: if isSignedIn();
+      allow read, create: if request.auth != null;
       allow update, delete: if isAdmin();
     }
     
     match /asistencias/{asistenciaId} {
-      allow read, create: if isSignedIn();
+      allow read, create: if request.auth != null;
       allow update, delete: if isAdmin();
     }
     
-    // DEFAULT DENY: Bloquea el acceso a cualquier otra ruta no definida explícitamente.
+    // DEFAULT DENY: Deniega el acceso a cualquier otra ruta no definida explícitamente.
+    // Esto es redundante si cada colección está definida, pero es una buena práctica de seguridad.
     match /{path=**} {
-        allow read, write: if false;
+      allow read, write: if false;
     }
   }
 }
