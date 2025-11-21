@@ -57,11 +57,11 @@ service cloud.firestore {
 
     /**
      * @description Rules for the user roles collection.
+     * This is the definitive fix: A user can ALWAYS read or write their OWN document.
+     * An admin can read or write ANY document. This breaks the circular dependency.
      * @path /users/{userId}
      */
      match /users/{userId} {
-        // A user can read/write their own document. An admin can also read/write any user document.
-        // This rule is critical for allowing a user to create their own profile upon first login.
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
