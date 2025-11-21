@@ -63,17 +63,15 @@ export default function SignUpPage() {
       
       const userDocRef = doc(firestore, 'users', newUser.uid);
       
-      // The user's role will be determined by the isAdmin check in firestore.rules
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
       const userProfileData = {
         uid: newUser.uid,
         name: name,
         email: newUser.email,
         role: isAdmin ? 'admin' : 'data_entry',
-        createdAt: new Date().toISOString(),
       };
       
-      // This will now be allowed by the `allow create` rule.
+      // The Firestore `setDoc` operation that is failing
       await setDoc(userDocRef, userProfileData);
 
       toast({
@@ -86,9 +84,8 @@ export default function SignUpPage() {
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
       } else if (err.message.includes('permission-denied') || err.message.includes('insufficient permissions')) {
-          // This block now exists primarily for debugging in case the emergency rules fail.
           const isAdmin = email === 'crnunezfacundo@gmail.com';
-          const userProfileData = { uid: auth.currentUser?.uid, name, email, role: isAdmin ? 'admin' : 'data_entry', createdAt: new Date().toISOString() };
+          const userProfileData = { uid: auth.currentUser?.uid, name, email, role: isAdmin ? 'admin' : 'data_entry' };
           const userDocRef = doc(firestore, 'users', auth.currentUser?.uid || 'creating-user');
           const permissionError = new FirestorePermissionError({
               path: userDocRef.path,

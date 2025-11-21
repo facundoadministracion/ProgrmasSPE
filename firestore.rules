@@ -13,19 +13,18 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // The admin is identified by their specific email address.
     function isAdmin() {
-      // The most reliable check: identifies the admin by email, available in the token at all times.
       return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
 
     // ========== User Profiles ==========
-    // Emergency rule to unblock registration. This MUST be solved.
     match /users/{userId} {
-        // 1. EMERGENCY create rule. Allows ANYONE to create a user profile document.
+        // EMERGENCY RULE: Allow ANYONE to create a user profile to unblock registration.
         // This is not secure for production but is necessary to get past the current blocker.
         allow create;
         
-        // 2. Once created, only the owner or an admin can read/update/delete.
+        // Once created, only the owner or an admin can read/update/delete.
         allow read, update, delete: if isOwner(userId) || isAdmin();
     }
     
