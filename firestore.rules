@@ -4,12 +4,62 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- REGLAS DE EMERGENCIA ---
-    // Permite a cualquier usuario AUTENTICADO leer y escribir en CUALQUIER colección.
-    // Esto es para desbloquear el problema de creación de perfiles.
-    // No es ideal para producción, pero es necesario para avanzar.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // ========== Helper Functions ==========
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // El admin es quien tiene 'admin' en su documento de perfil.
+    function isAdmin() {
+      // Importante: No se puede usar get() en reglas de creación si el documento no existe.
+      // Pero para cualquier otra operación (read, write en OTRAS colecciones), esto funciona.
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // El usuario es dueño del documento.
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ========== User Profiles ==========
+    // Reglas para la colección de usuarios, con permisos separados y explícitos.
+    match /users/{userId} {
+      // 1. CUALQUIER usuario autenticado puede CREAR su propio perfil.
+      // Esta es la regla clave que rompe el círculo vicioso del registro.
+      allow create: if isOwner(userId);
+
+      // 2. Un usuario puede LEER y ACTUALIZAR su propio perfil.
+      allow read, update: if isOwner(userId);
+      
+      // 3. Un administrador puede LEER y ESCRIBIR en cualquier perfil.
+      // Esta regla se suma a las anteriores, no las reemplaza.
+      allow read, write: if isAdmin();
+    }
+
+    // ========== Reglas Generales para Otras Colecciones ==========
+    // Un administrador puede hacer todo en el resto de las colecciones.
+    // Un usuario logueado (data_entry) puede leer todo.
+    match /participants/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /payments/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    // Los usuarios data_entry pueden crear novedades y asistencias.
+    match /novedades/{docId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+     match /asistencias/{docId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
   }
 }

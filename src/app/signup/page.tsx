@@ -62,22 +62,22 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Step 2: Create the user document in Firestore with the correct role
+      // Step 2: Create the user document in Firestore.
       const userDocRef = doc(firestore, 'users', newUser.uid);
       
-      // The role is determined here. This is safe because even if a user
-      // spoofs the client-side code, the security rules will only allow
-      // the `create` operation, not an `update` to change the role later.
+      // The role is determined here. The `isAdmin` flag is used *only* to set the
+      // data in the document. The security rules will then use this data for authorization.
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
       const userProfileData = {
         uid: newUser.uid,
         name: name,
         email: newUser.email,
-        role: isAdmin ? 'admin' : 'data_entry',
+        role: isAdmin ? 'admin' : 'data_entry', // Set the role in the document
         createdAt: serverTimestamp(),
       };
-
-      // The new security rules will allow this operation because the user's UID matches the document ID.
+      
+      // Step 3: Write the document. The new security rules will allow this operation
+      // because the user's UID matches the document ID being created.
       await setDoc(userDocRef, userProfileData);
 
       toast({
@@ -87,16 +87,20 @@ export default function SignUpPage() {
       router.push('/login');
 
     } catch (err: any) {
-       // This catch block will now correctly handle authentication errors,
-       // while permission errors on setDoc would be caught by the more robust
-       // error handling architecture if they were to occur.
+        // This will now catch any other auth error, or a permission error if the rules fail.
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
       } else if (err.name === 'FirebaseError' && err.message.includes('permission-denied')) {
-         const permissionError = new FirestorePermissionError({
-              path: `users/${auth.currentUser?.uid || 'unknown-uid'}`,
+          // If we still get a permission error, emit the contextual error.
+          const userDocRef = doc(firestore, 'users', auth.currentUser?.uid || 'creating-user');
+          const isAdmin = email === 'crnunezfacundo@gmail.com';
+          const userProfileData = {
+            uid: auth.currentUser?.uid, name, email, role: isAdmin ? 'admin' : 'data_entry'
+          };
+          const permissionError = new FirestorePermissionError({
+              path: userDocRef.path,
               operation: 'create',
-              requestResourceData: {email, name}
+              requestResourceData: userProfileData,
             });
          errorEmitter.emit('permission-error', permissionError);
          setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
