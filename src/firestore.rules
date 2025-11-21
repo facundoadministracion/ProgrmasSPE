@@ -9,61 +9,59 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // A user is an admin if their email is the one specified.
-    // The email_verified check is removed to allow immediate access after signup.
+    // El admin es quien tiene 'admin' en su documento de perfil.
     function isAdmin() {
-      return request.auth.token.email == "crnunezfacundo@gmail.com";
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // A user is the owner of the document.
+    // El usuario es dueño del documento.
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // ========== Root Level - Default Deny ==========
+    // ========== User Profiles ==========
+    // Reglas para la colección de usuarios, siguiendo la mejor práctica.
+    match /users/{userId} {
+      // 1. CUALQUIER usuario autenticado puede CREAR su propio perfil.
+      // Esta es la regla clave que rompe el círculo vicioso del registro.
+      allow create: if isOwner(userId);
+
+      // 2. Un usuario puede LEER y ACTUALIZAR su propio perfil.
+      allow read, update: if isOwner(userId);
+      
+      // 3. Un administrador puede LEER y ESCRIBIR en cualquier perfil.
+      allow read, write: if isAdmin();
+    }
+
+    // ========== Reglas Generales para Otras Colecciones ==========
+    // Un administrador puede hacer todo en el resto de las colecciones.
+    // Un usuario logueado (data_entry) puede leer todo.
+    match /participants/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /payments/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    // Los usuarios data_entry pueden crear novedades y asistencias.
+    match /novedades/{docId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+    match /asistencias/{docId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Por seguridad, si ninguna regla anterior coincide, se deniega.
     match /{path=**} {
       allow read, write: if false;
-    }
-
-    // ========== Specific Collection Rules ==========
-
-    // --- User Profiles ---
-    // Anyone can create their own user profile on signup.
-    // Admins can read/update any profile, and users can read/update their own.
-    match /artifacts/{appId}/public/data/users/{userId} {
-      allow create: if isSignedIn();
-      allow read, update: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow delete: if isAdmin();
-    }
-
-    // --- Participants, Payments, Config ---
-    // Readable by any authenticated user, but only writable by an admin.
-    match /artifacts/{appId}/public/data/participants/{participantId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isAdmin();
-    }
-
-    match /artifacts/{appId}/public/data/payments/{paymentId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isAdmin();
-    }
-    
-    match /artifacts/{appId}/public/data/config/{configId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isAdmin();
-    }
-
-    // --- Novedades & Asistencias ---
-    // Any authenticated user can create them, but only admins can modify/delete.
-    // This allows 'data_entry' users to perform their main task.
-    match /artifacts/{appId}/public/data/novedades/{novedadId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if isSignedIn() && isAdmin();
-    }
-    
-    match /artifacts/{appId}/public/data/asistencias/{asistenciaId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if isSignedIn() && isAdmin();
     }
   }
 }

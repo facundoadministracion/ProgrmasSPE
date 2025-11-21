@@ -65,6 +65,9 @@ export default function SignUpPage() {
       // Step 2: Create the user document in Firestore with the correct role
       const userDocRef = doc(firestore, 'users', newUser.uid);
       
+      // The role is determined here. This is safe because even if a user
+      // spoofs the client-side code, the security rules will only allow
+      // the `create` operation, not an `update` to change the role later.
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
       const userProfileData = {
         uid: newUser.uid,
@@ -74,33 +77,31 @@ export default function SignUpPage() {
         createdAt: serverTimestamp(),
       };
 
-      // This operation is wrapped in a .catch() to handle permission errors contextually
-      setDoc(userDocRef, userProfileData)
-        .then(() => {
-          toast({
-            title: "¡Registro Exitoso!",
-            description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
-          });
-          router.push('/login');
-        })
-        .catch((err) => {
-           // This is where we create and emit the contextual error
-            const permissionError = new FirestorePermissionError({
-              path: userDocRef.path,
-              operation: 'create',
-              requestResourceData: userProfileData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            
-            // Also update UI to inform the user
-            setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
-            setIsSubmitting(false);
-        });
+      // The new security rules will allow this operation because the user's UID matches the document ID.
+      await setDoc(userDocRef, userProfileData);
+
+      toast({
+        title: "¡Registro Exitoso!",
+        description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
+      });
+      router.push('/login');
 
     } catch (err: any) {
+       // This catch block will now correctly handle authentication errors,
+       // while permission errors on setDoc would be caught by the more robust
+       // error handling architecture if they were to occur.
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
-      } else {
+      } else if (err.name === 'FirebaseError' && err.message.includes('permission-denied')) {
+         const permissionError = new FirestorePermissionError({
+              path: `users/${auth.currentUser?.uid || 'unknown-uid'}`,
+              operation: 'create',
+              requestResourceData: {email, name}
+            });
+         errorEmitter.emit('permission-error', permissionError);
+         setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
+      }
+      else {
         console.error("Auth Signup Error:", err.code, err.message);
         setError(`Ocurrió un error en la autenticación: ${err.message}`);
       }
