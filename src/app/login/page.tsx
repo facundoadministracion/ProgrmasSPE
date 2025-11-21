@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useUser } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -48,6 +48,26 @@ export default function LoginPage() {
     }
   };
 
+  const handlePasswordReset = async () => {
+    const emailForReset = prompt("Por favor, ingrese su correo electrónico para restablecer la contraseña:");
+    if (emailForReset && auth) {
+      try {
+        await sendPasswordResetEmail(auth, emailForReset);
+        toast({
+          title: "Correo enviado",
+          description: "Si la cuenta existe, se ha enviado un enlace para restablecer la contraseña a su correo.",
+        });
+      } catch (err: any) {
+        console.error("Password Reset Error:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo enviar el correo de restablecimiento. Intente de nuevo.",
+        });
+      }
+    }
+  };
+
   if (isUserLoading || user) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando...</div>;
   }
@@ -77,7 +97,16 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-1">
-              <label htmlFor="password">Contraseña</label>
+              <div className="flex justify-between items-center">
+                <label htmlFor="password">Contraseña</label>
+                <button
+                  type="button"
+                  onClick={handlePasswordReset}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  ¿Olvidó su contraseña?
+                </button>
+              </div>
               <Input
                 id="password"
                 type="password"
