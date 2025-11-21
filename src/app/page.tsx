@@ -8,7 +8,7 @@ import {
   useMemoFirebase,
   useFirestore,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, getDoc, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
@@ -116,15 +116,23 @@ export default function App() {
                 setActiveTab('dashboard');
               }
             } else {
-              // This can happen if the user document hasn't been created yet after signup.
-              // We'll set a default role and wait for the listener to catch the update.
-              setUserProfile({ uid: user.uid, email: user.email || '', name: 'Usuario', role: 'data_entry', createdAt: new Date().toISOString()}); 
+              // The user document doesn't exist, let's create it.
+              console.log("User profile not found, creating one...");
+              const newUserProfile: UserRole = { 
+                uid: user.uid, 
+                email: user.email || '', 
+                name: user.displayName || 'Usuario', 
+                role: 'data_entry', // Default role
+                createdAt: new Date().toISOString() 
+              };
+              await setDoc(userDocRef, newUserProfile);
+              setUserProfile(newUserProfile);
               setActiveTab('attendance');
             }
         } catch (error) {
-            console.error("Error fetching user role:", error);
-            // Handle permission errors or other issues
-            setUserProfile({ uid: user.uid, email: user.email || '', name: 'Usuario', role: 'data_entry', createdAt: new Date().toISOString()});
+            console.error("Error fetching or creating user role:", error);
+            // Fallback for safety, e.g. permission errors on initial check
+            setUserProfile({ uid: user.uid, email: user.email || '', name: user.displayName || 'Usuario', role: 'data_entry', createdAt: new Date().toISOString()});
             setActiveTab('attendance');
         }
       };
