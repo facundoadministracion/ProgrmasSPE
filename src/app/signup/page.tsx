@@ -36,13 +36,11 @@ export default function SignUpPage() {
     const checkAdminAndFirstUser = async () => {
       if (!firestore) return;
       
-      // Check if there are any users in the users collection
       const usersQuery = query(collection(firestore, 'users'));
       const usersSnapshot = await getDocs(usersQuery);
       const isDbEmpty = usersSnapshot.empty;
       setIsFirstUser(isDbEmpty);
 
-      // Check if current user is admin
       if (user) {
         const userDocRef = doc(firestore, 'users', user.uid);
         try {
@@ -98,11 +96,17 @@ export default function SignUpPage() {
       });
       
       alert(`¡Usuario ${email} creado exitosamente con el rol de ${assignedRole}!`);
-      router.push('/');
+      // No redirigir si es el primer usuario, para que pueda ver el mensaje de éxito
+      // y sepa que ahora debe iniciar sesión.
+      if (!isFirstUser) {
+        router.push('/');
+      } else {
+        router.push('/login');
+      }
 
     } catch (err: any) {
        if (err.code === 'auth/email-already-in-use') {
-        setError('El correo electrónico ya está en uso.');
+        setError('El correo electrónico ya está en uso. Si eres tú, inicia sesión. Si olvidaste la contraseña, deberás contactar al soporte para reiniciar el acceso.');
       } else {
         setError('Ocurrió un error durante el registro.');
       }
@@ -199,7 +203,7 @@ export default function SignUpPage() {
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={!canCreateUser}>
+            <Button type="submit" className="w-full" disabled={!canCreateUser && !isFirstUser}>
               {isFirstUser ? "Crear Usuario Administrador" : "Crear Usuario"}
             </Button>
             {isFirstUser && <p className="text-xs text-center text-gray-500 mt-2">El primer usuario registrado será administrador.</p>}
