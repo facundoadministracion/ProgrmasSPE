@@ -1,11 +1,70 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REGLA TEMPORAL PERMISIVA: Cualquier usuario autenticado puede leer y escribir
-    // en cualquier lugar. Esto es solo para permitir la creación del primer
-    // usuario administrador y se revertirá inmediatamente después.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // El administrador se define por un email específico.
+      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
+    }
+
+    function isOwner(userId) {
+      // El usuario es el dueño del documento.
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- User Profiles Collection ---
+    match /users/{userId} {
+      
+      // CREATE: Un usuario autenticado puede crear su PROPIO perfil.
+      // Esto rompe el círculo vicioso del registro.
+      allow create: if isOwner(userId);
+      
+      // READ, UPDATE: Un usuario puede leer/actualizar su PROPIO perfil. El admin puede hacerlo con cualquiera.
+      allow read, update: if isOwner(userId) || isAdmin();
+      
+      // DELETE: Solo el admin puede borrar perfiles.
+      allow delete: if isAdmin();
+    }
+    
+    // --- Participants, Payments, Config ---
+    // Legible por cualquier usuario autenticado, pero solo escribible por un administrador.
+    match /participants/{participantId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    match /config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // --- Novedades & Asistencias ---
+    // Cualquier usuario autenticado (incluyendo 'data_entry') puede crearlos.
+    // Solo un admin puede modificar o borrar.
+    match /novedades/{novedadId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+    
+    match /asistencias/{asistenciaId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+    
+    // DEFAULT DENY: Bloquea el acceso a cualquier otra ruta no definida explícitamente.
+    match /{path=**} {
+        allow read, write: if false;
     }
   }
 }
