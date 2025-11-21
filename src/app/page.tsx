@@ -231,7 +231,7 @@ export default function App() {
   const anyDataLoading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading;
 
   // --- STRONG LOADING BARRIER ---
-  // While authenticating, or if not authenticated, show a loading screen.
+  // While authenticating, or if not authenticated, or profile is not loaded, show a loading screen.
   // This prevents any components from trying to render with incomplete data.
   if (isUserLoading || !user || !userProfile) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
