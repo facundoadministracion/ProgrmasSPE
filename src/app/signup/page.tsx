@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -69,10 +69,9 @@ export default function SignUpPage() {
         name: name,
         email: newUser.email,
         role: isAdmin ? 'admin' : 'data_entry',
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(), // Using ISO string instead of serverTimestamp
       };
       
-      // La nueva regla "allow create: if isOwner(userId);" permitirá esta operación.
       await setDoc(userDocRef, userProfileData);
 
       toast({
@@ -86,7 +85,7 @@ export default function SignUpPage() {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
       } else if (err.message.includes('permission-denied') || err.message.includes('insufficient permissions')) {
           const isAdmin = email === 'crnunezfacundo@gmail.com';
-          const userProfileData = { uid: auth.currentUser?.uid, name, email, role: isAdmin ? 'admin' : 'data_entry' };
+          const userProfileData = { uid: auth.currentUser?.uid, name, email, role: isAdmin ? 'admin' : 'data_entry', createdAt: new Date().toISOString() };
           const userDocRef = doc(firestore, 'users', auth.currentUser?.uid || 'creating-user');
           const permissionError = new FirestorePermissionError({
               path: userDocRef.path,

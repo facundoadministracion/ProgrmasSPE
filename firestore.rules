@@ -9,35 +9,29 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // El admin se identifica por su email, que está en el token de autenticación.
-    // Esto funciona de inmediato, sin necesidad de leer un documento que aún no existe.
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
-    }
-
-    // El usuario es dueño del documento que intenta modificar.
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
+    }
+
     // ========== User Profiles ==========
-    // Reglas explícitas para la colección de usuarios.
     match /users/{userId} {
-      // 1. CUALQUIER usuario autenticado puede CREAR su propio perfil.
-      // Esta es la regla clave que rompe el círculo vicioso del registro.
+      // 1. A signed-in user can CREATE their own profile document. This breaks the registration deadlock.
       allow create: if isOwner(userId);
 
-      // 2. Un usuario puede LEER y ACTUALIZAR su propio perfil.
+      // 2. A user can READ and UPDATE their own profile.
       allow read, update: if isOwner(userId);
       
-      // 3. Un administrador puede LEER y ESCRIBIR en cualquier perfil.
-      // Esta regla se suma a las anteriores, no las reemplaza.
+      // 3. An admin has full read/write access to any user profile.
       allow read, write: if isAdmin();
     }
 
-    // ========== Reglas Generales para Otras Colecciones ==========
-    // Un administrador puede hacer todo en el resto de las colecciones.
-    // Un usuario logueado (data_entry) puede leer datos y crear novedades/asistencias.
+    // ========== General Rules for Other Collections ==========
+    // An admin can do anything in the rest of the collections.
+    // A logged-in user (data_entry) can read data and create specific documents.
     match /participants/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
