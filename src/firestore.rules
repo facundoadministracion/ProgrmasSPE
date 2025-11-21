@@ -9,9 +9,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // A user is an admin if their verified email is the one specified.
+    // A user is an admin if their email is the one specified.
+    // The email_verified check is removed to allow immediate access after signup.
     function isAdmin() {
-      return request.auth.token.email_verified && request.auth.token.email == "crnunezfacundo@gmail.com";
+      return request.auth.token.email == "crnunezfacundo@gmail.com";
     }
 
     // A user is the owner of the document.
