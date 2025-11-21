@@ -8,7 +8,7 @@ import {
   useMemoFirebase,
   useFirestore,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
@@ -136,7 +136,7 @@ export default function App() {
 
       return () => unsubscribe();
     }
-  }, [user, firestore, auth]);
+  }, [user, firestore, auth, activeTab]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
