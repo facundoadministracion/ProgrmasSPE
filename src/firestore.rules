@@ -50,8 +50,9 @@ service cloud.firestore {
      * role from the /users/{userId} document. Returns false if the doc doesn't exist.
      */
     function isAdmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc.data.role == 'admin';
+      // Use exists() to prevent errors on non-existent documents.
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     /**
@@ -59,12 +60,10 @@ service cloud.firestore {
      * @path /users/{userId}
      */
      match /users/{userId} {
-        // A user can always read their own user document.
-        // An admin can read any user document.
+        // A user can read their own document. An admin can read any user document.
         allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-
-        // A user can create their own document (e.g., on signup or first login).
-        // An admin can create or update any user document.
+        
+        // A user can create or update their own document. An admin can also write to any user doc.
         allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
@@ -138,8 +137,8 @@ service cloud.firestore {
     match /artifacts/{appId}/public/data/config/{configId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
       allow delete: if false;
     }
   }

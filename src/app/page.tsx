@@ -116,13 +116,12 @@ export default function App() {
                 setActiveTab('dashboard');
               }
             } else {
-              // The user document doesn't exist, let's create it.
               console.log("User profile not found, creating one...");
               const newUserProfile: UserRole = { 
                 uid: user.uid, 
                 email: user.email || '', 
                 name: user.displayName || 'Usuario', 
-                role: 'data_entry', // Default role
+                role: 'data_entry',
                 createdAt: new Date().toISOString() 
               };
               await setDoc(userDocRef, newUserProfile);
@@ -132,13 +131,21 @@ export default function App() {
         } catch (error) {
             console.error("Error fetching or creating user role:", error);
             // Fallback for safety, e.g. permission errors on initial check
-            setUserProfile({ uid: user.uid, email: user.email || '', name: user.displayName || 'Usuario', role: 'data_entry', createdAt: new Date().toISOString()});
+            // This might happen if rules are not set up correctly.
+             setUserProfile({ 
+                uid: user.uid, 
+                email: user.email || '', 
+                name: user.displayName || 'Usuario', 
+                role: 'data_entry', 
+                createdAt: new Date().toISOString()
+            });
             setActiveTab('attendance');
         }
       };
       fetchRole();
     }
   }, [user, firestore]);
+
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -161,37 +168,31 @@ export default function App() {
 
   const handleUpdateConfig = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(!firestore || !configData?.[0]?.id) {
-        if(firestore) {
-            const formData = new FormData(e.currentTarget);
-            const data = {
-              tutorias: {
-                senior: parseFloat(formData.get('senior') as string || '0'),
-                estandar: parseFloat(formData.get('estandar') as string || '0'),
-                junior: parseFloat(formData.get('junior') as string || '0'),
-              },
-              joven: { monto: parseFloat(formData.get('joven') as string || '0') },
-              tecno: { monto: parseFloat(formData.get('tecno') as string || '0') }
-            };
-            await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'config'), { ...data, timestamp: serverTimestamp() });
-            alert("Configuración creada");
-        }
-        return;
-    }
+    if(!firestore) return;
+  
     const formData = new FormData(e.currentTarget);
     const data = {
       tutorias: {
-        senior: parseFloat(formData.get('senior') as string),
-        estandar: parseFloat(formData.get('estandar') as string),
-        junior: parseFloat(formData.get('junior') as string),
+        senior: parseFloat(formData.get('senior') as string || '0'),
+        estandar: parseFloat(formData.get('estandar') as string || '0'),
+        junior: parseFloat(formData.get('junior') as string || '0'),
       },
-      joven: { monto: parseFloat(formData.get('joven') as string) },
-      tecno: { monto: parseFloat(formData.get('tecno') as string) }
+      joven: { monto: parseFloat(formData.get('joven') as string || '0') },
+      tecno: { monto: parseFloat(formData.get('tecno') as string || '0') }
     };
-    const configDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'config', configData[0].id);
-    await updateDoc(configDocRef, { ...data, timestamp: serverTimestamp() });
-    alert("Montos actualizados");
+  
+    if (!configData?.[0]?.id) {
+      // Create new config document
+      await addDoc(collection(firestore, 'artifacts', appId, 'public', 'data', 'config'), { ...data, timestamp: serverTimestamp() });
+      alert("Configuración creada");
+    } else {
+      // Update existing config document
+      const configDocRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'config', configData[0].id);
+      await updateDoc(configDocRef, { ...data, timestamp: serverTimestamp() });
+      alert("Montos actualizados");
+    }
   };
+  
   
   const role = userProfile?.role;
   const loading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || isUserLoading || !userProfile;
@@ -268,7 +269,7 @@ export default function App() {
   };
 
   const renderConfig = () => {
-    const config = configData?.[0] || { tutorias: {}, joven: {}, tecno: {} };
+    const config = configData?.[0] || { tutorias: { senior: 0, estandar: 0, junior: 0 }, joven: { monto: 0 }, tecno: { monto: 0 } };
     return(
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800">Configuración de Montos</h2>
@@ -276,20 +277,20 @@ export default function App() {
                  <Card>
                     <CardHeader><CardTitle>Tutorías (Por Categoría)</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div><label className="block text-sm mb-1">Senior</label><Input name="senior" type="number" defaultValue={config?.tutorias?.senior} /></div>
-                        <div><label className="block text-sm mb-1">Estándar</label><Input name="estandar" type="number" defaultValue={config?.tutorias?.estandar} /></div>
-                        <div><label className="block text-sm mb-1">Junior</label><Input name="junior" type="number" defaultValue={config?.tutorias?.junior} /></div>
+                        <div><label className="block text-sm mb-1">Senior</label><Input name="senior" type="number" defaultValue={config.tutorias.senior} /></div>
+                        <div><label className="block text-sm mb-1">Estándar</label><Input name="estandar" type="number" defaultValue={config.tutorias.estandar} /></div>
+                        <div><label className="block text-sm mb-1">Junior</label><Input name="junior" type="number" defaultValue={config.tutorias.junior} /></div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader><CardTitle>Otros Programas (Fijo)</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div><label className="block text-sm mb-1">Empleo Joven</label><Input name="joven" type="number" defaultValue={config?.joven?.monto} /></div>
-                        <div><label className="block text-sm mb-1">Tecnoempleo</label><Input name="tecno" type="number" defaultValue={config?.tecno?.monto} /></div>
+                        <div><label className="block text-sm mb-1">Empleo Joven</label><Input name="joven" type="number" defaultValue={config.joven.monto} /></div>
+                        <div><label className="block text-sm mb-1">Tecnoempleo</label><Input name="tecno" type="number" defaultValue={config.tecno.monto} /></div>
                     </CardContent>
                 </Card>
                 <div className="md:col-span-2">
-                  <Button type="submit" className="w-full">Guardar Todos los Cambios</Button>
+                  <Button type="submit" className="w-full" disabled={role !== 'admin'}>Guardar Todos los Cambios</Button>
                 </div>
             </form>
         </div>
