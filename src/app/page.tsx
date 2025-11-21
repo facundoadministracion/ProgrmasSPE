@@ -8,7 +8,7 @@ import {
   useMemoFirebase,
   useFirestore,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
@@ -66,12 +66,14 @@ import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 export default function App() {
   const { auth, isUserLoading } = useFirebase();
   const { user } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
   
   const [userProfile, setUserProfile] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -108,35 +110,35 @@ export default function App() {
         if (doc.exists()) {
           const userData = doc.data() as UserRole;
           setUserProfile(userData);
-          if (userData.role === 'data_entry') {
+          // Adjust tab based on role, but don't prevent admin from seeing other tabs
+          if (userData.role === 'data_entry' && activeTab !== 'attendance') {
             setActiveTab('attendance');
-          } else if (activeTab !== 'participants' && activeTab !== 'config' && activeTab !== 'attendance' && activeTab !== 'dashboard' ) {
-            setActiveTab('dashboard');
+          } else if (userData.role === 'admin' && activeTab !== 'participants' && activeTab !== 'config' && activeTab !== 'attendance' && activeTab !== 'dashboard') {
+             setActiveTab('dashboard');
           }
         } else {
-          // The user document should have been created on signup.
-          // If it's missing, they might have an auth account but no profile.
-          // We can log them out to force a re-signup or just treat them as a limited user.
-          console.warn("User profile not found in Firestore for UID:", user.uid);
-          // For now, let's treat them as if they have no role.
-          setUserProfile({
-            uid: user.uid,
-            email: user.email || '',
-            name: user.displayName || 'Usuario Desconocido',
-            role: 'data_entry', // Fallback role
-            createdAt: new Date().toISOString()
+          console.warn("User profile not found for UID:", user.uid, "This should have been created at signup.");
+          // Don't create the user here. The user must sign up again if the doc is missing.
+          toast({
+            variant: "destructive",
+            title: "Error de Perfil",
+            description: "No se encontró su perfil de usuario. Por favor, contacte a un administrador o intente registrarse de nuevo.",
           });
-          setActiveTab('attendance');
+          signOut(auth);
         }
       }, (error) => {
         console.error("Error fetching user profile:", error);
-        // Maybe sign out the user if their profile is inaccessible
+        toast({
+            variant: "destructive",
+            title: "Error de Permisos",
+            description: "No se pudo cargar su perfil. Es posible que no tenga permisos. " + error.message,
+        });
         signOut(auth);
       });
 
       return () => unsubscribe();
     }
-  }, [user, firestore, auth, activeTab]);
+  }, [user, firestore, auth, activeTab, toast]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {

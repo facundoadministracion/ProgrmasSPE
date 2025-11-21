@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Briefcase } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const { auth } = useFirebase();
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -27,16 +29,22 @@ export default function LoginPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!auth) return;
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (err: any) {
+      console.error("Login Error:", err.code, err.message);
+      let errorMessage = 'Ocurrió un error al iniciar sesión. Por favor, intente de nuevo.';
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Credenciales inválidas. Por favor, verifique e intente de nuevo.');
-      } else {
-        setError('Ocurrió un error al iniciar sesión.');
+        errorMessage = 'Credenciales inválidas. Verifique su email y contraseña.';
       }
-      console.error(err);
+      setError(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Error de inicio de sesión",
+        description: errorMessage,
+      });
     }
   };
 

@@ -32,6 +32,7 @@ service cloud.firestore {
      * the user's document exists before checking the role to prevent errors.
      */
     function isAdmin() {
+      // Use exists() to prevent errors on non-existent documents.
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
@@ -93,8 +94,7 @@ service cloud.firestore {
      */
     match /artifacts/{appId}/public/data/config/{configId} {
       allow get, list: if isSignedIn();
-      allow create, update: if isAdmin();
-      allow delete: if false;
+      allow create, update, delete: if isAdmin();
     }
   }
 }

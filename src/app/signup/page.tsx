@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirebase, useUser } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, getDocs, collection, query, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,72 +16,43 @@ import {
 } from '@/components/ui/card';
 import { Briefcase } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
   const { auth, firestore } = useFirebase();
-  const { user, isUserLoading } = useUser();
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
-  const [isFirstUser, setIsFirstUser] = useState(false);
-
-  useEffect(() => {
-    if (isUserLoading || !firestore) return;
-    
-    // Check if there are any users to determine if this is the first signup
-    const usersQuery = query(collection(firestore, 'users'));
-    const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
-      const isDbEmpty = snapshot.empty;
-      setIsFirstUser(isDbEmpty);
-
-      // Now check the current user's role
-      if (user) {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        getDoc(userDocRef).then(userDoc => {
-          setIsAdmin(userDoc.exists() && userDoc.data().role === 'admin');
-          setIsCheckingAdmin(false);
-        }).catch(err => {
-          console.error("Error checking admin status:", err);
-          setIsAdmin(false);
-          setIsCheckingAdmin(false);
-        });
-      } else {
-        setIsAdmin(false);
-        setIsCheckingAdmin(false);
-      }
-    }, (err) => {
-        console.error("Error checking for first user:", err);
-        setIsCheckingAdmin(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, isUserLoading, firestore]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    const canCreate = isFirstUser || isAdmin;
-    if (!canCreate) {
-      setError('Solo los administradores pueden crear nuevos usuarios.');
-      return;
-    }
+    setIsSubmitting(true);
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden.');
+      setIsSubmitting(false);
       return;
     }
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
+      setIsSubmitting(false);
       return;
     }
     if (!name.trim()) {
       setError('Por favor, ingrese su nombre y apellido.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!auth || !firestore) {
+      setError('Los servicios de Firebase no están disponibles.');
+      setIsSubmitting(false);
       return;
     }
 
@@ -90,66 +61,35 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
       
-      // Step 2: Determine the role
-      const assignedRole = isFirstUser ? 'admin' : 'data_entry';
-      
-      // Step 3: Create the user document in Firestore atomically
+      // Step 2: ALWAYS create the user document in Firestore with 'data_entry' role.
+      // The first user must be manually promoted to 'admin' in the Firebase Console.
       await setDoc(doc(firestore, 'users', newUser.uid), {
         uid: newUser.uid,
         name: name,
         email: newUser.email,
-        role: assignedRole,
+        role: 'data_entry',
         createdAt: serverTimestamp(),
       });
       
-      alert(`¡Usuario ${email} creado exitosamente con el rol de ${assignedRole}!`);
+      toast({
+        title: "¡Registro Exitoso!",
+        description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
+      });
       
-      // If an admin created a user, they stay on the main page.
-      // If it's the first user signing up, send them to login.
-      if (isFirstUser) {
-        router.push('/login');
-      } else {
-        router.push('/');
-      }
+      // Redirect to login after successful signup
+      router.push('/login');
 
     } catch (err: any) {
        if (err.code === 'auth/email-already-in-use') {
-        setError('El correo electrónico ya está en uso. Si es usted, inicie sesión.');
+        setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
       } else {
-        console.error(err);
+        console.error("Signup Error:", err.code, err.message);
         setError(`Ocurrió un error durante el registro: ${err.message}`);
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  if (isUserLoading || isCheckingAdmin) {
-    return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
-        Verificando permisos...
-      </div>
-    );
-  }
-  
-  const canCreateUser = isFirstUser || isAdmin;
-
-  if (user && !canCreateUser) {
-      return (
-         <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4">
-            <Card className="w-full max-w-sm text-center">
-                 <CardHeader>
-                    <CardTitle>Acceso Denegado</CardTitle>
-                    <CardDescription>Solo los administradores pueden registrar nuevos usuarios.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <Link href="/" className="font-medium text-blue-600 hover:underline">
-                        Volver al Panel Principal
-                    </Link>
-                </CardContent>
-            </Card>
-        </div>
-      )
-  }
-
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4">
@@ -161,10 +101,7 @@ export default function SignUpPage() {
           </div>
           <CardTitle>Crear Nuevo Usuario</CardTitle>
           <CardDescription>
-            {isFirstUser 
-              ? "Regístrate como el primer administrador." 
-              : "Registrar un nuevo miembro del equipo (rol: Data Entry)"
-            }
+            Complete el formulario para registrarse.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -212,20 +149,13 @@ export default function SignUpPage() {
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={!canCreateUser}>
-              {isFirstUser ? "Crear Usuario Administrador" : "Crear Usuario"}
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Registrando...' : 'Crear Usuario'}
             </Button>
-            {isFirstUser && <p className="text-xs text-center text-gray-500 mt-2">El primer usuario registrado será administrador.</p>}
             <div className="text-center text-sm text-gray-500 pt-2">
-              {user ? (
-                <Link href="/" className="font-medium text-blue-600 hover:underline">
-                  Volver al Panel
-                </Link>
-              ) : (
-                <Link href="/login" className="font-medium text-blue-600 hover:underline">
-                  ¿Ya tienes cuenta? Iniciar Sesión
-                </Link>
-              )}
+              <Link href="/login" className="font-medium text-blue-600 hover:underline">
+                ¿Ya tienes cuenta? Iniciar Sesión
+              </Link>
             </div>
           </form>
         </CardContent>
