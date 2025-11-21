@@ -83,35 +83,12 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // --- Data Fetching ---
-  const participantsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'participants')) : null, [firestore, user]);
-  const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
-  
-  const paymentsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'payments')) : null, [firestore, user]);
-  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
-  
-  const novedadesRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'novedades')) : null, [firestore, user]);
-  const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
-  
-  const configRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'config')) : null, [firestore, user]);
-  const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
-
-  const usersRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users')) : null, [firestore, user]);
-  const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
-  // --- End Data Fetching ---
-
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // Effect for handling authentication state
   useEffect(() => {
-    if (isUserLoading) {
-      return; 
-    }
-    if (!user) {
+    if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [isUserLoading, user, router]);
@@ -127,18 +104,12 @@ export default function App() {
       if (doc.exists()) {
         const userData = doc.data() as UserRole;
         setUserProfile(userData);
-        // Admin starts on dashboard, data_entry on attendance
-        if (userData.role === 'data_entry' && activeTab !== 'attendance') {
-          setActiveTab('attendance');
-        } else if (userData.role === 'admin' && activeTab !== 'dashboard' && activeTab !== 'participants' && activeTab !== 'users' && activeTab !== 'config') {
-          setActiveTab('dashboard');
+        if (userData.role === 'admin' && activeTab !== 'dashboard' && activeTab !== 'participants' && activeTab !== 'users' && activeTab !== 'config') {
+            setActiveTab('dashboard');
         }
       } else {
-         console.error("User profile document not found for UID:", user.uid, "This should not happen after signup.");
-         // Log out the user if their profile is missing, as the app cannot function.
-         if (auth) {
-           signOut(auth);
-         }
+         console.error("User profile document not found for UID:", user.uid);
+         if (auth) signOut(auth);
       }
     }, (error) => {
       console.error("Error fetching user profile:", error);
@@ -147,18 +118,47 @@ export default function App() {
           operation: 'get',
       });
       errorEmitter.emit('permission-error', permissionError);
-      toast({
-          variant: "destructive",
-          title: "Error de Permisos",
-          description: "No se pudo cargar su perfil de usuario. Contacte al administrador.",
-      });
-      if (auth) {
-          signOut(auth);
-      }
+      if (auth) signOut(auth);
     });
 
     return () => unsubscribe();
-  }, [user, firestore, auth, toast]); // Removed activeTab from dependencies
+  }, [user, firestore, auth]);
+
+
+  // --- Data Fetching ---
+  const isAdmin = userProfile?.role === 'admin';
+
+  const participantsRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'participants')) : null, [firestore, isAdmin]);
+  const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
+  
+  const paymentsRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'payments')) : null, [firestore, isAdmin]);
+  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
+  
+  const novedadesRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'novedades')) : null, [firestore, isAdmin]);
+  const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
+  
+  const configRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'config')) : null, [firestore, isAdmin]);
+  const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
+
+  const usersRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'users')) : null, [firestore, isAdmin]);
+  const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
+  // --- End Data Fetching ---
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (userProfile?.role === 'data_entry') {
+        setActiveTab('attendance');
+        setDataLoaded(true);
+    } else if (isAdmin) {
+        const allDataLoaded = !participantsLoading && !paymentsLoading && !novedadesLoading && !configLoading && !usersLoading;
+        if (allDataLoaded) {
+            setDataLoaded(true);
+        }
+    }
+  }, [userProfile, isAdmin, participantsLoading, paymentsLoading, novedadesLoading, configLoading, usersLoading]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -228,15 +228,12 @@ export default function App() {
   
   
   const role = userProfile?.role;
-  const anyDataLoading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading;
+  const loading = !dataLoaded;
 
   // Strict loading gate: Do not render anything until auth is resolved and user profile is loaded.
   if (isUserLoading || !user || !userProfile) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
   }
-  
-  const loading = anyDataLoading;
-
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {

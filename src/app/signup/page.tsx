@@ -63,7 +63,6 @@ export default function SignUpPage() {
       const newUser = userCredential.user;
 
       // Step 2: Create the user document in Firestore with the correct role
-      // This logic is now robust and assigns the 'admin' role based on email.
       const userDocRef = doc(firestore, 'users', newUser.uid);
       
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
@@ -75,8 +74,6 @@ export default function SignUpPage() {
         createdAt: serverTimestamp(),
       };
 
-      // We await this operation to ensure it completes successfully.
-      // The new rules allow any authenticated user to create their own document.
       await setDoc(userDocRef, userProfileData);
 
       toast({

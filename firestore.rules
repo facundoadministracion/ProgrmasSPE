@@ -1,52 +1,40 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ========== Helper Function ==========
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // ========== User Profiles ==========
-    // Path: /users/{userId}
+    // Colección de usuarios
     match /users/{userId} {
       
+      // ADMIN EMAIL
       function isAdmin() {
-        return request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
+        return request.auth != null &&
+               request.auth.token.email == "crnunezfacundo@gmail.com";
       }
 
-      // ANY authenticated user can CREATE and READ/WRITE THEIR OWN document.
-      // This is the key to solving the signup problem.
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      // Un usuario puede leer y escribir solo su propio documento
+      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // The admin can read and write ANY user document.
+      // El admin puede leer y escribir todo
       allow read, write: if isAdmin();
     }
 
-    // ========== Participants, Payments, Config, Novedades, Asistencias ==========
-    // For now, these collections are only accessible to the admin.
-    // This provides a secure default. We can open them up later if needed.
-    
-    match /participants/{participantId} {
-      allow read, write: if request.auth.token.email == "crnunezfacundo@gmail.com"; 
+    // Para el resto de las colecciones, solo el admin tiene acceso.
+    // Esto previene lecturas no deseadas (ej. /config, /payments) antes de que la app sepa el rol del usuario.
+    match /participants/{docId} {
+       allow read, write: if request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
-
-    match /payments/{paymentId} {
-      allow read, write: if request.auth.token.email == "crnunezfacundo@gmail.com";
+    match /payments/{docId} {
+       allow read, write: if request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
-    
-    match /config/{configId} {
-      allow read, write: if request.auth.token.email == "crnunezfacundo@gmail.com";
+    match /config/{docId} {
+       allow read, write: if request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
-    
-    match /novedades/{novedadId} {
-      allow read, write: if request.auth.token.email == "crnunezfacundo@gmail.com";
+    match /novedades/{docId} {
+       allow read, write: if request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
-    
-    match /asistencias/{asistenciaId} {
-      allow read, write: if request.auth.token.email == "crnunezfacundo@gmail.com";
+     match /asistencias/{docId} {
+       allow read, write: if request.auth != null && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
   }
 }
