@@ -73,8 +73,8 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
 export default function App() {
-  const { auth, isUserLoading } = useFirebase();
-  const { user } = useUser();
+  const { auth } = useFirebase();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
@@ -83,6 +83,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
 
+  // --- Data Fetching ---
+  // Ensure queries are only created when the user is fully loaded and authenticated
   const participantsRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'participants')) : null, [firestore, user]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
@@ -97,18 +99,28 @@ export default function App() {
 
   const usersRef = useMemoFirebase(() => firestore && user ? query(collection(firestore, 'users')) : null, [firestore, user]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
+  // --- End Data Fetching ---
+
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
+  // Effect for handling authentication state
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    // Wait until the initial user loading is complete
+    if (isUserLoading) {
+      return; // Do nothing while we're waiting for auth status
+    }
+    // If loading is done and there's no user, redirect to login
+    if (!user) {
       router.push('/login');
     }
   }, [isUserLoading, user, router]);
 
+  // Effect for fetching the user's specific profile role
   useEffect(() => {
+    // Only run if we have a user and a firestore instance
     if (user && firestore) {
       const userDocRef = doc(firestore, 'users', user.uid);
       const unsubscribe = onSnapshot(userDocRef, (doc) => {
@@ -118,10 +130,6 @@ export default function App() {
           // Adjust tab based on role, but don't prevent admin from seeing other tabs
           if (userData.role === 'data_entry' && activeTab !== 'attendance') {
             setActiveTab('attendance');
-          } else if (userData.role === 'admin' && activeTab === 'users') {
-             // allow user mgmt
-          } else if (userData.role === 'admin' && activeTab !== 'participants' && activeTab !== 'config' && activeTab !== 'attendance' && activeTab !== 'dashboard') {
-             setActiveTab('dashboard');
           }
         } else {
           // This can happen briefly on first login if Firestore is slow.
@@ -220,7 +228,18 @@ export default function App() {
   
   
   const role = userProfile?.role;
-  const loading = isUserLoading || !userProfile || (!!user && (participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading));
+  const anyDataLoading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading;
+
+  // --- STRONG LOADING BARRIER ---
+  // While authenticating, or if not authenticated, show a loading screen.
+  // This prevents any components from trying to render with incomplete data.
+  if (isUserLoading || !user || !userProfile) {
+    return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
+  }
+  
+  // Now we know we have a user and a profile, but we might still be fetching collection data
+  const loading = anyDataLoading;
+
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
@@ -322,8 +341,6 @@ export default function App() {
     );
   }
 
-  if (loading) return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
-
   return (
     <SidebarProvider>
       <Sidebar>
@@ -382,11 +399,17 @@ export default function App() {
             <span className="font-bold">Gestión LR</span>
         </header>
         <main className="flex-1 p-4 md:p-8">
-            {activeTab === 'dashboard' && role === 'admin' && renderDashboard()}
-            {activeTab === 'participants' && role === 'admin' && renderParticipants()}
-            {activeTab === 'attendance' && <AttendanceSection participants={participants || []} />}
-            {activeTab === 'users' && role === 'admin' && <UserManagement users={allUsers || []} onUpdateRole={handleUpdateUserRole} currentUser={user} />}
-            {activeTab === 'config' && role === 'admin' && renderConfig()}
+            {loading ? (
+                <div className="flex items-center justify-center h-full text-gray-400">Cargando datos...</div>
+            ) : (
+                <>
+                  {activeTab === 'dashboard' && role === 'admin' && renderDashboard()}
+                  {activeTab === 'participants' && role === 'admin' && renderParticipants()}
+                  {activeTab === 'attendance' && <AttendanceSection participants={participants || []} />}
+                  {activeTab === 'users' && role === 'admin' && <UserManagement users={allUsers || []} onUpdateRole={handleUpdateUserRole} currentUser={user} />}
+                  {activeTab === 'config' && role === 'admin' && renderConfig()}
+                </>
+            )}
         </main>
       </SidebarInset>
 
