@@ -7,6 +7,8 @@ import {
   useUser,
   useMemoFirebase,
   useFirestore,
+  errorEmitter,
+  FirestorePermissionError,
 } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -125,15 +127,22 @@ export default function App() {
           }
         } else {
           // This can happen briefly on first login if Firestore is slow.
-          console.warn("User profile not found for UID:", user.uid, "Attempting to create...");
+          console.warn("User profile not found for UID:", user.uid);
         }
       }, (error) => {
-        console.error("Error fetching user profile:", error);
+        const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+
+        // We can still inform the user, but the primary error is now the contextual one.
         toast({
             variant: "destructive",
             title: "Error de Permisos",
-            description: "No se pudo cargar su perfil. Es posible que no tenga permisos. " + error.message,
+            description: "No se pudo cargar su perfil de usuario.",
         });
+
         if (auth) {
             signOut(auth);
         }
