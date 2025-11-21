@@ -8,21 +8,20 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-
-    // El admin es quien tiene 'admin' en su documento de perfil.
+    
+    // El admin se identifica por su email, que está en el token de autenticación.
+    // Esto funciona de inmediato, sin necesidad de leer un documento que aún no existe.
     function isAdmin() {
-      // Importante: No se puede usar get() en reglas de creación si el documento no existe.
-      // Pero para cualquier otra operación (read, write en OTRAS colecciones), esto funciona.
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
     }
 
-    // El usuario es dueño del documento.
+    // El usuario es dueño del documento que intenta modificar.
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     // ========== User Profiles ==========
-    // Reglas para la colección de usuarios, con permisos separados y explícitos.
+    // Reglas explícitas para la colección de usuarios.
     match /users/{userId} {
       // 1. CUALQUIER usuario autenticado puede CREAR su propio perfil.
       // Esta es la regla clave que rompe el círculo vicioso del registro.
@@ -38,7 +37,7 @@ service cloud.firestore {
 
     // ========== Reglas Generales para Otras Colecciones ==========
     // Un administrador puede hacer todo en el resto de las colecciones.
-    // Un usuario logueado (data_entry) puede leer todo.
+    // Un usuario logueado (data_entry) puede leer datos y crear novedades/asistencias.
     match /participants/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -52,7 +51,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Los usuarios data_entry pueden crear novedades y asistencias.
     match /novedades/{docId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
