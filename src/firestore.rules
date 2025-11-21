@@ -1,17 +1,68 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ========== Helper Functions ==========
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Regla general y permisiva para toda la data de la app
-    // Permite a cualquier usuario autenticado leer y escribir en las colecciones.
-    // Esto es para facilitar la configuración inicial.
-    match /artifacts/{appId}/public/data/{collection}/{docId} {
-      allow read, write: if isSignedIn();
+    // A user is an admin if their verified email is the one specified.
+    function isAdmin() {
+      return request.auth.token.email_verified && request.auth.token.email == "crnunezfacundo@gmail.com";
+    }
+
+    // A user is the owner of the document.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // ========== Root Level - Default Deny ==========
+    match /{path=**} {
+      allow read, write: if false;
+    }
+
+    // ========== Specific Collection Rules ==========
+
+    // --- User Profiles ---
+    // Anyone can create their own user profile on signup.
+    // Admins can read/update any profile, and users can read/update their own.
+    match /artifacts/{appId}/public/data/users/{userId} {
+      allow create: if isSignedIn();
+      allow read, update: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // --- Participants, Payments, Config ---
+    // Readable by any authenticated user, but only writable by an admin.
+    match /artifacts/{appId}/public/data/participants/{participantId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin();
+    }
+
+    match /artifacts/{appId}/public/data/payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin();
+    }
+    
+    match /artifacts/{appId}/public/data/config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin();
+    }
+
+    // --- Novedades & Asistencias ---
+    // Any authenticated user can create them, but only admins can modify/delete.
+    // This allows 'data_entry' users to perform their main task.
+    match /artifacts/{appId}/public/data/novedades/{novedadId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isSignedIn() && isAdmin();
+    }
+    
+    match /artifacts/{appId}/public/data/asistencias/{asistenciaId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isSignedIn() && isAdmin();
     }
   }
 }
