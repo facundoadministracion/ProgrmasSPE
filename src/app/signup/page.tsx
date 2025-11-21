@@ -74,23 +74,35 @@ export default function SignUpPage() {
         createdAt: serverTimestamp(),
       };
 
-      await setDoc(userDocRef, userProfileData);
-
-      toast({
-        title: "¡Registro Exitoso!",
-        description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
-      });
-      router.push('/login');
+      // This operation is wrapped in a .catch() to handle permission errors contextually
+      setDoc(userDocRef, userProfileData)
+        .then(() => {
+          toast({
+            title: "¡Registro Exitoso!",
+            description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
+          });
+          router.push('/login');
+        })
+        .catch((err) => {
+           // This is where we create and emit the contextual error
+            const permissionError = new FirestorePermissionError({
+              path: userDocRef.path,
+              operation: 'create',
+              requestResourceData: userProfileData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            
+            // Also update UI to inform the user
+            setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
+            setIsSubmitting(false);
+        });
 
     } catch (err: any) {
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
-      } else if (err.code === 'permission-denied') {
-        setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
-        console.error("Firestore Permission Error on Signup:", err);
       } else {
-        console.error("Auth/Firestore Signup Error:", err.code, err.message);
-        setError(`Ocurrió un error: ${err.message}`);
+        console.error("Auth Signup Error:", err.code, err.message);
+        setError(`Ocurrió un error en la autenticación: ${err.message}`);
       }
       setIsSubmitting(false);
     }
