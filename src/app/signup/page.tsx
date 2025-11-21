@@ -58,36 +58,27 @@ export default function SignUpPage() {
     }
 
     try {
+      // Step 1: Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
+      // Step 2: Create the user document in Firestore with the correct role
+      // This logic is now robust and assigns the 'admin' role based on email.
+      const userDocRef = doc(firestore, 'users', newUser.uid);
+      
+      const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
       const userProfileData = {
         uid: newUser.uid,
         name: name,
         email: newUser.email,
-        role: 'data_entry', // All new users start as data_entry
+        role: isAdmin ? 'admin' : 'data_entry',
         createdAt: serverTimestamp(),
       };
-      
-      const userDocRef = doc(firestore, 'users', newUser.uid);
-      
-      // Use a non-blocking write. The security rules MUST allow this.
-      // We are not awaiting the result, just firing and forgetting.
-      // The onSnapshot listener in the main page will pick up the new user profile.
-      setDoc(userDocRef, userProfileData)
-        .catch((err) => {
-          // This will only be called if the setDoc itself fails, likely due to permissions.
-          console.error("Firestore setDoc Error:", err);
-          const permissionError = new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'create',
-            requestResourceData: userProfileData,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          // This error will be shown to the user in the dev overlay.
-        });
 
-      // After successfully creating the auth user, we immediately redirect.
+      // We await this operation to ensure it completes successfully.
+      // The new rules allow any authenticated user to create their own document.
+      await setDoc(userDocRef, userProfileData);
+
       toast({
         title: "¡Registro Exitoso!",
         description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
@@ -97,9 +88,12 @@ export default function SignUpPage() {
     } catch (err: any) {
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
+      } else if (err.code === 'permission-denied') {
+        setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
+        console.error("Firestore Permission Error on Signup:", err);
       } else {
-        console.error("Auth Signup Error:", err.code, err.message);
-        setError(`Ocurrió un error de autenticación: ${err.message}`);
+        console.error("Auth/Firestore Signup Error:", err.code, err.message);
+        setError(`Ocurrió un error: ${err.message}`);
       }
       setIsSubmitting(false);
     }

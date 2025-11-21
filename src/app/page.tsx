@@ -119,6 +119,7 @@ export default function App() {
   // Effect for fetching the user's specific profile role
   useEffect(() => {
     if (!user || !firestore) {
+      setUserProfile(null);
       return;
     }
     const userDocRef = doc(firestore, 'users', user.uid);
@@ -126,13 +127,21 @@ export default function App() {
       if (doc.exists()) {
         const userData = doc.data() as UserRole;
         setUserProfile(userData);
+        // Admin starts on dashboard, data_entry on attendance
         if (userData.role === 'data_entry' && activeTab !== 'attendance') {
           setActiveTab('attendance');
+        } else if (userData.role === 'admin' && activeTab !== 'dashboard' && activeTab !== 'participants' && activeTab !== 'users' && activeTab !== 'config') {
+          setActiveTab('dashboard');
         }
       } else {
-         console.warn("User profile document not found for UID:", user.uid, "This can happen on first login. It should be created shortly.");
+         console.error("User profile document not found for UID:", user.uid, "This should not happen after signup.");
+         // Log out the user if their profile is missing, as the app cannot function.
+         if (auth) {
+           signOut(auth);
+         }
       }
     }, (error) => {
+      console.error("Error fetching user profile:", error);
       const permissionError = new FirestorePermissionError({
           path: userDocRef.path,
           operation: 'get',
@@ -141,7 +150,7 @@ export default function App() {
       toast({
           variant: "destructive",
           title: "Error de Permisos",
-          description: "No se pudo cargar su perfil de usuario.",
+          description: "No se pudo cargar su perfil de usuario. Contacte al administrador.",
       });
       if (auth) {
           signOut(auth);
@@ -149,7 +158,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, firestore, auth, activeTab, toast]);
+  }, [user, firestore, auth, toast]); // Removed activeTab from dependencies
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -221,6 +230,7 @@ export default function App() {
   const role = userProfile?.role;
   const anyDataLoading = participantsLoading || paymentsLoading || configLoading || novedadesLoading || usersLoading;
 
+  // Strict loading gate: Do not render anything until auth is resolved and user profile is loaded.
   if (isUserLoading || !user || !userProfile) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
   }
