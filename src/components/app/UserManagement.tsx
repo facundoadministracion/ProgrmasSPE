@@ -33,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { DEPARTAMENTOS, ROLES } from '@/lib/constants';
+import Link from 'next/link';
 
 interface UserManagementProps {
   users: UserRole[];
@@ -61,13 +62,8 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
         if (editingUser) {
             await updateDoc(doc(firestore, 'users', editingUser.uid), userData);
         } else {
-            // For new users, we would normally handle auth creation and then this.
-            // This component assumes user auth object already exists.
-            // This form is for editing existing or creating profiles for already-authed users.
-            // We'll simulate adding, but this needs a proper flow with auth.
             console.error("Cannot create new user from this component. Please use Sign Up page.");
             alert("La creación de nuevos usuarios debe hacerse desde la página de registro.");
-            // await addDoc(collection(firestore, 'users'), { ...userData, createdAt: serverTimestamp()});
         }
         setIsModalOpen(false);
         setEditingUser(null);
@@ -94,7 +90,9 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Gestión de Usuarios del Sistema</h2>
-        {/* <Button onClick={() => { setEditingUser(null); setIsModalOpen(true); }}><PlusCircle /> Nuevo Usuario</Button> */}
+        <Button asChild>
+          <Link href="/signup"><PlusCircle /> Nuevo Usuario</Link>
+        </Button>
       </div>
       
       <Card>

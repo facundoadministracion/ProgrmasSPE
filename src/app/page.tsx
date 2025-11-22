@@ -98,8 +98,8 @@ export default function App() {
   // Effect for fetching or creating user's profile
   useEffect(() => {
     if (!user || !firestore) {
-      setUserProfile(null);
-      setIsProfileLoading(!user);
+      // If there's no user or firestore isn't ready, we are not loading a profile.
+      setIsProfileLoading(!user); 
       return;
     }
     
@@ -126,7 +126,7 @@ export default function App() {
               .then(() => {
                 console.log("User profile created successfully on first login.");
                 setUserProfile(newUserProfile);
-                setIsProfileLoading(false);
+                setIsProfileLoading(false); // Profile is now loaded
               })
               .catch(error => {
                 console.error("Error creating user profile:", error);
@@ -246,13 +246,10 @@ export default function App() {
     const alerts = (participants || []).filter(p => { const s = getAlertStatus(p); return s && (s.type === 'red' || s.type === 'yellow'); }).length;
     return (
       <div className="space-y-8">
-        <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Resumen General</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <DashboardCard title="Total Activos" value={participants?.length ?? 0} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
-                <DashboardCard title="Alertas Admin." value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención urgente" isLoading={participantsLoading} />
-                <DashboardCard title="Pagos Registrados" value={payments?.length ?? 0} icon={DollarSign} color="green" subtitle="Histórico total de transacciones" isLoading={paymentsLoading} />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <DashboardCard title="Total Activos" value={participants?.length ?? 0} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
+            <DashboardCard title="Alertas Admin." value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención urgente" isLoading={participantsLoading} />
+            <DashboardCard title="Pagos Registrados" value={payments?.length ?? 0} icon={DollarSign} color="green" subtitle="Histórico total de transacciones" isLoading={paymentsLoading} />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
@@ -346,6 +343,24 @@ export default function App() {
     );
   }
 
+  const ActiveTabContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return isAdmin ? renderDashboard() : null;
+      case 'participants':
+        return isAdmin ? renderParticipants() : null;
+      case 'attendance':
+        return (isAdmin || isDataEntry) ? <AttendanceSection participants={participants || []} /> : null;
+      case 'users':
+        return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
+      case 'config':
+        return isAdmin ? renderConfig() : null;
+      default:
+        return null;
+    }
+  };
+
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -380,11 +395,6 @@ export default function App() {
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link href="/signup"><PlusCircle size={16} />Nuevo Usuario</Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
               </>
             )}
           </SidebarMenu>
@@ -406,13 +416,11 @@ export default function App() {
             <span className="font-bold">Gestión LR</span>
         </header>
         <main className="flex-1 p-4 md:p-8">
-            
-          {activeTab === 'dashboard' && isAdmin && renderDashboard()}
-          {activeTab === 'participants' && isAdmin && renderParticipants()}
-          {activeTab === 'attendance' && (isAdmin || isDataEntry) && <AttendanceSection participants={participants || []} />}
-          {activeTab === 'users' && isAdmin && <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} />}
-          {activeTab === 'config' && isAdmin && renderConfig()}
-                
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-800">Bienvenido, {userProfile.name}</h1>
+                {activeTab === 'dashboard' && <p className="text-gray-500">Aquí tienes un resumen de la actividad reciente.</p>}
+            </div>
+          <ActiveTabContent />
         </main>
       </SidebarInset>
 
