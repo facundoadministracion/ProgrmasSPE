@@ -7,15 +7,12 @@ import { getFirestore } from 'firebase/firestore';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  // Siempre inicializa usando la configuración explícita para evitar ambigüedades.
-  // Si la app ya está inicializada, la recupera.
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   return getSdks(app);
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  // Esta función ahora solo obtiene los servicios del app ya inicializado.
-  // Se especifica el nombre de la base de datos para proyectos que no usan "(default)".
+  // Conecta explícitamente a la base de datos con nombre.
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
