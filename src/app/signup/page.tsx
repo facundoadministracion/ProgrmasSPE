@@ -59,14 +59,11 @@ export default function SignUpPage() {
     }
 
     try {
-      // Step 1: Create the user in Firebase Authentication
+      // Step 1: Create user in Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Step 2: Force a token refresh to ensure the backend recognizes the new user
-      await newUser.getIdToken(true);
-
-      // Step 3: Define the user profile data
+      // Step 2: Create user profile data
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
       const userProfileData: Omit<UserRole, 'createdAt'> & { createdAt: string } = {
         uid: newUser.uid,
@@ -75,40 +72,36 @@ export default function SignUpPage() {
         role: isAdmin ? 'admin' : 'data_entry',
         createdAt: new Date().toISOString(),
       };
-      
-      // Step 4: Create the user document in Firestore
+
+      // Step 3: Write user profile to Firestore
       const userDocRef = doc(firestore, 'users', newUser.uid);
-      
-      // Use .catch() for permission error handling
-      setDoc(userDocRef, userProfileData).catch(serverError => {
-        // This block will execute if setDoc fails due to permissions
-        const permissionError = new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'create',
-            requestResourceData: userProfileData,
-        });
-        // Emit the contextual error
-        errorEmitter.emit('permission-error', permissionError);
-        // We don't set local state error here, as the listener will throw
-        setIsSubmitting(false);
-      }).then(() => {
-        // This block executes on successful write
-        if (!isSubmitting) return; // Avoid running if an error was caught
-        toast({
-          title: "¡Registro Exitoso!",
-          description: `La cuenta para ${email} ha sido creada. Ahora será redirigido para iniciar sesión.`,
-        });
-        router.push('/login');
+      await setDoc(userDocRef, userProfileData);
+
+      toast({
+        title: "¡Registro Exitoso!",
+        description: `La cuenta para ${email} ha sido creada. Ahora será redirigido para iniciar sesión.`,
       });
+      router.push('/login');
 
     } catch (err: any) {
-        // This catch block now primarily handles Auth errors
-        console.error("Auth Error (Non-Permission):", err.code, err.message);
-        if (err.code === 'auth/email-already-in-use') {
-            setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
-        } else {
-            setError(`Ocurrió un error en la autenticación: ${err.message}`);
-        }
+      console.error("SignUp Error:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
+      } else if (err.code === 'permission-denied') {
+         setError('Error de permisos. Verifique las reglas de seguridad de Firestore.');
+         // Emit contextual error for debugging
+         const permissionError = new FirestorePermissionError({
+            path: `users/${(auth.currentUser?.uid || 'unknown')}`,
+            operation: 'create',
+            requestResourceData: { name, email, role: 'data_entry' }, // Example data
+        });
+        errorEmitter.emit('permission-error', permissionError);
+
+      } else {
+        setError(`Ocurrió un error: ${err.message}`);
+      }
+    } finally {
+        // This will always run, ensuring the button is re-enabled
         setIsSubmitting(false);
     }
   };
