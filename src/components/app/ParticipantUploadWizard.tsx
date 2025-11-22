@@ -33,6 +33,8 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
                 departamento: values[5]?.trim() || '',
                 lugarTrabajo: values[6]?.trim() || '',
                 categoria: values[7]?.trim() || 'N/A',
+                email: values[8]?.trim() || '',
+                telefono: values[9]?.trim() || '',
                 // Default values for fields not in this simple CSV
                 pagosAcumulados: 0,
                 activo: true,
@@ -113,11 +115,11 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded text-sm text-blue-800">
             <p>Pegue aquí los datos desde su hoja de cálculo. Asegúrese que las columnas estén en el orden correcto:</p>
-            <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria</p>
+            <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria, email, telefono</p>
           </div>
           <Textarea 
             className="w-full h-48 font-mono text-sm" 
-            placeholder="Juan Perez,30111222,1990-05-15,Tutorías,2023-01-10,Capital,Escuela N° 5,Senior..." 
+            placeholder="Juan Perez,30111222,1990-05-15,Tutorías,2023-01-10,Capital,Escuela N° 5,Senior,juan@email.com,3804123456..." 
             value={csvText} 
             onChange={e => setCsvText(e.target.value)}
           />
