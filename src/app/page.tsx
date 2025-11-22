@@ -425,7 +425,7 @@ export default function App() {
                   <div><label className="text-sm">Email</label><Input name="email" type="email" /></div>
                   <div><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
               </div>
-              <div className="flex items-center gap-2 mt-2 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico (Staff)</label></div>
+              <div className="flex items-center gap-2 mt-2 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
               <Button type="submit" className="w-full mt-4">Guardar</Button>
           </form>
         </DialogContent>
