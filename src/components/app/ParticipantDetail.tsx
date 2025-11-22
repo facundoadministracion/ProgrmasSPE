@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
@@ -13,6 +14,7 @@ import {
   Phone,
   PlusCircle,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,12 +23,17 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PROGRAMAS } from '@/lib/constants';
 
-const ParticipantDetail = ({ participant, payments }: { participant: Participant, payments: Payment[]}) => {
+const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
+  const currentYear = new Date().getFullYear().toString();
   
+  // Carga de datos bajo demanda para este participante específico
   const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades'), where('participantId', '==', participant.id)) : null, [firestore, participant.id]);
-  const { data: novedadesData } = useCollection<Novedad>(novedadesRef);
+  const { data: novedadesData, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   const novedades = useMemo(() => (novedadesData || []).sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [novedadesData]);
+
+  const paymentsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'payments'), where('dni', '==', participant.dni), where('anio', '==', currentYear)) : null, [firestore, participant.dni, currentYear]);
+  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
 
   const [newNovedad, setNewNovedad] = useState({ descripcion: '', fecha: new Date().toISOString().split('T')[0] });
 
@@ -116,13 +123,15 @@ const ParticipantDetail = ({ participant, payments }: { participant: Participant
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {payments.filter(p => p.dni === participant.dni).map(pay => (
+                        {paymentsLoading && <TableRow><TableCell colSpan={3} className="h-24 text-center"><Loader2 className="animate-spin inline-block mr-2"/>Cargando pagos...</TableCell></TableRow>}
+                        {!paymentsLoading && (payments || []).map(pay => (
                             <TableRow key={pay.id}>
                                 <TableCell>{pay.mes}/{pay.anio}</TableCell>
                                 <TableCell className="font-mono font-bold text-green-700">${pay.monto}</TableCell>
                                 <TableCell className="text-gray-500">{pay.fechaCarga?.seconds ? new Date(pay.fechaCarga.seconds * 1000).toLocaleDateString() : 'Reciente'}</TableCell>
                             </TableRow>
                         ))}
+                        {!paymentsLoading && (!payments || payments.length === 0) && <TableRow><TableCell colSpan={3} className="h-24 text-center">No hay pagos registrados este año.</TableCell></TableRow>}
                     </TableBody>
                 </Table>
               </div>
@@ -140,7 +149,8 @@ const ParticipantDetail = ({ participant, payments }: { participant: Participant
                   </div>
                 </form>
                 <div className="space-y-3 max-h-60 overflow-y-auto">
-                   {(novedades || []).map(nov => (
+                   {novedadesLoading && <div className="text-center text-gray-400 p-4"><Loader2 className="animate-spin inline-block mr-2"/>Cargando novedades...</div>}
+                   {!novedadesLoading && (novedades || []).map(nov => (
                      <div key={nov.id} className="border-l-2 border-blue-400 pl-3 py-1">
                         <div className="flex justify-between items-start">
                           <p className="text-sm text-gray-800 font-medium">{nov.descripcion}</p>
@@ -148,6 +158,7 @@ const ParticipantDetail = ({ participant, payments }: { participant: Participant
                         </div>
                      </div>
                    ))}
+                   {!novedadesLoading && (!novedades || novedades.length === 0) && <div className="text-center text-gray-400 p-4">No hay novedades registradas.</div>}
                 </div>
               </div>
             </TabsContent>

@@ -1,30 +1,44 @@
+
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Novedad, Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
-import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Users, Wrench } from 'lucide-react';
+import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Users, Wrench, Loader2 } from 'lucide-react';
 import { Card as UICard, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
-const Card = ({ title, value, icon: Icon, subtitle }: { title: string, value: string | number, icon: React.ElementType, subtitle: string }) => (
+const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
     <UICard>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-            <div className="text-2xl font-bold">{value}</div>
+            {isLoading ? <div className="h-7 w-1/2 bg-gray-200 animate-pulse rounded" /> : <div className="text-2xl font-bold">{value}</div>}
             <p className="text-xs text-muted-foreground">{subtitle}</p>
         </CardContent>
     </UICard>
 );
 
-const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: { programName: string; participants: Participant[]; allNovedades: Novedad[]; onBack: () => void; }) => {
+const ProgramAnalytics = ({ programName, participants, onBack }: { programName: string; participants: Participant[]; onBack: () => void; }) => {
   const [month, setMonth] = useState(String(new Date().getMonth()));
   const [year, setYear] = useState(String(new Date().getFullYear()));
+  const { firestore } = useFirebase();
+
+  // Carga de novedades bajo demanda
+  const novedadesRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const startDate = new Date(parseInt(year), parseInt(month), 1).toISOString().split('T')[0];
+    const endDate = new Date(parseInt(year), parseInt(month) + 1, 0).toISOString().split('T')[0];
+    return query(collection(firestore, 'novedades'), where('fecha', '>=', startDate), where('fecha', '<=', endDate));
+  }, [firestore, year, month]);
+
+  const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
 
   const analytics = useMemo(() => {
     const programParticipants = participants.filter(p => p.programa === programName);
@@ -32,15 +46,9 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
     const y = parseInt(year);
     
     const getRefDate = (p: Participant): Date | null => {
-        if (p.fechaIngreso) {
-            // Handle Firebase Timestamp or string date
-            if (typeof p.fechaIngreso === 'string') return new Date(p.fechaIngreso);
-            if ('seconds' in p.fechaIngreso) return new Date((p.fechaIngreso as any).seconds * 1000);
-        }
-        if (p.fechaAlta) {
-            if (typeof p.fechaAlta === 'string') return new Date(p.fechaAlta);
-            if ('seconds' in p.fechaAlta) return new Date((p.fechaAlta as any).seconds * 1000);
-        }
+        if (p.fechaIngreso) return new Date(p.fechaIngreso + 'T00:00:00');
+        if (typeof p.fechaAlta === 'string') return new Date(p.fechaAlta);
+        if (p.fechaAlta && 'seconds' in p.fechaAlta) return new Date((p.fechaAlta as any).seconds * 1000);
         return null; 
     };
 
@@ -50,12 +58,11 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
         return d.getMonth() === m && d.getFullYear() === y;
     });
 
-    const bajasNovedades = allNovedades.filter(n => {
+    const bajasNovedades = (allNovedades || []).filter(n => {
         if(!n.fecha) return false;
-        const d = new Date(n.fecha);
         const isThisProgram = programParticipants.some(p => p.id === n.participantId);
         const isBaja = n.descripcion.toLowerCase().includes('baja');
-        return isThisProgram && isBaja && d.getMonth() === m && d.getFullYear() === y;
+        return isThisProgram && isBaja;
     });
 
     const endOfMonth = new Date(y, m + 1, 0);
@@ -96,7 +103,7 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
             <Card title="Total Activos" value={analytics.activos.length} icon={Users} subtitle={`Acumulado a ${MONTHS[parseInt(month)]}`} />
             <Card title="Equipo Técnico" value={analytics.equipoTecnico} icon={Wrench} subtitle="Personal de Staff" />
             <Card title="Altas del Mes" value={analytics.altas.length} icon={UserPlus} subtitle="Nuevos ingresos" />
-            <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" />
+            <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" isLoading={novedadesLoading}/>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {programName === PROGRAMAS.TUTORIAS && (
@@ -127,9 +134,10 @@ const ProgramAnalytics = ({ programName, participants, allNovedades, onBack }: {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{p.fechaIngreso ? new Date(p.fechaIngreso).toLocaleDateString() : (p.fechaAlta && new Date(typeof p.fechaAlta === 'string' ? p.fechaAlta : (p.fechaAlta as any).seconds * 1000).toLocaleDateString()) || '-'}</TableCell></TableRow>))}
-                                {analytics.bajasNovedades.map(n => (<TableRow key={'baja-'+n.id}><TableCell><Badge variant="destructive">Baja</Badge></TableCell><TableCell className="font-medium">{n.participantName}</TableCell><TableCell className="text-muted-foreground">{n.descripcion}</TableCell><TableCell>{new Date(n.fecha).toLocaleDateString()}</TableCell></TableRow>))}
-                                {analytics.altas.length === 0 && analytics.bajasNovedades.length === 0 && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400">Sin movimientos este mes</TableCell></TableRow>}
+                                {novedadesLoading && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400"><Loader2 className="animate-spin inline-block mr-2" />Cargando movimientos...</TableCell></TableRow>}
+                                {!novedadesLoading && analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{p.fechaIngreso ? new Date(p.fechaIngreso + 'T00:00:00').toLocaleDateString() : (p.fechaAlta && new Date(typeof p.fechaAlta === 'string' ? p.fechaAlta : (p.fechaAlta as any).seconds * 1000).toLocaleDateString()) || '-'}</TableCell></TableRow>))}
+                                {!novedadesLoading && analytics.bajasNovedades.map(n => (<TableRow key={'baja-'+n.id}><TableCell><Badge variant="destructive">Baja</Badge></TableCell><TableCell className="font-medium">{n.participantName}</TableCell><TableCell className="text-muted-foreground">{n.descripcion}</TableCell><TableCell>{new Date(n.fecha + 'T00:00:00').toLocaleDateString()}</TableCell></TableRow>))}
+                                {!novedadesLoading && analytics.altas.length === 0 && analytics.bajasNovedades.length === 0 && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400">Sin movimientos este mes</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </div>

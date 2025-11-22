@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -140,20 +141,33 @@ export default function App() {
   }, [user, firestore]);
 
   // --- CARGA DE DATOS OPTIMIZADA ---
+  // Solo se cargan las colecciones esenciales y/o pequeñas al inicio.
+  // Payments y Novedades se cargarán bajo demanda.
   const participantsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
-  
-  const paymentsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'payments'), where('anio', '==', currentYear)) : null, [firestore, currentYear]);
-  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
-  
-  const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades'), where('fecha', '>=', `${currentYear}-01-01`)) : null, [firestore, currentYear]);
-  const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   
   const configRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'config')) : null, [firestore]);
   const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
 
   const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
+
+  // Los pagos ahora se contarán de forma asíncrona para el dashboard
+  const [paymentCount, setPaymentCount] = useState(0);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const q = query(collection(firestore, 'payments'), where('anio', '==', currentYear));
+    getDocs(q).then(snapshot => {
+      setPaymentCount(snapshot.size);
+      setPaymentsLoading(false);
+    }).catch(err => {
+      console.error("Error counting payments:", err);
+      setPaymentsLoading(false);
+    });
+  }, [firestore, currentYear]);
+
 
   // --- UI STATE ---
   const isAdmin = userProfile?.role === ROLES.ADMIN;
@@ -216,7 +230,6 @@ export default function App() {
     }
   };
   
-  // Pantallas de Carga
   if (isUserLoading || !user) {
     return <div className="flex flex-col items-center justify-center h-screen text-gray-500 gap-4"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p>Iniciando sesión...</p></div>;
   }
@@ -227,7 +240,8 @@ export default function App() {
   
   const renderDashboard = () => {
     if (selectedProgramDetail) {
-        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} allNovedades={allNovedades || []} onBack={() => setSelectedProgramDetail(null)} />;
+        // ProgramAnalytics ahora es responsable de cargar sus propios datos de novedades
+        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
     }
     const alerts = (participants || []).filter(p => { const s = getAlertStatus(p); return s && (s.type === 'red' || s.type === 'yellow'); }).length;
     return (
@@ -235,7 +249,7 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <DashboardCard title="Total Activos" value={participants?.length ?? 0} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
             <DashboardCard title="Alertas Admin." value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención urgente" isLoading={participantsLoading} />
-            <DashboardCard title="Pagos (Este Año)" value={payments?.length ?? 0} icon={DollarSign} color="green" subtitle={`Transacciones en ${currentYear}`} isLoading={paymentsLoading} />
+            <DashboardCard title="Pagos (Este Año)" value={paymentCount} icon={DollarSign} color="green" subtitle={`Transacciones en ${currentYear}`} isLoading={paymentsLoading} />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
@@ -409,7 +423,7 @@ export default function App() {
       
       <Dialog open={!!(selectedParticipant && selectedParticipant !== 'new')} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Legajo Personal</DialogTitle><DialogDescription>Información del participante, pagos y novedades.</DialogDescription></DialogHeader>
-          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant} payments={payments || []} />}
+          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant} />}
         </DialogContent>
       </Dialog>
       
