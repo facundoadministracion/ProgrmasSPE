@@ -52,7 +52,6 @@ const PaymentUploadWizard = ({
     const separator = lines[0].includes(';') ? ';' : ',';
     const result = [];
     
-    // Detección de encabezado: si la primera línea contiene 'dni' o 'monto', la omitimos.
     const firstLineLower = lines[0].toLowerCase();
     if (firstLineLower.includes('dni') || firstLineLower.includes('monto')) {
       lines.shift();
@@ -77,7 +76,13 @@ const PaymentUploadWizard = ({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
+      let text = e.target?.result as string;
+
+      // FIX: Remove potential UTF-8 BOM character from the beginning of the file
+      if (text && text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1);
+      }
+      
       const records = parseCSV(text);
       const programParticipants = participants.filter(
         (p) => p.programa === config.programa
@@ -406,3 +411,5 @@ const PaymentUploadWizard = ({
   );
 };
 export default PaymentUploadWizard;
+
+    
