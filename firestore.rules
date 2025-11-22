@@ -1,35 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Función para verificar si un usuario es administrador
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // Reglas para la colección de usuarios
-    match /users/{userId} {
-      // Un usuario puede crear su propio perfil.
-      allow create: if request.auth.uid == userId;
-      // Cualquiera autenticado puede leer la lista de usuarios (para la UI de admin), pero solo un admin puede leer cualquier perfil.
-      // O un usuario puede leer su propio perfil.
-      allow read: if request.auth != null && (isAdmin() || request.auth.uid == userId);
-      // Solo un administrador puede actualizar roles.
-      allow update: if isAdmin();
-      // Solo un administrador puede borrar usuarios.
-      allow delete: if isAdmin();
-    }
-    
-    // Reglas para el resto de las colecciones
-    match /{collection}/{docId} {
-        // Los administradores tienen acceso total a todo.
-        // O, si eres el dueño del documento, puedes leerlo y escribirlo.
-        allow read, write: if request.auth != null && (isAdmin() || resource.data.ownerId == request.auth.uid);
-    }
-    
-    // Acceso a la configuración solo para administradores
-    match /config/{configId} {
-        allow read, write: if request.auth != null && isAdmin();
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
