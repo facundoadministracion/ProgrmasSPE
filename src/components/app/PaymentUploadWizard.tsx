@@ -133,29 +133,27 @@ const PaymentUploadWizard = ({
       });
 
       // 2. Deactivate participants not in the CSV
-      analysis.toDeactivate.forEach(p => {
-        const partRef = doc(firestore, 'participants', p.id);
-        batch.update(partRef, { activo: false });
-      });
+      if (flagMissing) {
+        analysis.toDeactivate.forEach(p => {
+          const partRef = doc(firestore, 'participants', p.id);
+          batch.update(partRef, { activo: false });
 
-      // 3. (Optional) Flag missing participants with a novelty
-      if (flagMissing && analysis.toDeactivate.length > 0) {
-        analysis.toDeactivate.forEach((p) => {
           const novRef = doc(collection(firestore, 'novedades'));
-          batch.set(novRef, {
-            participantId: p.id,
-            participantName: p.nombre,
-            descripcion: `Ausente en liquidación ${MONTHS[config.mes]} ${config.anio}. Se pasa a INACTIVO.`,
-            fecha: new Date().toISOString().split('T')[0],
-            fechaRealCarga: serverTimestamp(),
-            ownerId: user.uid,
-          });
+            batch.set(novRef, {
+              participantId: p.id,
+              participantName: p.nombre,
+              descripcion: `Ausente en liquidación ${MONTHS[config.mes]} ${config.anio}. Se pasa a INACTIVO.`,
+              fecha: new Date().toISOString().split('T')[0],
+              fechaRealCarga: serverTimestamp(),
+              ownerId: user.uid,
+            });
         });
       }
 
+
       await batch.commit();
       alert(
-        `¡Proceso finalizado!\n- Pagos registrados: ${analysis.matched.length}\n- Participantes pasados a INACTIVO: ${analysis.toDeactivate.length}`
+        `¡Proceso finalizado!\n- Pagos registrados: ${analysis.matched.length}\n- Participantes pasados a INACTIVO: ${flagMissing ? analysis.toDeactivate.length : 0}`
       );
       onClose();
     } catch (e) {
@@ -280,7 +278,7 @@ const PaymentUploadWizard = ({
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-4 text-center">
             <Card className="p-4 bg-green-50 border-green-200">
-              <CardContent>
+              <CardContent className="p-2">
                 <h3 className="text-2xl font-bold text-green-700">
                   {analysis.matched.length}
                 </h3>
@@ -290,7 +288,7 @@ const PaymentUploadWizard = ({
               </CardContent>
             </Card>
             <Card className="p-4 bg-yellow-50 border-yellow-200">
-              <CardContent>
+              <CardContent className="p-2">
                 <h3 className="text-2xl font-bold text-yellow-700">
                   {analysis.toDeactivate.length}
                 </h3>
@@ -303,10 +301,10 @@ const PaymentUploadWizard = ({
               className={`p-4 ${
                 analysis.unknown.length > 0
                   ? 'bg-red-50 border-red-200 text-red-700'
-                  : 'bg-gray-50 text-gray-400'
+                  : 'bg-gray-100 text-gray-500'
               }`}
             >
-              <CardContent>
+              <CardContent className="p-2">
                 <h3 className="text-2xl font-bold">{analysis.unknown.length}</h3>
                 <p className="text-xs uppercase font-bold">Desconocidos</p>
               </CardContent>
@@ -340,7 +338,7 @@ const PaymentUploadWizard = ({
               </h4>
               <p className="text-sm text-yellow-700 mt-1 mb-2">
                 Personas activas en el padrón del programa que no figuran en este
-                archivo de pago. Se marcarán como INACTIVOS.
+                archivo de pago. Puede marcar una novedad y pasarlos a INACTIVO.
               </p>
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -352,7 +350,7 @@ const PaymentUploadWizard = ({
                   htmlFor="flagMissing"
                   className="text-sm font-bold text-yellow-900 select-none"
                 >
-                  Registrar una novedad automática por la desactivación
+                  Pasar a INACTIVO y registrar una novedad por la ausencia
                 </label>
               </div>
             </div>
@@ -360,9 +358,13 @@ const PaymentUploadWizard = ({
 
           {analysis.unknown.length > 0 && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-800 text-sm">
-              <strong>Bloqueo de Seguridad:</strong> Hay {analysis.unknown.length}{' '}
-              DNIs desconocidos. Debe cargarlos primero en el Padrón General
-              de Participantes.
+              <strong className="font-bold flex items-center gap-2"><XCircle/>Bloqueo de Seguridad</strong>
+              Hay {analysis.unknown.length}{' '}
+              DNIs desconocidos en el archivo CSV. Debe cargarlos primero en el Padrón General
+              de Participantes antes de poder liquidarles un pago.
+              <ul className="list-disc pl-5 mt-2 text-xs font-mono">
+                {analysis.unknown.map(u => <li key={u.dni}>{u.dni}</li>)}
+              </ul>
             </div>
           )}
 
@@ -370,18 +372,16 @@ const PaymentUploadWizard = ({
             <Button variant="ghost" onClick={() => setStep(2)}>
               Atrás
             </Button>
-            {analysis.unknown.length === 0 ? (
-              <Button
-                onClick={handleExecute}
-                disabled={processing || analysis.matched.length === 0}
-                variant="default"
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {processing ? 'Procesando...' : 'Confirmar Operación'}
-              </Button>
-            ) : (
-              <Button disabled>Corregir Errores</Button>
-            )}
+            <Button
+              onClick={handleExecute}
+              disabled={processing || analysis.unknown.length > 0}
+              variant="default"
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+            >
+              {processing ? 'Procesando...' : (
+                analysis.unknown.length > 0 ? 'Corregir Errores para Continuar' : 'Confirmar Operación'
+              )}
+            </Button>
           </div>
         </div>
       )}
@@ -389,3 +389,5 @@ const PaymentUploadWizard = ({
   );
 };
 export default PaymentUploadWizard;
+
+    
