@@ -86,9 +86,11 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       
       const records = parseCSV(text);
       
+      // Consider ALL participants for matching, regardless of their 'activo' status.
       const programParticipants = participants.filter(
         (p) => p.programa === config.programa
       );
+      const allParticipants = participants; // Use all participants for matching
 
       const csvDnis = new Set(records.map(r => cleanDNI(r.dni)));
 
@@ -98,13 +100,15 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       
       records.forEach((rec) => {
         const cleanedCsvDni = cleanDNI(rec.dni);
-        const found = participants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
+        // Find in ALL participants, not just active ones.
+        const found = allParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
         
         if (found) {
             const isNew = (found.pagosAcumulados || 0) === 0;
             if (found.activo) {
                 matched.push({ ...rec, participant: found, isNew });
             } else {
+                // This person was inactive but is in the new payment file.
                 toReactivate.push({ ...rec, participant: found, isNew });
             }
         } else {
@@ -112,6 +116,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
         }
       });
       
+      // Deactivation logic remains: active participants of the program not in the CSV.
       const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
 
       setAnalysis({ matched, unknown, toDeactivate, toReactivate, totalCsv: records.length });
@@ -135,7 +140,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
         const updates: any = {
           pagosAcumulados: (item.participant.pagosAcumulados || 0) + 1,
           ultimoPago: ultimoPagoStr,
-          activo: true,
+          activo: true, 
         };
 
         if (item.isNew && altaResolution) {
