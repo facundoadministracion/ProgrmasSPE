@@ -44,12 +44,18 @@ const PaymentUploadWizard = ({
   const [flagMissing, setFlagMissing] = useState(true);
 
   const parseCSV = (text: string): { dni: string; monto: number }[] => {
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    let lines = text.split('\n').filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
     
     const separator = lines[0].includes(';') ? ';' : ',';
     const result = [];
     
+    // Detección de encabezado: si la primera línea contiene 'dni' o 'monto', la omitimos.
+    const firstLineLower = lines[0].toLowerCase();
+    if (firstLineLower.includes('dni') || firstLineLower.includes('monto')) {
+      lines.shift();
+    }
+
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].trim() === '') continue;
       const currentline = lines[i].split(separator);
