@@ -63,7 +63,7 @@ const PaymentUploadWizard = ({
       if (currentline.length >= 2) {
         // Force to string, remove non-numeric chars, then trim.
         const dni = String(currentline[0] || '').replace(/\D/g, '').trim();
-        const monto = parseFloat(String(currentline[1] || '0').trim());
+        const monto = parseFloat(String(currentline[1] || '0').trim().replace(',', '.'));
         if (dni && dni.length > 6 && !isNaN(monto)) {
           result.push({ dni, monto });
         }
@@ -93,7 +93,8 @@ const PaymentUploadWizard = ({
       const unknown: any[] = [];
       
       records.forEach((rec) => {
-        const found = programParticipants.find((p) => String(p.dni).replace(/\D/g, '').trim() === rec.dni);
+        // Force both to string for robust comparison
+        const found = programParticipants.find((p) => String(p.dni).replace(/\D/g, '').trim() === String(rec.dni).trim());
         if (found) {
           const isNew = (found.pagosAcumulados || 0) === 0;
           matched.push({ ...rec, participant: found, isNew });
@@ -411,3 +412,5 @@ const PaymentUploadWizard = ({
   );
 };
 export default PaymentUploadWizard;
+
+    

@@ -38,7 +38,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
 
             const participant = {
                 nombre: values[0] || '',
-                dni: values[1]?.replace(/\./g, '') || '',
+                dni: String(values[1]?.replace(/\./g, '') || ''), // Ensure DNI is a string
                 fechaNacimiento: values[2] || '',
                 programa: values[3] || '',
                 fechaIngreso: values[4] || '',
@@ -76,7 +76,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
         }
 
         const records = parseParticipantCSV(text);
-        const existingDnis = new Set(allParticipants.map(p => p.dni));
+        const existingDnis = new Set(allParticipants.map(p => String(p.dni)));
 
         const newParticipants: any[] = [];
         const duplicates: any[] = [];
@@ -217,3 +217,5 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   );
 };
 export default ParticipantUploadWizard;
+
+    

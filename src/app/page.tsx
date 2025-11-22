@@ -244,7 +244,16 @@ export default function App() {
     if (!firestore || !user) return;
     const formData = new FormData(e.currentTarget);
     const esEquipoTecnico = formData.get('esEquipoTecnico') === 'on';
-    const data = Object.fromEntries(formData.entries());
+    
+    const data: { [key: string]: any } = {};
+    formData.forEach((value, key) => {
+        data[key] = value;
+    });
+
+    // Ensure DNI is a string
+    if (data.dni) {
+        data.dni = String(data.dni);
+    }
     
     await addDoc(collection(firestore, 'participants'), {
       ...data, 
@@ -318,7 +327,7 @@ export default function App() {
   };
 
   const renderParticipants = () => {
-    const filtered = (participants || []).filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.dni.includes(searchTerm));
+    const filtered = (participants || []).filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
     
     const totalPages = Math.ceil(filtered.length / itemsPerPage);
     const paginatedData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -527,3 +536,5 @@ export default function App() {
     </SidebarProvider>
   );
 }
+
+    
