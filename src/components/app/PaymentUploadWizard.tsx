@@ -88,7 +88,7 @@ const PaymentUploadWizard = ({
       const unknown: any[] = [];
       
       records.forEach((rec) => {
-        const found = programParticipants.find((p) => p.dni === rec.dni);
+        const found = programParticipants.find((p) => p.dni.replace(/\./g, '') === rec.dni);
         if (found) {
           const isNew = (found.pagosAcumulados || 0) === 0;
           matched.push({ ...rec, participant: found, isNew });
@@ -97,7 +97,7 @@ const PaymentUploadWizard = ({
         }
       });
       
-      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(p.dni));
+      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(p.dni.replace(/\./g, '')));
 
       setAnalysis({ matched, unknown, toDeactivate, totalCsv: records.length });
       setStep(3);
