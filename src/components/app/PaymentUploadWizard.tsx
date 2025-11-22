@@ -4,7 +4,7 @@ import type { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { useFirebase, useUser } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { ArrowRight, FileSignature, AlertTriangle, Upload, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowRight, FileSignature, AlertTriangle, Upload, CheckCircle, XCircle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -39,6 +39,7 @@ const PaymentUploadWizard = ({
     matched: any[];
     unknown: any[];
     toDeactivate: Participant[];
+    toReactivate: any[];
     totalCsv: number;
   } | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -90,6 +91,7 @@ const PaymentUploadWizard = ({
       }
       
       const records = parseCSV(text);
+      // **FIX**: Use ALL participants from the selected program, regardless of their `activo` status.
       const programParticipants = participants.filter(
         (p) => p.programa === config.programa
       );
@@ -97,20 +99,28 @@ const PaymentUploadWizard = ({
 
       const matched: any[] = [];
       const unknown: any[] = [];
+      const toReactivate: any[] = [];
       
       records.forEach((rec) => {
-        const found = programParticipants.find((p) => cleanDNI(p.dni) === rec.dni);
+        const cleanedCsvDni = cleanDNI(rec.dni);
+        const found = programParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
+        
         if (found) {
-          const isNew = (found.pagosAcumulados || 0) === 0;
-          matched.push({ ...rec, participant: found, isNew });
+            const isNew = (found.pagosAcumulados || 0) === 0;
+            if (found.activo) {
+                matched.push({ ...rec, participant: found, isNew });
+            } else {
+                toReactivate.push({ ...rec, participant: found, isNew });
+            }
         } else {
           unknown.push(rec);
         }
       });
       
+      // A participant is deactivated if they were active but are not in the new payment CSV.
       const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
 
-      setAnalysis({ matched, unknown, toDeactivate, totalCsv: records.length });
+      setAnalysis({ matched, unknown, toDeactivate, toReactivate, totalCsv: records.length });
       setStep(3);
     };
     reader.readAsText(selectedFile, 'UTF-8');
@@ -123,9 +133,11 @@ const PaymentUploadWizard = ({
     try {
       const batch = writeBatch(firestore);
       const ultimoPagoStr = `${config.mes + 1}/${config.anio}`;
+      
+      const participantsToProcess = [...analysis.matched, ...analysis.toReactivate];
 
-      // 1. Update matched participants
-      analysis.matched.forEach((item) => {
+      // 1. Update matched and reactivated participants
+      participantsToProcess.forEach((item) => {
         const partRef = doc(firestore, 'participants', item.participant.id);
         const updates: any = {
           pagosAcumulados: (item.participant.pagosAcumulados || 0) + 1,
@@ -169,10 +181,9 @@ const PaymentUploadWizard = ({
         });
       }
 
-
       await batch.commit();
       alert(
-        `¡Proceso finalizado!\n- Pagos registrados: ${analysis.matched.length}\n- Participantes dados de baja: ${flagMissing ? analysis.toDeactivate.length : 0}`
+        `¡Proceso finalizado!\n- Pagos registrados (Activos): ${analysis.matched.length}\n- Pagos registrados (Reactivados): ${analysis.toReactivate.length}\n- Participantes dados de baja: ${flagMissing ? analysis.toDeactivate.length : 0}`
       );
       onClose();
     } catch (e) {
@@ -242,7 +253,7 @@ const PaymentUploadWizard = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[2023, 2024, 2025].map((y) => (
+                  {[2023, 2024, 2025, 2026].map((y) => (
                     <SelectItem key={y} value={String(y)}>
                       {y}
                     </SelectItem>
@@ -295,39 +306,31 @@ const PaymentUploadWizard = ({
 
       {step === 3 && analysis && (
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <Card className="p-4 bg-green-50 border-green-200">
-              <CardContent className="p-2">
-                <h3 className="text-2xl font-bold text-green-700">
-                  {analysis.matched.length}
-                </h3>
-                <p className="text-xs text-green-600 uppercase font-bold">
-                  Activos
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="p-4 bg-yellow-50 border-yellow-200">
-              <CardContent className="p-2">
-                <h3 className="text-2xl font-bold text-yellow-700">
-                  {analysis.toDeactivate.length}
-                </h3>
-                <p className="text-xs text-yellow-600 uppercase font-bold">
-                  Bajas
-                </p>
-              </CardContent>
-            </Card>
-            <Card
-              className={`p-4 ${
-                analysis.unknown.length > 0
-                  ? 'bg-red-50 border-red-200 text-red-700'
-                  : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              <CardContent className="p-2">
-                <h3 className="text-2xl font-bold">{analysis.unknown.length}</h3>
-                <p className="text-xs uppercase font-bold">Desconocidos</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+             <Card className="p-4 bg-green-50 border-green-200">
+                <CardContent className="p-2">
+                    <h3 className="text-2xl font-bold text-green-700">{analysis.matched.length}</h3>
+                    <p className="text-xs text-green-600 uppercase font-bold">Activos</p>
+                </CardContent>
+             </Card>
+             <Card className="p-4 bg-blue-50 border-blue-200">
+                <CardContent className="p-2">
+                    <h3 className="text-2xl font-bold text-blue-700">{analysis.toReactivate.length}</h3>
+                    <p className="text-xs text-blue-600 uppercase font-bold">Reactivados</p>
+                </CardContent>
+             </Card>
+             <Card className="p-4 bg-yellow-50 border-yellow-200">
+                <CardContent className="p-2">
+                    <h3 className="text-2xl font-bold text-yellow-700">{analysis.toDeactivate.length}</h3>
+                    <p className="text-xs text-yellow-600 uppercase font-bold">Bajas</p>
+                </CardContent>
+             </Card>
+             <Card className={`p-4 ${analysis.unknown.length > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-100'}`}>
+                <CardContent className="p-2">
+                    <h3 className={`text-2xl font-bold ${analysis.unknown.length > 0 ? 'text-red-700' : 'text-gray-500'}`}>{analysis.unknown.length}</h3>
+                    <p className={`text-xs uppercase font-bold ${analysis.unknown.length > 0 ? 'text-red-600' : 'text-gray-500'}`}>Desconocidos</p>
+                </CardContent>
+             </Card>
           </div>
 
           {analysis.matched.some((m) => m.isNew) && (
@@ -348,6 +351,27 @@ const PaymentUploadWizard = ({
                 onChange={(e) => setAltaResolution(e.target.value)}
               />
             </div>
+          )}
+          
+          {analysis.toReactivate.length > 0 && (
+            <Card>
+              <CardHeader className="bg-blue-50">
+                <CardTitle className="text-blue-800 flex items-center gap-2 text-base"><UserCheck />Participantes a Reactivar</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 text-sm text-blue-700">
+                <p>Hay {analysis.toReactivate.length} participantes que figuran como inactivos en el sistema pero aparecen en el nuevo archivo de pago. Se marcarán como activos.</p>
+                <div className="max-h-40 overflow-y-auto mt-4 border bg-white p-2 rounded">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>DNI</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {analysis.toReactivate.map(u => (
+                        <TableRow key={u.dni}><TableCell>{u.participant.nombre}</TableCell><TableCell className="font-mono">{u.dni}</TableCell></TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {analysis.toDeactivate.length > 0 && (
