@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import type { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { useFirebase, useUser } from '@/firebase';
-import { writeBatch, collection, doc, serverTimestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { ArrowRight, FileSignature, AlertTriangle, Upload, CheckCircle, XCircle, UserCheck } from 'lucide-react';
+import { writeBatch, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { ArrowRight, AlertTriangle, Upload, CheckCircle, XCircle, UserCheck, FileSignature } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -49,8 +49,8 @@ const PaymentUploadWizard = ({
   const cleanDNI = (value: any) =>
     String(value)
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove accents
-      .replace(/\D/g, '') // Remove all non-numeric characters
+      .replace(/[\u0300-\u036f]/g, '') // quita tildes
+      .replace(/\D/g, '') // quita todo lo no numérico
       .trim();
 
   const parseCSV = (text: string): { dni: string; monto: number }[] => {
@@ -91,11 +91,10 @@ const PaymentUploadWizard = ({
       }
       
       const records = parseCSV(text);
-      // **FIX**: Use ALL participants from the selected program, regardless of their `activo` status.
       const programParticipants = participants.filter(
         (p) => p.programa === config.programa
       );
-      const csvDnis = new Set(records.map(r => r.dni));
+      const csvDnis = new Set(records.map(r => cleanDNI(r.dni)));
 
       const matched: any[] = [];
       const unknown: any[] = [];
@@ -103,7 +102,7 @@ const PaymentUploadWizard = ({
       
       records.forEach((rec) => {
         const cleanedCsvDni = cleanDNI(rec.dni);
-        const found = programParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
+        const found = participants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
         
         if (found) {
             const isNew = (found.pagosAcumulados || 0) === 0;
@@ -117,7 +116,6 @@ const PaymentUploadWizard = ({
         }
       });
       
-      // A participant is deactivated if they were active but are not in the new payment CSV.
       const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
 
       setAnalysis({ matched, unknown, toDeactivate, toReactivate, totalCsv: records.length });
@@ -136,13 +134,12 @@ const PaymentUploadWizard = ({
       
       const participantsToProcess = [...analysis.matched, ...analysis.toReactivate];
 
-      // 1. Update matched and reactivated participants
       participantsToProcess.forEach((item) => {
         const partRef = doc(firestore, 'participants', item.participant.id);
         const updates: any = {
           pagosAcumulados: (item.participant.pagosAcumulados || 0) + 1,
           ultimoPago: ultimoPagoStr,
-          activo: true, // Mark as active
+          activo: true,
         };
 
         if (item.isNew && altaResolution) {
@@ -163,7 +160,6 @@ const PaymentUploadWizard = ({
         });
       });
 
-      // 2. Deactivate participants not in the CSV
       if (flagMissing) {
         analysis.toDeactivate.forEach(p => {
           const partRef = doc(firestore, 'participants', p.id);
@@ -233,7 +229,7 @@ const PaymentUploadWizard = ({
               >
                 <SelectTrigger>
                   <SelectValue />
-                </SelectTrigger>
+                </Trigger>
                 <SelectContent>
                   {MONTHS.map((m, i) => (
                     <SelectItem key={i} value={String(i)}>
@@ -251,7 +247,7 @@ const PaymentUploadWizard = ({
               >
                 <SelectTrigger>
                   <SelectValue />
-                </SelectTrigger>
+                </Trigger>
                 <SelectContent>
                   {[2023, 2024, 2025, 2026].map((y) => (
                     <SelectItem key={y} value={String(y)}>
