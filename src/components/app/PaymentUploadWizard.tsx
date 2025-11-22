@@ -45,6 +45,13 @@ const PaymentUploadWizard = ({
   const [altaResolution, setAltaResolution] = useState('');
   const [flagMissing, setFlagMissing] = useState(true);
 
+  const cleanDNI = (value: any) =>
+    String(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/\D/g, '') // Remove all non-numeric characters
+      .trim();
+
   const parseCSV = (text: string): { dni: string; monto: number }[] => {
     let lines = text.split('\n').filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
@@ -61,7 +68,7 @@ const PaymentUploadWizard = ({
       if (lines[i].trim() === '') continue;
       const currentline = lines[i].split(separator);
       if (currentline.length >= 2) {
-        const dni = String(currentline[0] || '').replace(/\D/g, '').trim();
+        const dni = cleanDNI(currentline[0]);
         const monto = parseFloat(String(currentline[1] || '0').trim().replace(',', '.'));
         if (dni && dni.length > 6 && !isNaN(monto)) {
           result.push({ dni, monto });
@@ -92,7 +99,7 @@ const PaymentUploadWizard = ({
       const unknown: any[] = [];
       
       records.forEach((rec) => {
-        const found = programParticipants.find((p) => String(p.dni).replace(/\D/g, '').trim() === String(rec.dni).trim());
+        const found = programParticipants.find((p) => cleanDNI(p.dni) === rec.dni);
         if (found) {
           const isNew = (found.pagosAcumulados || 0) === 0;
           matched.push({ ...rec, participant: found, isNew });
@@ -101,7 +108,7 @@ const PaymentUploadWizard = ({
         }
       });
       
-      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(String(p.dni).replace(/\D/g, '').trim()));
+      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
 
       setAnalysis({ matched, unknown, toDeactivate, totalCsv: records.length });
       setStep(3);
@@ -135,7 +142,7 @@ const PaymentUploadWizard = ({
         batch.set(payRef, {
           participantId: item.participant.id,
           participantName: item.participant.nombre,
-          dni: item.dni,
+          dni: cleanDNI(item.dni),
           monto: item.monto,
           mes: String(config.mes + 1),
           anio: String(config.anio),
