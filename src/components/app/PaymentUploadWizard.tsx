@@ -61,9 +61,10 @@ const PaymentUploadWizard = ({
       if (lines[i].trim() === '') continue;
       const currentline = lines[i].split(separator);
       if (currentline.length >= 2) {
-        const dni = currentline[0].trim().replace(/\./g, '');
-        const monto = parseFloat(currentline[1].trim());
-        if (!isNaN(parseInt(dni)) && dni.length > 6 && !isNaN(monto)) {
+        // Force to string, remove non-numeric chars, then trim.
+        const dni = String(currentline[0]).replace(/\D/g, '').trim();
+        const monto = parseFloat(String(currentline[1]).trim());
+        if (dni && dni.length > 6 && !isNaN(monto)) {
           result.push({ dni, monto });
         }
       }
@@ -78,7 +79,6 @@ const PaymentUploadWizard = ({
     reader.onload = (e) => {
       let text = e.target?.result as string;
 
-      // FIX: Remove potential UTF-8 BOM character from the beginning of the file
       if (text && text.charCodeAt(0) === 0xFEFF) {
         text = text.slice(1);
       }
@@ -93,7 +93,7 @@ const PaymentUploadWizard = ({
       const unknown: any[] = [];
       
       records.forEach((rec) => {
-        const found = programParticipants.find((p) => p.dni.replace(/\./g, '').trim() === rec.dni);
+        const found = programParticipants.find((p) => String(p.dni).replace(/\D/g, '').trim() === rec.dni);
         if (found) {
           const isNew = (found.pagosAcumulados || 0) === 0;
           matched.push({ ...rec, participant: found, isNew });
@@ -102,7 +102,7 @@ const PaymentUploadWizard = ({
         }
       });
       
-      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(p.dni.replace(/\./g, '').trim()));
+      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(String(p.dni).replace(/\D/g, '').trim()));
 
       setAnalysis({ matched, unknown, toDeactivate, totalCsv: records.length });
       setStep(3);
@@ -166,7 +166,7 @@ const PaymentUploadWizard = ({
 
       await batch.commit();
       alert(
-        `¡Proceso finalizado!\n- Pagos registrados: ${analysis.matched.length}\n- Participantes pasados a INACTIVO: ${flagMissing ? analysis.toDeactivate.length : 0}`
+        `¡Proceso finalizado!\n- Pagos registrados: ${analysis.matched.length}\n- Participantes dados de baja: ${flagMissing ? analysis.toDeactivate.length : 0}`
       );
       onClose();
     } catch (e) {
@@ -296,7 +296,7 @@ const PaymentUploadWizard = ({
                   {analysis.matched.length}
                 </h3>
                 <p className="text-xs text-green-600 uppercase font-bold">
-                  A Pagar (Activos)
+                  Activos
                 </p>
               </CardContent>
             </Card>
@@ -306,7 +306,7 @@ const PaymentUploadWizard = ({
                   {analysis.toDeactivate.length}
                 </h3>
                 <p className="text-xs text-yellow-600 uppercase font-bold">
-                  A Desactivar
+                  Bajas
                 </p>
               </CardContent>
             </Card>
@@ -363,7 +363,7 @@ const PaymentUploadWizard = ({
                   htmlFor="flagMissing"
                   className="text-sm font-bold text-yellow-900 select-none"
                 >
-                  Pasar a INACTIVO y registrar una novedad por la ausencia
+                  Dar de Baja y registrar una novedad por la ausencia
                 </label>
               </div>
             </div>
@@ -411,5 +411,3 @@ const PaymentUploadWizard = ({
   );
 };
 export default PaymentUploadWizard;
-
-    
