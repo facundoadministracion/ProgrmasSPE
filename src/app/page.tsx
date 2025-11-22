@@ -295,19 +295,21 @@ export default function App() {
     if (selectedProgramDetail) {
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
     }
-    const alerts = (participants || []).filter(p => { const s = getAlertStatus(p); return s && (s.type === 'red' || s.type === 'yellow'); }).length;
+    const alerts = (participants || []).filter(p => !p.activo).length;
+    const activeParticipants = (participants || []).filter(p => p.activo).length;
+
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <DashboardCard title="Total Activos" value={participants?.length ?? 0} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
-            <DashboardCard title="Alertas Admin." value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención urgente" isLoading={participantsLoading} />
+            <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
+            <DashboardCard title="Inactivos" value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención o baja" isLoading={participantsLoading} />
             <DashboardCard title="Pagos (Este Año)" value={paymentCount} icon={DollarSign} color="green" subtitle={`Transacciones en ${currentYear}`} isLoading={paymentsLoading} />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {Object.values(PROGRAMAS).map(prog => {
-                    const count = (participants || []).filter(p => p.programa === prog).length;
+                    const count = (participants || []).filter(p => p.programa === prog && p.activo).length;
                     return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo" isLoading={participantsLoading}/>;
                 })}
             </div>
@@ -348,9 +350,9 @@ export default function App() {
                         return (
                             <TableRow key={p.id}>
                                 <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
-                                <TableCell><span className="block text-sm">{p.programa}</span>{p.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}{!p.esEquipoTecnico && <span className="text-xs text-gray-400">{p.categoria}</span>}</TableCell>
+                                <TableCell><span className="block text-sm">{p.programa}</span>{p.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}{!p.esEquipoTecnico && p.programa === PROGRAMAS.TUTORIAS && <span className="text-xs text-gray-400">{p.categoria}</span>}</TableCell>
                                 <TableCell>{p.departamento}</TableCell>
-                                <TableCell>{alert ? <Badge variant={alert.type as any}>{alert.msg}</Badge> : <Badge variant="green">Activo</Badge>}</TableCell>
+                                <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
                                 <TableCell><Button variant="link" size="sm" onClick={() => setSelectedParticipant(p)}>Ver Legajo</Button></TableCell>
                             </TableRow>
                         )

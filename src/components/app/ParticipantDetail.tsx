@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
 import { calculateAge, formatDateToDDMMYYYY } from '@/lib/utils';
@@ -10,16 +10,27 @@ import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
   FileText,
-  Mail,
-  Phone,
   PlusCircle,
   Clock,
   Loader2,
+  UserX,
+  UserCheck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const DetailItem = ({ label, value, className }: { label: string, value: React.ReactNode, className?: string }) => (
@@ -33,7 +44,6 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
   const currentYear = new Date().getFullYear().toString();
   
-  // Carga de datos bajo demanda para este participante específico
   const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades'), where('participantId', '==', participant.id)) : null, [firestore, participant.id]);
   const { data: novedadesData, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   const novedades = useMemo(() => (novedadesData || []).sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [novedadesData]);
@@ -42,7 +52,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
 
   const [newNovedad, setNewNovedad] = useState({ descripcion: '', fecha: new Date().toISOString().split('T')[0] });
-
+  
   const handleAddNovedad = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNovedad.descripcion || !firestore) return;
@@ -56,6 +66,22 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
     });
     setNewNovedad({ ...newNovedad, descripcion: '' });
   };
+  
+  const toggleParticipantStatus = async () => {
+    if (!firestore) return;
+    const newStatus = !participant.activo;
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, { activo: newStatus });
+
+    await addDoc(collection(firestore, 'novedades'), {
+      participantId: participant.id,
+      participantName: participant.nombre,
+      descripcion: `Cambio de estado manual a ${newStatus ? 'ACTIVO' : 'INACTIVO'}.`,
+      fecha: new Date().toISOString().split('T')[0],
+      fechaRealCarga: serverTimestamp(),
+      ownerId: participant.ownerId,
+    });
+  }
 
   const alertStatus = getAlertStatus(participant);
   const age = calculateAge(participant.fechaNacimiento);
@@ -63,19 +89,42 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4 pb-4 border-b">
-        <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center text-2xl font-bold text-gray-500">
-          {participant.nombre.charAt(0)}
+      <div className="flex justify-between items-start pb-4 border-b">
+        <div className="flex items-center gap-4">
+            <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center text-2xl font-bold text-gray-500">
+              {participant.nombre.charAt(0)}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold">{participant.nombre}</h3>
+              <p className="text-gray-500">DNI: {participant.dni}</p>
+              <div className="flex gap-2 mt-1">
+                <Badge variant="blue">{participant.programa}</Badge>
+                {participant.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}
+                <Badge variant={alertStatus.type as any}>{alertStatus.msg}</Badge>
+              </div>
+            </div>
         </div>
-        <div>
-          <h3 className="text-xl font-bold">{participant.nombre}</h3>
-          <p className="text-gray-500">DNI: {participant.dni}</p>
-          <div className="flex gap-2 mt-1">
-            <Badge variant="blue">{participant.programa}</Badge>
-            {participant.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}
-            <Badge variant={paymentStatus.type as any}>{paymentStatus.text}</Badge>
-          </div>
-        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant={participant.activo ? "destructive" : "outline"} size="sm">
+              {participant.activo ? <UserX/> : <UserCheck/>}
+              {participant.activo ? 'Dar de Baja' : 'Reactivar'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Confirmar cambio de estado?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción marcará al participante como <strong>{participant.activo ? 'INACTIVO' : 'ACTIVO'}</strong>. 
+                Esto afectará su visibilidad en los reportes y liquidaciones. Se registrará una novedad con el cambio.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={toggleParticipantStatus}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <Tabs defaultValue="general">
@@ -93,17 +142,15 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
                 <DetailItem label="Lugar de Trabajo" value={participant.lugarTrabajo || '-'} className="bg-gray-50" />
                 <DetailItem label="Email" value={participant.email || '-'} className="bg-gray-50" />
                 <DetailItem label="Teléfono" value={participant.telefono || '-'} className="bg-gray-50" />
-                <DetailItem label="Último Pago" value={participant.ultimoPago || 'Sin registros'} className="bg-gray-50 col-span-2"/>
+                <DetailItem label="Último Pago Registrado" value={participant.ultimoPago || 'Sin registros'} className="bg-gray-50 col-span-2"/>
 
-                {alertStatus && (
+                {alertStatus && (alertStatus.type === 'yellow' || alertStatus.type === 'red') && (
                   <div className={`md:col-span-2 mt-2 p-3 rounded-lg border-l-4 flex items-start gap-3 text-sm ${
-                    alertStatus.type === 'red' ? 'bg-red-50 border-red-500 text-red-800' :
-                    alertStatus.type === 'yellow' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' :
-                    'bg-green-50 border-green-500 text-green-800'
+                    alertStatus.type === 'red' ? 'bg-red-50 border-red-500 text-red-800' : 'bg-yellow-50 border-yellow-500 text-yellow-800'
                   }`}>
                     <AlertTriangle size={20} className="mt-0.5"/>
                     <div>
-                      <h4 className="font-bold">Estado Administrativo</h4>
+                      <h4 className="font-bold">Alerta Administrativa</h4>
                       <p>{alertStatus.msg}</p>
                     </div>
                   </div>
