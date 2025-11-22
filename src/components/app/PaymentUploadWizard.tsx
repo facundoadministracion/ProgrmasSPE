@@ -18,14 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-
-const PaymentUploadWizard = ({
-  participants,
-  onClose,
-}: {
-  participants: Participant[];
-  onClose: () => void;
-}) => {
+const PaymentUploadWizard = ({ participants, onClose }: { participants: Participant[]; onClose: () => void; }) => {
   const { firestore } = useFirebase();
   const { user } = useUser();
   const [step, setStep] = useState(1);
@@ -46,12 +39,13 @@ const PaymentUploadWizard = ({
   const [altaResolution, setAltaResolution] = useState('');
   const [flagMissing, setFlagMissing] = useState(true);
 
-  const cleanDNI = (value: any) =>
-    String(value)
-      .normalize('NFD')
+  const cleanDNI = (value: any): string => {
+    return String(value)
+      .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, '') // quita tildes
       .replace(/\D/g, '') // quita todo lo no numérico
       .trim();
+  };
 
   const parseCSV = (text: string): { dni: string; monto: number }[] => {
     let lines = text.split('\n').filter(line => line.trim() !== '');
@@ -91,9 +85,11 @@ const PaymentUploadWizard = ({
       }
       
       const records = parseCSV(text);
+      
       const programParticipants = participants.filter(
         (p) => p.programa === config.programa
       );
+
       const csvDnis = new Set(records.map(r => cleanDNI(r.dni)));
 
       const matched: any[] = [];
@@ -436,4 +432,5 @@ const PaymentUploadWizard = ({
     </div>
   );
 };
+
 export default PaymentUploadWizard;
