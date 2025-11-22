@@ -42,8 +42,8 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
   const cleanDNI = (value: any): string => {
     return String(value)
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, '') // quita tildes
-      .replace(/\D/g, '') // quita todo lo no numérico
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\D/g, '')
       .trim();
   };
 
@@ -85,14 +85,9 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       }
       
       const records = parseCSV(text);
+      const csvDnis = new Set(records.map(r => r.dni));
       
-      // Consider ALL participants for matching, regardless of their 'activo' status.
-      const programParticipants = participants.filter(
-        (p) => p.programa === config.programa
-      );
-      const allParticipants = participants; // Use all participants for matching
-
-      const csvDnis = new Set(records.map(r => cleanDNI(r.dni)));
+      const allProgramParticipants = participants.filter(p => p.programa === config.programa);
 
       const matched: any[] = [];
       const unknown: any[] = [];
@@ -100,24 +95,21 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       
       records.forEach((rec) => {
         const cleanedCsvDni = cleanDNI(rec.dni);
-        // Find in ALL participants, not just active ones.
-        const found = allParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
+        const found = allProgramParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
         
         if (found) {
             const isNew = (found.pagosAcumulados || 0) === 0;
             if (found.activo) {
-                matched.push({ ...rec, participant: found, isNew });
+              matched.push({ ...rec, participant: found, isNew });
             } else {
-                // This person was inactive but is in the new payment file.
-                toReactivate.push({ ...rec, participant: found, isNew });
+              toReactivate.push({ ...rec, participant: found, isNew });
             }
         } else {
           unknown.push(rec);
         }
       });
       
-      // Deactivation logic remains: active participants of the program not in the CSV.
-      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
+      const toDeactivate = allProgramParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
 
       setAnalysis({ matched, unknown, toDeactivate, toReactivate, totalCsv: records.length });
       setStep(3);
