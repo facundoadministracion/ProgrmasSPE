@@ -19,7 +19,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp, "programas-spe")
+    firestore: getFirestore(firebaseApp, "progrmas-spe")
   };
 }
 
