@@ -10,14 +10,12 @@ export function initializeFirebase() {
   if (!getApps().length) {
     let firebaseApp;
     try {
+      // Intenta inicializar con configuración automática si está disponible (entornos de Firebase)
       firebaseApp = initializeApp();
     } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
+      // Si falla (entorno local/de desarrollo), usa el objeto de configuración explícito.
       firebaseApp = initializeApp(firebaseConfig);
     }
-
     return getSdks(firebaseApp);
   }
 
@@ -25,11 +23,15 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
+  // Conecta explícitamente a la base de datos correcta.
+  // Tu proyecto 'programas-spe' usa la base de datos '(default)'.
+  // Al no especificar un segundo argumento, nos aseguramos de usar la predeterminada.
+  const firestore = getFirestore(firebaseApp);
+  
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    // Conecta explícitamente a la base de datos con nombre para que coincida con la configuración del proyecto.
-    firestore: getFirestore(firebaseApp) 
+    firestore: firestore
   };
 }
 

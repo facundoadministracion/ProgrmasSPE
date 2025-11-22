@@ -1,10 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Esta regla permite leer y escribir a CUALQUIER usuario (incluso anónimo)
-    // Ideal para desarrollo. En producción las ajustaremos.
+    // Permite leer y escribir a cualquier usuario autenticado.
+    // Esto es un paso intermedio para asegurar la funcionalidad.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }
