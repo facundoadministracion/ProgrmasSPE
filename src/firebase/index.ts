@@ -15,10 +15,11 @@ export function initializeFirebase() {
 
 export function getSdks(firebaseApp: FirebaseApp) {
   // Esta función ahora solo obtiene los servicios del app ya inicializado.
+  // Se especifica el nombre de la base de datos para proyectos que no usan "(default)".
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
+    firestore: getFirestore(firebaseApp, "programas-spe")
   };
 }
 
