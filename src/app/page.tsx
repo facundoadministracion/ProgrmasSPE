@@ -44,6 +44,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Upload,
 } from 'lucide-react';
 
 import type { Participant, Payment, Novedad, AppConfig, UserRole } from '@/lib/types';
@@ -87,6 +88,7 @@ import ParticipantDetail from '@/components/app/ParticipantDetail';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
+import ParticipantUploadWizard from '@/components/app/ParticipantUploadWizard';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import { useToast } from '@/hooks/use-toast';
@@ -184,7 +186,8 @@ export default function App() {
   const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPaymentUploadOpen, setIsPaymentUploadOpen] = useState(false);
+  const [isParticipantUploadOpen, setIsParticipantUploadOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -283,9 +286,10 @@ export default function App() {
       <div className="space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
-          <div className="flex gap-4 w-full md:w-auto">
+          <div className="flex gap-2 w-full md:w-auto">
             <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><Input type="text" placeholder="Buscar DNI/Nombre..." className="pl-10" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} /></div>
-            <Button onClick={() => setSelectedParticipant('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo Participante</Button>
+            <Button onClick={() => setIsParticipantUploadOpen(true)} variant="outline"><Upload className="mr-2 h-4 w-4" /> Carga Masiva</Button>
+            <Button onClick={() => setSelectedParticipant('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo</Button>
           </div>
         </div>
         <Card>
@@ -382,7 +386,7 @@ export default function App() {
             </>}
             {(isAdmin || isDataEntry) && <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</SidebarMenuButton></SidebarMenuItem>}
             {isAdmin && <>
-              <SidebarMenuItem><SidebarMenuButton onClick={() => setIsUploadModalOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton onClick={() => setIsPaymentUploadOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton></SidebarMenuItem>
               <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton></SidebarMenuItem>
             </>}
           </SidebarMenu>
@@ -437,9 +441,15 @@ export default function App() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
+      <Dialog open={isPaymentUploadOpen} onOpenChange={setIsPaymentUploadOpen}>
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Carga Masiva de Pagos</DialogTitle><DialogDescription>Siga los pasos para cargar un archivo CSV de pagos.</DialogDescription></DialogHeader>
-          <PaymentUploadWizard participants={participants || []} onClose={() => setIsUploadModalOpen(false)} />
+          <PaymentUploadWizard participants={participants || []} onClose={() => setIsPaymentUploadOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isParticipantUploadOpen} onOpenChange={setIsParticipantUploadOpen}>
+        <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Carga Masiva de Participantes</DialogTitle><DialogDescription>Pegue el contenido de su archivo CSV para registrar nuevos participantes.</DialogDescription></DialogHeader>
+          <ParticipantUploadWizard allParticipants={participants || []} onClose={() => setIsParticipantUploadOpen(false)} />
         </DialogContent>
       </Dialog>
     </SidebarProvider>
