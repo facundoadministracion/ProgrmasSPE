@@ -24,7 +24,8 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read, update, delete: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow update, delete: if isOwner(userId) || isAdmin();
     }
 
     match /participants/{docId} {
