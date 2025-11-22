@@ -1,64 +1,10 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // safeEmail checks for the existence of the email in the token
-    function safeEmail() {
-      return request.auth != null && request.auth.token.email != null
-        ? request.auth.token.email
-        : "";
-    }
-
-    // isAdmin checks if the user has the admin email address
-    function isAdmin() {
-      // NOTE: Using email for admin role is not recommended for production.
-      // Use custom claims for a more secure approach.
-      return safeEmail() == "crnunezfacundo@gmail.com";
-    }
-
-    function isDataEntry() {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'data_entry';
-    }
-
-    match /users/{userId} {
-      // A user can read and write to their own profile document.
-      allow read, write: if isOwner(userId) || isAdmin();
-      // Only admins can list or delete users.
-      allow list, delete: if isAdmin();
-    }
-
-    match /participants/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /payments/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /config/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /novedades/{docId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
-    match /asistencias/{docId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin();
+    // Esta regla permite leer y escribir a CUALQUIER usuario (incluso anónimo)
+    // Ideal para desarrollo. En producción las ajustaremos.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
