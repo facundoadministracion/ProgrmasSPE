@@ -94,7 +94,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function App() {
   const { auth } = useFirebase();
   const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
+  const firestore = useFirestore("programas-spe");
   const router = useRouter();
   const { toast } = useToast();
   
@@ -283,8 +283,9 @@ export default function App() {
       <div className="space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex gap-4 w-full md:w-auto">
             <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><Input type="text" placeholder="Buscar DNI/Nombre..." className="pl-10" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} /></div>
+            <Button onClick={() => setSelectedParticipant('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo Participante</Button>
           </div>
         </div>
         <Card>
@@ -444,3 +445,5 @@ export default function App() {
     </SidebarProvider>
   );
 }
+
+    
