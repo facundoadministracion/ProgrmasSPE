@@ -49,10 +49,17 @@ export default function LoginPage() {
   };
 
   const handlePasswordReset = async () => {
-    const emailForReset = prompt("Por favor, ingrese su correo electrónico para restablecer la contraseña:");
-    if (emailForReset && auth) {
+    if (!email) {
+      toast({
+        variant: "destructive",
+        title: "Falta Email",
+        description: "Por favor, ingrese su correo electrónico en el campo de email para restablecer la contraseña.",
+      });
+      return;
+    }
+    if (auth) {
       try {
-        await sendPasswordResetEmail(auth, emailForReset);
+        await sendPasswordResetEmail(auth, email);
         toast({
           title: "Correo enviado",
           description: "Si la cuenta existe, se ha enviado un enlace para restablecer la contraseña a su correo.",

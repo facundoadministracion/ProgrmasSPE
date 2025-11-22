@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { ROLES } from './constants';
 
 export interface Participant {
   id: string;
@@ -56,10 +57,14 @@ export interface AppConfig {
   };
 }
 
+type ObjectValues<T> = T[keyof T];
+export type Role = ObjectValues<typeof ROLES>;
+
 export interface UserRole {
   uid: string;
   email: string;
   name: string;
-  role: 'admin' | 'data_entry';
+  role: Role;
   createdAt: string;
+  departamento?: string;
 }

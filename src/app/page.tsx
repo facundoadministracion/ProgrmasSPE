@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   useFirebase,
   useCollection,
@@ -11,7 +10,7 @@ import {
   errorEmitter,
   FirestorePermissionError,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, getDoc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
@@ -26,10 +25,13 @@ import {
   UserCheck,
   PlusCircle,
   Users2,
+  Shield,
+  Trash2, 
+  Edit
 } from 'lucide-react';
 import type { Participant, Payment, Novedad, AppConfig, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
+import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
 import {
@@ -72,6 +74,7 @@ import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+
 
 export default function App() {
   const { auth } = useFirebase();
@@ -120,31 +123,31 @@ export default function App() {
   }, [user, firestore]);
 
 
-  // --- Data Fetching ---
-  const isAdmin = userProfile?.role === 'admin';
+  const isAdmin = userProfile?.role === ROLES.ADMIN;
+  const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
 
-  const participantsRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'participants')) : null, [firestore, isAdmin]);
+  const participantsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  const paymentsRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'payments')) : null, [firestore, isAdmin]);
+  const paymentsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'payments')) : null, [firestore]);
   const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
   
-  const novedadesRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'novedades')) : null, [firestore, isAdmin]);
+  const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades')) : null, [firestore]);
   const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   
-  const configRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'config')) : null, [firestore, isAdmin]);
+  const configRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'config')) : null, [firestore]);
   const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
 
-  const usersRef = useMemoFirebase(() => isAdmin && firestore ? query(collection(firestore, 'users')) : null, [firestore, isAdmin]);
+  const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
-  // --- End Data Fetching ---
+
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   useEffect(() => {
-    if (userProfile?.role === 'data_entry') {
+     if (userProfile?.role === ROLES.DATA_ENTRY) {
         setActiveTab('attendance');
         setDataLoaded(true);
     } else if (isAdmin) {
@@ -201,41 +204,18 @@ export default function App() {
       alert("Montos actualizados");
     }
   };
-
-  const handleUpdateUserRole = async (uid: string, newRole: 'admin' | 'data_entry') => {
-    if (!firestore || userProfile?.role !== 'admin') {
-      toast({ variant: 'destructive', title: 'Permiso denegado' });
-      return;
-    }
-    if (uid === user?.uid) {
-        toast({ variant: 'destructive', title: 'Acción no permitida', description: 'No puede cambiar su propio rol.' });
-        return;
-    }
-    const userDocRef = doc(firestore, 'users', uid);
-    try {
-      await updateDoc(userDocRef, { role: newRole });
-      toast({ title: 'Rol actualizado', description: `El rol del usuario ha sido cambiado a ${newRole}.` });
-    } catch (error: any) {
-      console.error('Error updating user role:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el rol del usuario.' });
-    }
-  };
-  
   
   const role = userProfile?.role;
   const loading = !dataLoaded;
 
-  // Strict loading gate: Do not render anything until auth is resolved and user profile is loaded.
   if (isUserLoading || !user) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
   }
   
-  // Profile might still be loading, show a specific message for that.
   if (!userProfile && !isUserLoading) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando perfil de usuario...</div>;
   }
 
-  // Final check
   if (!userProfile) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando...</div>;
   }
@@ -277,7 +257,7 @@ export default function App() {
           <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
           <div className="flex gap-2">
             <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><Input type="text" placeholder="Buscar DNI/Nombre..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-            {role === 'admin' && <Button onClick={() => setSelectedParticipant('new')}><PlusCircle size={16}/> Nuevo</Button>}
+            {isAdmin && <Button onClick={() => setSelectedParticipant('new')}><PlusCircle size={16}/> Nuevo</Button>}
           </div>
         </div>
         <Card>
@@ -334,7 +314,7 @@ export default function App() {
                     </CardContent>
                 </Card>
                 <div className="md:col-span-2">
-                  <Button type="submit" className="w-full" disabled={role !== 'admin'}>Guardar Todos los Cambios</Button>
+                  <Button type="submit" className="w-full" disabled={!isAdmin}>Guardar Todos los Cambios</Button>
                 </div>
             </form>
         </div>
@@ -349,7 +329,7 @@ export default function App() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {role === 'admin' && (
+            {isAdmin && (
               <>
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => { setActiveTab('dashboard'); setSelectedProgramDetail(null); }} isActive={activeTab === 'dashboard'}><Users size={16} />Resumen Gral.</SidebarMenuButton>
@@ -357,18 +337,20 @@ export default function App() {
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setActiveTab('participants')} isActive={activeTab === 'participants'}><UserCheck size={16} />Participantes</SidebarMenuButton>
                 </SidebarMenuItem>
+                 <SidebarMenuItem>
+                    <SidebarMenuButton onClick={() => setActiveTab('users')} isActive={activeTab === 'users'}><Shield size={16} />Usuarios</SidebarMenuButton>
+                </SidebarMenuItem>
               </>
             )}
-            <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setActiveTab('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</SidebarMenuButton>
-            </SidebarMenuItem>
-            {role === 'admin' && (
+            {(isAdmin || isDataEntry) && (
+              <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => setActiveTab('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {isAdmin && (
               <>
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setIsUploadModalOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => setActiveTab('users')} isActive={activeTab === 'users'}><Users2 size={16} />Usuarios</SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton>
@@ -403,11 +385,11 @@ export default function App() {
                 <div className="flex items-center justify-center h-full text-gray-400">Cargando datos...</div>
             ) : (
                 <>
-                  {activeTab === 'dashboard' && role === 'admin' && renderDashboard()}
-                  {activeTab === 'participants' && role === 'admin' && renderParticipants()}
-                  {activeTab === 'attendance' && <AttendanceSection participants={participants || []} />}
-                  {activeTab === 'users' && role === 'admin' && <UserManagement users={allUsers || []} onUpdateRole={handleUpdateUserRole} currentUser={user} />}
-                  {activeTab === 'config' && role === 'admin' && renderConfig()}
+                  {activeTab === 'dashboard' && isAdmin && renderDashboard()}
+                  {activeTab === 'participants' && isAdmin && renderParticipants()}
+                  {activeTab === 'attendance' && (isAdmin || isDataEntry) && <AttendanceSection participants={participants || []} />}
+                  {activeTab === 'users' && isAdmin && <UserManagement users={allUsers || []} currentUser={user} />}
+                  {activeTab === 'config' && isAdmin && renderConfig()}
                 </>
             )}
         </main>

@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -6,6 +5,10 @@ service cloud.firestore {
 
     function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     // safeEmail checks for the existence of the email in the token
@@ -17,12 +20,20 @@ service cloud.firestore {
 
     // isAdmin checks if the user has the admin email address
     function isAdmin() {
+      // NOTE: Using email for admin role is not recommended for production.
+      // Use custom claims for a more secure approach.
       return safeEmail() == "crnunezfacundo@gmail.com";
+    }
+
+    function isDataEntry() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'data_entry';
     }
 
     match /users/{userId} {
       // A user can read and write to their own profile document.
-      allow read, write: if request.auth.uid == userId;
+      allow read, write: if isOwner(userId) || isAdmin();
+      // Only admins can list or delete users.
+      allow list, delete: if isAdmin();
     }
 
     match /participants/{docId} {
