@@ -5,7 +5,7 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
-import { calculateAge } from '@/lib/utils';
+import { calculateAge, formatDateToDDMMYYYY } from '@/lib/utils';
 import {
   AlertTriangle,
   FileText,
@@ -90,7 +90,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                    <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Edad</p><p className="font-bold">{age > 0 ? `${age} años` : 'N/D'}</p></div>
-                   <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Fecha Ingreso</p><p className="font-bold text-indigo-700">{participant.fechaIngreso ? new Date(participant.fechaIngreso).toLocaleDateString() : '-'}</p></div>
+                   <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Fecha Ingreso</p><p className="font-bold text-indigo-700">{formatDateToDDMMYYYY(participant.fechaIngreso as string)}</p></div>
                    <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Categoría</p><p className="font-bold">{participant.categoria || 'N/A'}</p></div>
                    <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Lugar Trabajo</p><p className="font-bold">{participant.lugarTrabajo || '-'}</p></div>
                    <div className="p-3 bg-gray-50 rounded col-span-2"><p className="text-gray-500">Último Pago Registrado</p><p className="font-bold text-lg">{participant.ultimoPago || 'Sin registros'}</p></div>
@@ -127,7 +127,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
                             <TableRow key={pay.id}>
                                 <TableCell>{pay.mes}/{pay.anio}</TableCell>
                                 <TableCell className="font-mono font-bold text-green-700">${pay.monto}</TableCell>
-                                <TableCell className="text-gray-500">{pay.fechaCarga?.seconds ? new Date(pay.fechaCarga.seconds * 1000).toLocaleDateString() : 'Reciente'}</TableCell>
+                                <TableCell className="text-gray-500">{pay.fechaCarga?.seconds ? new Date(pay.fechaCarga.seconds * 1000).toLocaleDateString('es-AR') : 'Reciente'}</TableCell>
                             </TableRow>
                         ))}
                         {!paymentsLoading && (!payments || payments.length === 0) && <TableRow><TableCell colSpan={3} className="h-24 text-center">No hay pagos registrados este año.</TableCell></TableRow>}
@@ -153,7 +153,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
                      <div key={nov.id} className="border-l-2 border-blue-400 pl-3 py-1">
                         <div className="flex justify-between items-start">
                           <p className="text-sm text-gray-800 font-medium">{nov.descripcion}</p>
-                          <span className="text-xs text-gray-400 whitespace-nowrap flex items-center gap-1"><Clock size={12} /> {new Date(nov.fecha).toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-400 whitespace-nowrap flex items-center gap-1"><Clock size={12} /> {formatDateToDDMMYYYY(nov.fecha)}</span>
                         </div>
                      </div>
                    ))}

@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Novedad, Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
+import { formatDateToDDMMYYYY } from '@/lib/utils';
 import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Users, Wrench, Loader2 } from 'lucide-react';
 import { Card as UICard, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -134,8 +135,8 @@ const ProgramAnalytics = ({ programName, participants, onBack }: { programName: 
                             </TableHeader>
                             <TableBody>
                                 {novedadesLoading && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400"><Loader2 className="animate-spin inline-block mr-2" />Cargando movimientos...</TableCell></TableRow>}
-                                {!novedadesLoading && analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{p.fechaIngreso ? new Date(p.fechaIngreso + 'T00:00:00').toLocaleDateString() : (p.fechaAlta && new Date(typeof p.fechaAlta === 'string' ? p.fechaAlta : (p.fechaAlta as any).seconds * 1000).toLocaleDateString()) || '-'}</TableCell></TableRow>))}
-                                {!novedadesLoading && analytics.bajasNovedades.map(n => (<TableRow key={'baja-'+n.id}><TableCell><Badge variant="destructive">Baja</Badge></TableCell><TableCell className="font-medium">{n.participantName}</TableCell><TableCell className="text-muted-foreground">{n.descripcion}</TableCell><TableCell>{new Date(n.fecha + 'T00:00:00').toLocaleDateString()}</TableCell></TableRow>))}
+                                {!novedadesLoading && analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{formatDateToDDMMYYYY(p.fechaIngreso as string)}</TableCell></TableRow>))}
+                                {!novedadesLoading && analytics.bajasNovedades.map(n => (<TableRow key={'baja-'+n.id}><TableCell><Badge variant="destructive">Baja</Badge></TableCell><TableCell className="font-medium">{n.participantName}</TableCell><TableCell className="text-muted-foreground">{n.descripcion}</TableCell><TableCell>{formatDateToDDMMYYYY(n.fecha)}</TableCell></TableRow>))}
                                 {!novedadesLoading && analytics.altas.length === 0 && analytics.bajasNovedades.length === 0 && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400">Sin movimientos este mes</TableCell></TableRow>}
                             </TableBody>
                         </Table>
