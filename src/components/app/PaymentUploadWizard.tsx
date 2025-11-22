@@ -88,7 +88,7 @@ const PaymentUploadWizard = ({
       const unknown: any[] = [];
       
       records.forEach((rec) => {
-        const found = programParticipants.find((p) => p.dni.replace(/\./g, '') === rec.dni);
+        const found = programParticipants.find((p) => p.dni.replace(/\./g, '').trim() === rec.dni);
         if (found) {
           const isNew = (found.pagosAcumulados || 0) === 0;
           matched.push({ ...rec, participant: found, isNew });
@@ -97,7 +97,7 @@ const PaymentUploadWizard = ({
         }
       });
       
-      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(p.dni.replace(/\./g, '')));
+      const toDeactivate = programParticipants.filter(p => p.activo && !csvDnis.has(p.dni.replace(/\./g, '').trim()));
 
       setAnalysis({ matched, unknown, toDeactivate, totalCsv: records.length });
       setStep(3);
@@ -367,10 +367,10 @@ const PaymentUploadWizard = ({
           {analysis.unknown.length > 0 && (
             <Card>
                 <CardHeader className="bg-red-50">
-                    <CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>Bloqueo de Seguridad</CardTitle>
+                    <CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>DNIs Desconocidos (Bloqueo de Seguridad)</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 text-sm text-red-700">
-                    <p>Hay {analysis.unknown.length} DNIs desconocidos en el archivo CSV. Debe cargarlos primero en el Padrón General de Participantes antes de poder liquidarles un pago.</p>
+                    <p>Hay {analysis.unknown.length} DNIs en el archivo CSV que no se encontraron en el Padrón General de Participantes. Debe cargarlos primero antes de poder liquidarles un pago.</p>
                     <div className="max-h-40 overflow-y-auto mt-4 border bg-white p-2 rounded">
                         <Table>
                             <TableHeader><TableRow><TableHead>DNI Desconocido</TableHead></TableRow></TableHeader>
@@ -396,7 +396,7 @@ const PaymentUploadWizard = ({
               className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
             >
               {processing ? 'Procesando...' : (
-                analysis.unknown.length > 0 ? 'Corregir Errores para Continuar' : 'Confirmar Operación'
+                analysis.unknown.length > 0 ? 'Corrija los Errores para Continuar' : 'Confirmar Operación'
               )}
             </Button>
           </div>
