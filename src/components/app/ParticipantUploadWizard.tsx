@@ -17,14 +17,25 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   const [processing, setProcessing] = useState(false);
 
   const parseParticipantCSV = (text: string): Omit<Participant, 'id'>[] => {
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    let lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return [];
+    
     const result: Omit<Participant, 'id'>[] = [];
-    // remove header
-    const headers = lines.shift()?.toLowerCase().split(',') || [];
+    
+    // Detectar separador (coma o punto y coma)
+    const separator = lines[0].includes(';') ? ';' : ',';
+
+    // Detección de encabezado: si la primera línea contiene 'dni' o 'nombre', la omitimos.
+    const firstLineLower = lines[0].toLowerCase();
+    if (firstLineLower.includes('dni') || firstLineLower.includes('nombre')) {
+      lines.shift();
+    }
     
     lines.forEach(line => {
         try {
-            const values = line.split(',');
+            const values = line.split(separator);
+            if (values.length < 2) return;
+
             const participant = {
                 nombre: values[0]?.trim() || '',
                 dni: values[1]?.trim().replace(/\./g, '') || '',
@@ -59,7 +70,11 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target?.result as string;
-        if (!text) return;
+        if (!text) {
+            setAnalysis({ newParticipants: [], duplicates: [], totalCsv: 0 });
+            setStep(2);
+            return;
+        }
 
         const records = parseParticipantCSV(text);
         const existingDnis = new Set(allParticipants.map(p => p.dni));
@@ -79,7 +94,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
         setAnalysis({ newParticipants, duplicates, totalCsv: records.length });
         setStep(2);
     };
-    reader.readAsText(selectedFile);
+    reader.readAsText(selectedFile, 'UTF-8');
   };
 
   const handleExecute = async () => {
@@ -122,7 +137,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
       {step === 1 && (
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded text-sm text-blue-800">
-            <p>Seleccione el archivo CSV para subir. Asegúrese que las columnas estén en el orden correcto y que el archivo no tenga cabecera:</p>
+            <p>Seleccione el archivo CSV para subir. El sistema detectará automáticamente si tiene encabezado. Las columnas deben ser:</p>
             <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria, email, telefono</p>
           </div>
 
@@ -139,7 +154,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
                         </>
                     )}
                 </div>
-                <Input id="csv-upload" type="file" className="hidden" accept=".csv" onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)} />
+                <Input id="csv-upload" type="file" className="hidden" accept=".csv,text/csv" onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)} />
             </label>
           </div>
 
@@ -204,3 +219,5 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   );
 };
 export default ParticipantUploadWizard;
+
+    
