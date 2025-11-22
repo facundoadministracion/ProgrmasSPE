@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirebase } from '@/firebase';
+import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -68,7 +68,7 @@ export default function SignUpPage() {
 
       // Step 3: Define the user profile data
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
-      const userProfileData: UserRole = {
+      const userProfileData: Omit<UserRole, 'createdAt'> & { createdAt: string } = {
         uid: newUser.uid,
         name: name,
         email: newUser.email || '',
@@ -78,20 +78,34 @@ export default function SignUpPage() {
       
       // Step 4: Create the user document in Firestore
       const userDocRef = doc(firestore, 'users', newUser.uid);
-      await setDoc(userDocRef, userProfileData);
-
-      toast({
-        title: "¡Registro Exitoso!",
-        description: `La cuenta para ${email} ha sido creada. Ahora será redirigido para iniciar sesión.`,
+      
+      // Use .catch() for permission error handling
+      setDoc(userDocRef, userProfileData).catch(serverError => {
+        // This block will execute if setDoc fails due to permissions
+        const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'create',
+            requestResourceData: userProfileData,
+        });
+        // Emit the contextual error
+        errorEmitter.emit('permission-error', permissionError);
+        // We don't set local state error here, as the listener will throw
+        setIsSubmitting(false);
+      }).then(() => {
+        // This block executes on successful write
+        if (!isSubmitting) return; // Avoid running if an error was caught
+        toast({
+          title: "¡Registro Exitoso!",
+          description: `La cuenta para ${email} ha sido creada. Ahora será redirigido para iniciar sesión.`,
+        });
+        router.push('/login');
       });
-      router.push('/login');
 
     } catch (err: any) {
-        console.error("Auth Signup Error:", err.code, err.message);
+        // This catch block now primarily handles Auth errors
+        console.error("Auth Error (Non-Permission):", err.code, err.message);
         if (err.code === 'auth/email-already-in-use') {
             setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
-        } else if (err.message.includes('permission-denied') || err.message.includes('insufficient permissions')) {
-            setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
         } else {
             setError(`Ocurrió un error en la autenticación: ${err.message}`);
         }
