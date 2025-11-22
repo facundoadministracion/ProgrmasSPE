@@ -93,8 +93,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function App() {
   const { auth } = useFirebase();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
-  const firestore = useFirestore("programas-spe");
   const router = useRouter();
   const { toast } = useToast();
   
@@ -445,5 +445,3 @@ export default function App() {
     </SidebarProvider>
   );
 }
-
-    
