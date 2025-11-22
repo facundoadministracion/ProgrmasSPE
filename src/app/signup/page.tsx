@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -60,18 +60,22 @@ export default function SignUpPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
-      
+
+      // Forzar la actualización del token para que Firestore lo reconozca
+      await newUser.getIdToken(true);
+
       const userDocRef = doc(firestore, 'users', newUser.uid);
-      
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
+
       const userProfileData = {
         uid: newUser.uid,
         name: name,
         email: newUser.email,
         role: isAdmin ? 'admin' : 'data_entry',
+        createdAt: new Date().toISOString(),
       };
       
-      // The Firestore `setDoc` operation that is failing
+      // Ahora Firestore debería tener la autenticación correcta
       await setDoc(userDocRef, userProfileData);
 
       toast({
@@ -81,22 +85,10 @@ export default function SignUpPage() {
       router.push('/login');
 
     } catch (err: any) {
+      console.error("Auth Signup Error:", err.code, err.message);
        if (err.code === 'auth/email-already-in-use') {
         setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
-      } else if (err.message.includes('permission-denied') || err.message.includes('insufficient permissions')) {
-          const isAdmin = email === 'crnunezfacundo@gmail.com';
-          const userProfileData = { uid: auth.currentUser?.uid, name, email, role: isAdmin ? 'admin' : 'data_entry' };
-          const userDocRef = doc(firestore, 'users', auth.currentUser?.uid || 'creating-user');
-          const permissionError = new FirestorePermissionError({
-              path: userDocRef.path,
-              operation: 'create',
-              requestResourceData: userProfileData,
-            });
-         errorEmitter.emit('permission-error', permissionError);
-         setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
-      }
-      else {
-        console.error("Auth Signup Error:", err.code, err.message);
+      } else {
         setError(`Ocurrió un error en la autenticación: ${err.message}`);
       }
       setIsSubmitting(false);
