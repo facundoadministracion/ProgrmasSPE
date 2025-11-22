@@ -62,8 +62,8 @@ const PaymentUploadWizard = ({
       const currentline = lines[i].split(separator);
       if (currentline.length >= 2) {
         // Force to string, remove non-numeric chars, then trim.
-        const dni = String(currentline[0]).replace(/\D/g, '').trim();
-        const monto = parseFloat(String(currentline[1]).trim());
+        const dni = String(currentline[0] || '').replace(/\D/g, '').trim();
+        const monto = parseFloat(String(currentline[1] || '0').trim());
         if (dni && dni.length > 6 && !isNaN(monto)) {
           result.push({ dni, monto });
         }
