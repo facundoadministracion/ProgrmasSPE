@@ -184,6 +184,30 @@
         "fecha"
       ]
     },
+    "Asistencia": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Asistencia",
+      "type": "object",
+      "description": "Represents a monthly attendance record for a participant.",
+      "properties": {
+        "id": { "type": "string" },
+        "participantId": { "type": "string" },
+        "participantName": { "type": "string" },
+        "dni": { "type": "string" },
+        "mes": { "type": "number" },
+        "anio": { "type": "number" },
+        "lugarTrabajo": { "type": "string" },
+        "responsable": { "type": "string" },
+        "metodo": { "type": "string" },
+        "emailPresentacion": { "type": "string", "format": "email" },
+        "tardanza": { "type": "boolean" },
+        "certificado": { "type": "boolean" },
+        "observaciones": { "type": "string" },
+        "fechaCarga": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "participantId", "mes", "anio", "lugarTrabajo", "responsable", "metodo"]
+    },
     "UserRole": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserRole",
@@ -255,6 +279,16 @@
             "$ref": "#/entities/config"
           },
           "description": "Stores configuration settings."
+        }
+      },
+       {
+        "path": "asistencias/{asistenciaId}",
+        "definition": {
+          "entityName": "Asistencia",
+          "schema": {
+            "$ref": "#/entities/Asistencia"
+          },
+          "description": "Stores monthly attendance records."
         }
       }
     ],

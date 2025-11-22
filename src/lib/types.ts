@@ -42,6 +42,24 @@ export interface Novedad {
   fechaRealCarga: Timestamp;
 }
 
+export interface Asistencia {
+    id: string;
+    participantId: string;
+    participantName: string;
+    dni: string;
+    mes: number;
+    anio: number;
+    lugarTrabajo: string;
+    responsable: string;
+    metodo: string;
+    emailPresentacion?: string;
+    tardanza: boolean;
+    certificado: boolean;
+    observaciones?: string;
+    fechaCarga: Timestamp;
+    ownerId?: string;
+}
+
 export interface AppConfig {
   id: string;
   tutorias: {
