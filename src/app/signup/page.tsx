@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,6 +18,7 @@ import {
 import { Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import type { UserRole } from '@/lib/types';
 
 export default function SignUpPage() {
   const { auth, firestore } = useFirebase();
@@ -57,8 +59,26 @@ export default function SignUpPage() {
     }
 
     try {
-      // SOLO CREA EL USUARIO, NO ESCRIBE EN FIRESTORE
-      await createUserWithEmailAndPassword(auth, email, password);
+      // Step 1: Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const newUser = userCredential.user;
+
+      // Step 2: Force a token refresh to ensure the backend recognizes the new user
+      await newUser.getIdToken(true);
+
+      // Step 3: Define the user profile data
+      const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
+      const userProfileData: UserRole = {
+        uid: newUser.uid,
+        name: name,
+        email: newUser.email || '',
+        role: isAdmin ? 'admin' : 'data_entry',
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Step 4: Create the user document in Firestore
+      const userDocRef = doc(firestore, 'users', newUser.uid);
+      await setDoc(userDocRef, userProfileData);
 
       toast({
         title: "¡Registro Exitoso!",
@@ -67,13 +87,15 @@ export default function SignUpPage() {
       router.push('/login');
 
     } catch (err: any) {
-      console.error("Auth Signup Error:", err.code, err.message);
-       if (err.code === 'auth/email-already-in-use') {
-        setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
-      } else {
-        setError(`Ocurrió un error en la autenticación: ${err.message}`);
-      }
-      setIsSubmitting(false);
+        console.error("Auth Signup Error:", err.code, err.message);
+        if (err.code === 'auth/email-already-in-use') {
+            setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
+        } else if (err.message.includes('permission-denied') || err.message.includes('insufficient permissions')) {
+            setError('Error de permisos al crear el perfil de usuario. Contacte al administrador.');
+        } else {
+            setError(`Ocurrió un error en la autenticación: ${err.message}`);
+        }
+        setIsSubmitting(false);
     }
   };
 
