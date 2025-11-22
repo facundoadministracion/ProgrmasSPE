@@ -33,21 +33,20 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
     
     lines.forEach(line => {
         try {
-            const values = line.split(separator);
+            const values = line.split(separator).map(v => v.trim());
             if (values.length < 2) return;
 
             const participant = {
-                nombre: values[0]?.trim() || '',
-                dni: values[1]?.trim().replace(/\./g, '') || '',
-                fechaNacimiento: values[2]?.trim() || '',
-                programa: values[3]?.trim() || '',
-                fechaIngreso: values[4]?.trim() || '',
-                departamento: values[5]?.trim() || '',
-                lugarTrabajo: values[6]?.trim() || '',
-                categoria: values[7]?.trim() || 'N/A',
-                email: values[8]?.trim() || '',
-                telefono: values[9]?.trim() || '',
-                // Default values for fields not in this simple CSV
+                nombre: values[0] || '',
+                dni: values[1]?.replace(/\./g, '') || '',
+                fechaNacimiento: values[2] || '',
+                programa: values[3] || '',
+                fechaIngreso: values[4] || '',
+                departamento: values[5] || '',
+                lugarTrabajo: values[6] || '',
+                categoria: values[7] || 'N/A',
+                email: values[8] || '',
+                telefono: values[9] || '',
                 pagosAcumulados: 0,
                 activo: true,
                 esEquipoTecnico: false,
@@ -87,7 +86,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
             duplicates.push(rec);
           } else {
             newParticipants.push(rec);
-            existingDnis.add(rec.dni); // Add to set to handle duplicates within the same CSV
+            existingDnis.add(rec.dni); 
           }
         });
 
@@ -137,7 +136,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
       {step === 1 && (
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded text-sm text-blue-800">
-            <p>Seleccione el archivo CSV para subir. El sistema detectará automáticamente si tiene encabezado. Las columnas deben ser:</p>
+            <p>Seleccione el archivo CSV para subir. El sistema detectará automáticamente el separador (`,` o `;`) y si tiene encabezado. Las columnas deben ser:</p>
             <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria, email, telefono</p>
           </div>
 
@@ -201,7 +200,6 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
             </div>
           }
 
-
           <div className="flex justify-between pt-4 border-t">
             <Button variant="ghost" onClick={() => setStep(1)}>Atrás</Button>
             <Button 
@@ -219,5 +217,3 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   );
 };
 export default ParticipantUploadWizard;
-
-    
