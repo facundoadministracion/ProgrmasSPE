@@ -122,13 +122,20 @@ export default function App() {
     
     const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
-            setUserProfile(docSnapshot.data() as UserRole);
+            const userData = docSnapshot.data() as UserRole;
+            if (user.email === 'crnunezfacundo@gmail.com' && userData.name !== 'Facundo') {
+              updateDoc(userDocRef, { name: 'Facundo' });
+              setUserProfile({ ...userData, name: 'Facundo' });
+            } else {
+              setUserProfile(userData);
+            }
         } else {
             console.warn(`Creando perfil para ${user.uid}...`);
             const isAdmin = user.email === 'crnunezfacundo@gmail.com';
+            const name = user.email === 'crnunezfacundo@gmail.com' ? 'Facundo' : user.displayName || user.email?.split('@')[0] || 'Usuario';
             const newUserProfile: UserRole = {
                 uid: user.uid,
-                name: user.displayName || user.email?.split('@')[0] || 'Usuario',
+                name: name,
                 email: user.email || 'anonimo',
                 role: isAdmin ? ROLES.ADMIN : ROLES.DATA_ENTRY,
                 createdAt: new Date().toISOString(),
