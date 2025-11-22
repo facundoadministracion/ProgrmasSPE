@@ -420,7 +420,7 @@ export default function App() {
                   <div><label className="text-sm">Programa</label><Select name="programa" defaultValue={PROGRAMAS.TUTORIAS}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                   <div><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
                   <div><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
-                  <div><label className="text-sm">Categoría (Tutorías)</label><Select name="categoria"><SelectTrigger><SelectValue placeholder="-"/></SelectTrigger><SelectContent><SelectItem value="">-</SelectItem>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
+                  <div><label className="text-sm">Categoría (Tutorías)</label><Select name="categoria"><SelectTrigger><SelectValue placeholder="-"/></SelectTrigger><SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                   <div><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
                   <div><label className="text-sm">Email</label><Input name="email" type="email" /></div>
                   <div><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
