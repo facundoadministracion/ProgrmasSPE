@@ -15,7 +15,9 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 
 const PaymentUploadWizard = ({
   participants,
@@ -262,7 +264,7 @@ const PaymentUploadWizard = ({
                     ) : (
                         <>
                         <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click para subir</span> o arrastre el archivo</p>
-                        <p className="text-xs text-gray-500">Archivo .CSV (DNI, MONTO)</p>
+                        <p className="text-xs text-gray-500">Archivo .CSV (DNI; MONTO)</p>
                         </>
                     )}
                 </div>
@@ -363,15 +365,24 @@ const PaymentUploadWizard = ({
           )}
 
           {analysis.unknown.length > 0 && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-800 text-sm">
-              <strong className="font-bold flex items-center gap-2"><XCircle/>Bloqueo de Seguridad</strong>
-              Hay {analysis.unknown.length}{' '}
-              DNIs desconocidos en el archivo CSV. Debe cargarlos primero en el Padrón General
-              de Participantes antes de poder liquidarles un pago.
-              <ul className="list-disc pl-5 mt-2 text-xs font-mono">
-                {analysis.unknown.map(u => <li key={u.dni}>{u.dni}</li>)}
-              </ul>
-            </div>
+            <Card>
+                <CardHeader className="bg-red-50">
+                    <CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>Bloqueo de Seguridad</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 text-sm text-red-700">
+                    <p>Hay {analysis.unknown.length} DNIs desconocidos en el archivo CSV. Debe cargarlos primero en el Padrón General de Participantes antes de poder liquidarles un pago.</p>
+                    <div className="max-h-40 overflow-y-auto mt-4 border bg-white p-2 rounded">
+                        <Table>
+                            <TableHeader><TableRow><TableHead>DNI Desconocido</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {analysis.unknown.map(u => (
+                                    <TableRow key={u.dni}><TableCell className="font-mono">{u.dni}</TableCell></TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
           )}
 
           <div className="flex justify-between pt-4 border-t">
@@ -395,5 +406,3 @@ const PaymentUploadWizard = ({
   );
 };
 export default PaymentUploadWizard;
-
-    
