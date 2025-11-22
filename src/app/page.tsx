@@ -22,6 +22,7 @@ import {
   where,
   writeBatch,
   getDocs,
+  getCountFromServer,
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -141,8 +142,6 @@ export default function App() {
   }, [user, firestore]);
 
   // --- CARGA DE DATOS OPTIMIZADA ---
-  // Solo se cargan las colecciones esenciales y/o pequeñas al inicio.
-  // Payments y Novedades se cargarán bajo demanda.
   const participantsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
@@ -152,21 +151,26 @@ export default function App() {
   const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
-  // Los pagos ahora se contarán de forma asíncrona para el dashboard
   const [paymentCount, setPaymentCount] = useState(0);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
 
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || userProfile?.role !== ROLES.ADMIN) {
+        setPaymentsLoading(false);
+        return;
+    };
+    
+    setPaymentsLoading(true);
     const q = query(collection(firestore, 'payments'), where('anio', '==', currentYear));
-    getDocs(q).then(snapshot => {
-      setPaymentCount(snapshot.size);
+    
+    getCountFromServer(q).then(snapshot => {
+      setPaymentCount(snapshot.data().count);
       setPaymentsLoading(false);
     }).catch(err => {
       console.error("Error counting payments:", err);
       setPaymentsLoading(false);
     });
-  }, [firestore, currentYear]);
+  }, [firestore, currentYear, userProfile]);
 
 
   // --- UI STATE ---
@@ -240,7 +244,6 @@ export default function App() {
   
   const renderDashboard = () => {
     if (selectedProgramDetail) {
-        // ProgramAnalytics ahora es responsable de cargar sus propios datos de novedades
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
     }
     const alerts = (participants || []).filter(p => { const s = getAlertStatus(p); return s && (s.type === 'red' || s.type === 'yellow'); }).length;
@@ -435,3 +438,4 @@ export default function App() {
     </SidebarProvider>
   );
 }
+
