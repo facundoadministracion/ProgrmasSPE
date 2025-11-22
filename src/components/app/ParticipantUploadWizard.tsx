@@ -31,7 +31,8 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
                 programa: values[3]?.trim() || '',
                 fechaIngreso: values[4]?.trim() || '',
                 departamento: values[5]?.trim() || '',
-                categoria: values[6]?.trim() || 'N/A',
+                lugarTrabajo: values[6]?.trim() || '',
+                categoria: values[7]?.trim() || 'N/A',
                 // Default values for fields not in this simple CSV
                 pagosAcumulados: 0,
                 activo: true,
@@ -103,7 +104,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between text-sm font-medium text-gray-500 border-b pb-4">
-        <span className={step >= 1 ? "text-blue-600" : ""}>1. Pegar CSV</span>
+        <span className={step >= 1 ? "text-blue-600" : ""}>1. Pegar Contenido</span>
         <ArrowRight size={16} />
         <span className={step >= 2 ? "text-blue-600" : ""}>2. Análisis y Confirmación</span>
       </div>
@@ -112,11 +113,11 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded text-sm text-blue-800">
             <p>Pegue aquí los datos desde su hoja de cálculo. Asegúrese que las columnas estén en el orden correcto:</p>
-            <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, categoria</p>
+            <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria</p>
           </div>
           <Textarea 
             className="w-full h-48 font-mono text-sm" 
-            placeholder="Juan Perez,30111222,1990-05-15,Tutorías,2023-01-10,Capital,Senior..." 
+            placeholder="Juan Perez,30111222,1990-05-15,Tutorías,2023-01-10,Capital,Escuela N° 5,Senior..." 
             value={csvText} 
             onChange={e => setCsvText(e.target.value)}
           />
