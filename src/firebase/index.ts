@@ -7,31 +7,18 @@ import { getFirestore } from 'firebase/firestore';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  if (!getApps().length) {
-    let firebaseApp;
-    try {
-      // Intenta inicializar con configuración automática si está disponible (entornos de Firebase)
-      firebaseApp = initializeApp();
-    } catch (e) {
-      // Si falla (entorno local/de desarrollo), usa el objeto de configuración explícito.
-      firebaseApp = initializeApp(firebaseConfig);
-    }
-    return getSdks(firebaseApp);
-  }
-
-  return getSdks(getApp());
+  // Siempre inicializa usando la configuración explícita para evitar ambigüedades.
+  // Si la app ya está inicializada, la recupera.
+  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  return getSdks(app);
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  // Conecta explícitamente a la base de datos correcta.
-  // Tu proyecto 'programas-spe' usa la base de datos '(default)'.
-  // Al no especificar un segundo argumento, nos aseguramos de usar la predeterminada.
-  const firestore = getFirestore(firebaseApp);
-  
+  // Esta función ahora solo obtiene los servicios del app ya inicializado.
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: firestore
+    firestore: getFirestore(firebaseApp)
   };
 }
 
