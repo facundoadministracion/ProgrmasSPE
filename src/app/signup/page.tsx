@@ -19,6 +19,7 @@ import { Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import type { UserRole } from '@/lib/types';
+import { ROLES } from '@/lib/constants';
 
 export default function SignUpPage() {
   const { auth, firestore } = useFirebase();
@@ -69,7 +70,7 @@ export default function SignUpPage() {
         uid: newUser.uid,
         name: name,
         email: newUser.email || '',
-        role: isAdmin ? 'admin' : 'data_entry',
+        role: isAdmin ? ROLES.ADMIN : ROLES.DATA_ENTRY,
         createdAt: new Date().toISOString(),
       };
 
@@ -79,9 +80,9 @@ export default function SignUpPage() {
 
       toast({
         title: "¡Registro Exitoso!",
-        description: `La cuenta para ${email} ha sido creada. Ahora será redirigido para iniciar sesión.`,
+        description: `La cuenta para ${email} ha sido creada. Será redirigido a la lista de usuarios.`,
       });
-      router.push('/login');
+      router.push('/');
 
     } catch (err: any) {
       console.error("SignUp Error:", err);
@@ -116,7 +117,7 @@ export default function SignUpPage() {
           </div>
           <CardTitle>Crear Nuevo Usuario</CardTitle>
           <CardDescription>
-            Complete el formulario para registrarse.
+            Complete el formulario para registrar un nuevo perfil de acceso.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -168,8 +169,8 @@ export default function SignUpPage() {
               {isSubmitting ? 'Registrando...' : 'Crear Usuario'}
             </Button>
             <div className="text-center text-sm text-gray-500 pt-2">
-              <Link href="/login" className="font-medium text-blue-600 hover:underline">
-                ¿Ya tienes cuenta? Iniciar Sesión
+              <Link href="/" className="font-medium text-blue-600 hover:underline">
+                Volver al Panel
               </Link>
             </div>
           </form>
