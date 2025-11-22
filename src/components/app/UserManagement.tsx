@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import type { User } from 'firebase/auth';
 import type { UserRole } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, addDoc, updateDoc, deleteDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -20,19 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
-import { DEPARTAMENTOS, ROLES } from '@/lib/constants';
+import { PlusCircle, Loader2 } from 'lucide-react';
+import { ROLES } from '@/lib/constants';
 import Link from 'next/link';
 
 interface UserManagementProps {
@@ -43,55 +35,18 @@ interface UserManagementProps {
 
 const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) => {
   const { firestore } = useFirebase();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserRole | null>(null);
-
-  const handleSaveUser = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!firestore) return;
-
-    const formData = new FormData(e.target);
-    const userData: Partial<UserRole> = {
-        name: formData.get('name') as string,
-        email: formData.get('email') as string,
-        role: formData.get('role') as UserRole['role'],
-        departamento: formData.get('departamento') as string,
-    };
-    
-    try {
-        if (editingUser) {
-            await updateDoc(doc(firestore, 'users', editingUser.uid), userData);
-        } else {
-            console.error("Cannot create new user from this component. Please use Sign Up page.");
-            alert("La creación de nuevos usuarios debe hacerse desde la página de registro.");
-        }
-        setIsModalOpen(false);
-        setEditingUser(null);
-    } catch (err) {
-        console.error(err);
-        alert("Error al guardar usuario.");
-    }
-  };
 
   const handleUpdateRole = async (uid: string, role: UserRole['role']) => {
     if (!firestore) return;
     await updateDoc(doc(firestore, 'users', uid), { role });
   };
 
-  const handleDeleteUser = async (uid: string) => {
-      if(!firestore) return;
-      if(window.confirm("¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer.")) {
-          await deleteDoc(doc(firestore, 'users', uid));
-      }
-  };
-
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Gestión de Usuarios del Sistema</h2>
         <Button asChild>
-          <Link href="/signup"><PlusCircle /> Nuevo Usuario</Link>
+          <Link href="/signup"><PlusCircle className="mr-2 h-4 w-4"/> Nuevo Usuario</Link>
         </Button>
       </div>
       
@@ -100,15 +55,13 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
           <CardTitle>Lista de Usuarios</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? <div className="p-8 text-center text-gray-400">Cargando usuarios...</div> : (
+          {isLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/>Cargando usuarios...</div> : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead>Departamento</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -128,17 +81,8 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
                           <SelectContent>
                             <SelectItem value={ROLES.ADMIN}>Admin</SelectItem>
                             <SelectItem value={ROLES.DATA_ENTRY}>Data Entry</SelectItem>
-                            <SelectItem value={ROLES.TECNICO}>Técnico</SelectItem>
                           </SelectContent>
                         </Select>
-                    </TableCell>
-                    <TableCell>{user.departamento || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      {currentUser?.uid !== user.uid && (
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.uid)}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))}
