@@ -84,11 +84,10 @@ export default function App() {
   const { toast } = useToast();
   
   const [userProfile, setUserProfile] = useState<UserRole | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
-  const [dataLoaded, setDataLoaded] = useState(false);
-
-
+  
   // Effect for handling authentication state
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -100,19 +99,22 @@ export default function App() {
   useEffect(() => {
     if (!user || !firestore) {
       setUserProfile(null);
+      setIsProfileLoading(!user);
       return;
     }
     
+    setIsProfileLoading(true);
     const userDocRef = doc(firestore, 'users', user.uid);
 
     const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
             setUserProfile(docSnapshot.data() as UserRole);
+            setIsProfileLoading(false);
         } else {
             console.warn(`User profile for ${user.uid} not found. Creating it now.`);
             // User exists in Auth, but not in Firestore. Create the profile.
             const isAdmin = user.email === 'crnunezfacundo@gmail.com';
-            const newUserProfile: Omit<UserRole, 'createdAt'> & { createdAt: string } = {
+            const newUserProfile: UserRole = {
                 uid: user.uid,
                 name: user.displayName || user.email || 'Nuevo Usuario',
                 email: user.email || '',
@@ -120,12 +122,11 @@ export default function App() {
                 createdAt: new Date().toISOString(),
             };
 
-            // Use setDoc to create the document. It won't throw a permission error
-            // if the rules are `allow write: if request.auth.uid == userId;`
             setDoc(userDocRef, newUserProfile)
               .then(() => {
                 console.log("User profile created successfully on first login.");
-                setUserProfile(newUserProfile as UserRole);
+                setUserProfile(newUserProfile);
+                setIsProfileLoading(false);
               })
               .catch(error => {
                 console.error("Error creating user profile:", error);
@@ -135,6 +136,7 @@ export default function App() {
                     requestResourceData: newUserProfile,
                 });
                 errorEmitter.emit('permission-error', permissionError);
+                setIsProfileLoading(false);
               });
         }
     }, (error) => {
@@ -144,6 +146,7 @@ export default function App() {
             operation: 'get',
         });
         errorEmitter.emit('permission-error', permissionError);
+        setIsProfileLoading(false);
     });
 
     return () => unsubscribe();
@@ -176,14 +179,8 @@ export default function App() {
   useEffect(() => {
      if (userProfile?.role === ROLES.DATA_ENTRY) {
         setActiveTab('attendance');
-        setDataLoaded(true);
-    } else if (isAdmin) {
-        const allDataLoaded = !participantsLoading && !paymentsLoading && !novedadesLoading && !configLoading && !usersLoading;
-        if (allDataLoaded) {
-            setDataLoaded(true);
-        }
     }
-  }, [userProfile, isAdmin, participantsLoading, paymentsLoading, novedadesLoading, configLoading, usersLoading]);
+  }, [userProfile]);
 
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -232,21 +229,15 @@ export default function App() {
     }
   };
   
-  const role = userProfile?.role;
-  const loading = !dataLoaded;
-
-  if (isUserLoading || !user) {
-    return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
-  }
-  
-  if (!userProfile && !isUserLoading) {
+  if (isUserLoading || isProfileLoading) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando perfil de usuario...</div>;
   }
-
+  
   if (!userProfile) {
-    return <div className="flex items-center justify-center h-screen text-gray-500">Cargando...</div>;
+    // This case might happen briefly or if profile creation fails.
+    // The login/signup flow should handle redirection.
+    return <div className="flex items-center justify-center h-screen text-gray-500">Redirigiendo a inicio de sesión...</div>;
   }
-
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
@@ -258,9 +249,9 @@ export default function App() {
         <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Resumen General</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <DashboardCard title="Total Activos" value={participants?.length ?? 0} icon={Users} color="blue" subtitle="Padrón total consolidado" />
-                <DashboardCard title="Alertas Admin." value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención urgente" />
-                <DashboardCard title="Pagos Registrados" value={payments?.length ?? 0} icon={DollarSign} color="green" subtitle="Histórico total de transacciones" />
+                <DashboardCard title="Total Activos" value={participants?.length ?? 0} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
+                <DashboardCard title="Alertas Admin." value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención urgente" isLoading={participantsLoading} />
+                <DashboardCard title="Pagos Registrados" value={payments?.length ?? 0} icon={DollarSign} color="green" subtitle="Histórico total de transacciones" isLoading={paymentsLoading} />
             </div>
         </div>
         <div className="border-t pt-6">
@@ -268,7 +259,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {Object.values(PROGRAMAS).map(prog => {
                     const count = (participants || []).filter(p => p.programa === prog).length;
-                    return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo"/>;
+                    return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo" isLoading={participantsLoading}/>;
                 })}
             </div>
         </div>
@@ -288,6 +279,7 @@ export default function App() {
           </div>
         </div>
         <Card>
+          {participantsLoading ? <div className="p-8 text-center text-gray-400">Cargando participantes...</div> : (
             <Table>
                 <TableHeader>
                   <TableRow>
@@ -314,6 +306,7 @@ export default function App() {
                     })}
                 </TableBody>
             </Table>
+           )}
         </Card>
       </div>
     );
@@ -321,6 +314,11 @@ export default function App() {
 
   const renderConfig = () => {
     const config = configData?.[0] || { tutorias: { senior: 0, estandar: 0, junior: 0 }, joven: { monto: 0 }, tecno: { monto: 0 } };
+    
+    if(configLoading) {
+        return <div className="p-8 text-center text-gray-400">Cargando configuración...</div>;
+    }
+
     return(
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800">Configuración de Montos</h2>
@@ -408,17 +406,13 @@ export default function App() {
             <span className="font-bold">Gestión LR</span>
         </header>
         <main className="flex-1 p-4 md:p-8">
-            {loading ? (
-                <div className="flex items-center justify-center h-full text-gray-400">Cargando datos...</div>
-            ) : (
-                <>
-                  {activeTab === 'dashboard' && isAdmin && renderDashboard()}
-                  {activeTab === 'participants' && isAdmin && renderParticipants()}
-                  {activeTab === 'attendance' && (isAdmin || isDataEntry) && <AttendanceSection participants={participants || []} />}
-                  {activeTab === 'users' && isAdmin && <UserManagement users={allUsers || []} currentUser={user} />}
-                  {activeTab === 'config' && isAdmin && renderConfig()}
-                </>
-            )}
+            
+          {activeTab === 'dashboard' && isAdmin && renderDashboard()}
+          {activeTab === 'participants' && isAdmin && renderParticipants()}
+          {activeTab === 'attendance' && (isAdmin || isDataEntry) && <AttendanceSection participants={participants || []} />}
+          {activeTab === 'users' && isAdmin && <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} />}
+          {activeTab === 'config' && isAdmin && renderConfig()}
+                
         </main>
       </SidebarInset>
 

@@ -37,9 +37,10 @@ import { DEPARTAMENTOS, ROLES } from '@/lib/constants';
 interface UserManagementProps {
   users: UserRole[];
   currentUser: User | null;
+  isLoading: boolean;
 }
 
-const UserManagement = ({ users, currentUser }: UserManagementProps) => {
+const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) => {
   const { firestore } = useFirebase();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRole | null>(null);
@@ -64,7 +65,6 @@ const UserManagement = ({ users, currentUser }: UserManagementProps) => {
             // This component assumes user auth object already exists.
             // This form is for editing existing or creating profiles for already-authed users.
             // We'll simulate adding, but this needs a proper flow with auth.
-            // Since we can't create a user here without auth, we'll just log it.
             console.error("Cannot create new user from this component. Please use Sign Up page.");
             alert("La creación de nuevos usuarios debe hacerse desde la página de registro.");
             // await addDoc(collection(firestore, 'users'), { ...userData, createdAt: serverTimestamp()});
@@ -102,49 +102,51 @@ const UserManagement = ({ users, currentUser }: UserManagementProps) => {
           <CardTitle>Lista de Usuarios</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Departamento</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.uid}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                     <Select
-                        defaultValue={user.role}
-                        onValueChange={(newRole: UserRole['role']) => handleUpdateRole(user.uid, newRole) }
-                        disabled={currentUser?.uid === user.uid}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Seleccionar rol" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={ROLES.ADMIN}>Admin</SelectItem>
-                          <SelectItem value={ROLES.DATA_ENTRY}>Data Entry</SelectItem>
-                          <SelectItem value={ROLES.TECNICO}>Técnico</SelectItem>
-                        </SelectContent>
-                      </Select>
-                  </TableCell>
-                  <TableCell>{user.departamento || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    {currentUser?.uid !== user.uid && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.uid)}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                    )}
-                  </TableCell>
+          {isLoading ? <div className="p-8 text-center text-gray-400">Cargando usuarios...</div> : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Departamento</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.uid}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                       <Select
+                          defaultValue={user.role}
+                          onValueChange={(newRole: UserRole['role']) => handleUpdateRole(user.uid, newRole) }
+                          disabled={currentUser?.uid === user.uid}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Seleccionar rol" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ROLES.ADMIN}>Admin</SelectItem>
+                            <SelectItem value={ROLES.DATA_ENTRY}>Data Entry</SelectItem>
+                            <SelectItem value={ROLES.TECNICO}>Técnico</SelectItem>
+                          </SelectContent>
+                        </Select>
+                    </TableCell>
+                    <TableCell>{user.departamento || '-'}</TableCell>
+                    <TableCell className="text-right">
+                      {currentUser?.uid !== user.uid && (
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(user.uid)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
