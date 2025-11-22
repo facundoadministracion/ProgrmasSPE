@@ -94,7 +94,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       const toReactivate: any[] = [];
       
       records.forEach((rec) => {
-        const cleanedCsvDni = cleanDNI(rec.dni);
+        const cleanedCsvDni = rec.dni;
         const found = allProgramParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
         
         if (found) {
