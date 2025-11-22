@@ -8,24 +8,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
+    // safeEmail checks for the existence of the email in the token
     function safeEmail() {
       return request.auth != null && request.auth.token.email != null
         ? request.auth.token.email
         : "";
     }
 
+    // isAdmin checks if the user has the admin email address
     function isAdmin() {
       return safeEmail() == "crnunezfacundo@gmail.com";
     }
 
     match /users/{userId} {
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow read: if isOwner(userId) || isAdmin();
-      allow update, delete: if isOwner(userId) || isAdmin();
+      // A user can only read and write to their own profile. Admins are handled by other rules.
+      // This is the most direct and fail-safe rule.
+      allow read, write: if request.auth.uid == userId;
     }
 
     match /participants/{docId} {
