@@ -11,7 +11,7 @@ import {
   errorEmitter,
   FirestorePermissionError,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
@@ -106,9 +106,7 @@ export default function App() {
         if (doc.exists()) {
             setUserProfile(doc.data() as UserRole);
         } else {
-            console.warn(`User profile for ${user.uid} not found. It should have been created on sign up.`);
-            // Optionally, sign out the user if a profile is mandatory
-            // signOut(auth);
+            console.warn(`User profile for ${user.uid} not found. This can happen on first login.`);
         }
     }, (error) => {
         const permissionError = new FirestorePermissionError({
@@ -119,7 +117,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, firestore, auth]);
+  }, [user, firestore]);
 
 
   // --- Data Fetching ---
@@ -228,9 +226,20 @@ export default function App() {
   const loading = !dataLoaded;
 
   // Strict loading gate: Do not render anything until auth is resolved and user profile is loaded.
-  if (isUserLoading || !user || !userProfile) {
+  if (isUserLoading || !user) {
     return <div className="flex items-center justify-center h-screen text-gray-500">Cargando sistema...</div>;
   }
+  
+  // Profile might still be loading, show a specific message for that.
+  if (!userProfile && !isUserLoading) {
+    return <div className="flex items-center justify-center h-screen text-gray-500">Cargando perfil de usuario...</div>;
+  }
+
+  // Final check
+  if (!userProfile) {
+    return <div className="flex items-center justify-center h-screen text-gray-500">Cargando...</div>;
+  }
+
 
   const renderDashboard = () => {
     if (selectedProgramDetail) {
