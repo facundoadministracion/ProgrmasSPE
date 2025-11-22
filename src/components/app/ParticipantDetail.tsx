@@ -6,6 +6,7 @@ import { collection, query, where, addDoc, serverTimestamp } from 'firebase/fire
 import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
 import { calculateAge, formatDateToDDMMYYYY } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
   FileText,
