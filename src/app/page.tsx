@@ -96,7 +96,7 @@ export default function App() {
     }
   }, [isUserLoading, user, router]);
 
-  // Effect for fetching user's profile
+  // Effect for fetching or creating user's profile
   useEffect(() => {
     if (!user || !firestore) {
       setUserProfile(null);
@@ -105,13 +105,40 @@ export default function App() {
     
     const userDocRef = doc(firestore, 'users', user.uid);
 
-    const unsubscribe = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-            setUserProfile(doc.data() as UserRole);
+    const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+            setUserProfile(docSnapshot.data() as UserRole);
         } else {
-            console.warn(`User profile for ${user.uid} not found. This can happen on first login.`);
+            console.warn(`User profile for ${user.uid} not found. Creating it now.`);
+            // User exists in Auth, but not in Firestore. Create the profile.
+            const isAdmin = user.email === 'crnunezfacundo@gmail.com';
+            const newUserProfile: Omit<UserRole, 'createdAt'> & { createdAt: string } = {
+                uid: user.uid,
+                name: user.displayName || user.email || 'Nuevo Usuario',
+                email: user.email || '',
+                role: isAdmin ? ROLES.ADMIN : ROLES.DATA_ENTRY,
+                createdAt: new Date().toISOString(),
+            };
+
+            // Use setDoc to create the document. It won't throw a permission error
+            // if the rules are `allow write: if request.auth.uid == userId;`
+            setDoc(userDocRef, newUserProfile)
+              .then(() => {
+                console.log("User profile created successfully on first login.");
+                setUserProfile(newUserProfile as UserRole);
+              })
+              .catch(error => {
+                console.error("Error creating user profile:", error);
+                 const permissionError = new FirestorePermissionError({
+                    path: userDocRef.path,
+                    operation: 'create',
+                    requestResourceData: newUserProfile,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+              });
         }
     }, (error) => {
+        console.error("Error fetching user profile:", error);
         const permissionError = new FirestorePermissionError({
             path: userDocRef.path,
             operation: 'get',
