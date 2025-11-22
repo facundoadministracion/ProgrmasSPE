@@ -85,7 +85,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       }
       
       const records = parseCSV(text);
-      const csvDnis = new Set(records.map(r => r.dni));
+      const csvDnis = new Set(records.map(r => cleanDNI(r.dni)));
       
       const allProgramParticipants = participants.filter(p => p.programa === config.programa);
 
@@ -94,7 +94,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
       const toReactivate: any[] = [];
       
       records.forEach((rec) => {
-        const cleanedCsvDni = rec.dni;
+        const cleanedCsvDni = cleanDNI(rec.dni);
         const found = allProgramParticipants.find((p) => cleanDNI(p.dni) === cleanedCsvDni);
         
         if (found) {
@@ -431,3 +431,5 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
 };
 
 export default PaymentUploadWizard;
+
+    
