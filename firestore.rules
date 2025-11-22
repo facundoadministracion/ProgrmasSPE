@@ -4,51 +4,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ========== Helper Functions ==========
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // The admin is identified by their specific email address.
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.email == "crnunezfacundo@gmail.com";
+    function safeEmail() {
+      return request.auth != null && request.auth.token.email != null
+        ? request.auth.token.email
+        : "";
     }
 
-    // ========== User Profiles ==========
-    match /users/{userId} {
-        // EMERGENCY RULE: Allow ANYONE to create a user profile to unblock registration.
-        // This is not secure for production but is necessary to get past the current blocker.
-        allow create;
-        
-        // Once created, only the owner or an admin can read/update/delete.
-        allow read, update, delete: if isOwner(userId) || isAdmin();
+    function isAdmin() {
+      return safeEmail() == "crnunezfacundo@gmail.com";
     }
-    
-    // ========== General Rules for Other Collections ==========
-    // An admin can do anything.
-    // A logged-in user (data_entry) can read most data and create specific documents.
+
+    match /users/{userId} {
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow read, update, delete: if isOwner(userId) || isAdmin();
+    }
+
     match /participants/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
     match /payments/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
     match /config/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    
+
     match /novedades/{docId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
-     match /asistencias/{docId} {
+
+    match /asistencias/{docId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
