@@ -75,6 +75,16 @@ export interface AppConfig {
   };
 }
 
+export interface ConfigHistoryItem extends AppConfig {
+  id: string;
+  mes: number;
+  anio: number;
+  actoAdministrativo: string;
+  fechaCarga: Timestamp;
+  ownerId: string;
+}
+
+
 type ObjectValues<T> = T[keyof T];
 export type Role = ObjectValues<typeof ROLES>;
 

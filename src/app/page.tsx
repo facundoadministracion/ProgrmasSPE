@@ -22,6 +22,7 @@ import {
   writeBatch,
   getDocs,
   getCountFromServer,
+  orderBy,
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -45,11 +46,12 @@ import {
   ChevronRight,
   Loader2,
   Upload,
+  History,
 } from 'lucide-react';
 
-import type { Participant, Payment, Novedad, AppConfig, UserRole } from '@/lib/types';
+import type { Participant, Payment, Novedad, ConfigHistoryItem, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES } from '@/lib/constants';
+import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES, MONTHS } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
 import {
@@ -193,8 +195,8 @@ export default function App() {
   const participantsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  const configRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'config')) : null, [firestore]);
-  const { data: configData, isLoading: configLoading } = useCollection<AppConfig>(configRef);
+  const configHistoryRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'configHistory'), orderBy('fechaCarga', 'desc')) : null, [firestore]);
+  const { data: configHistory, isLoading: configLoading } = useCollection<ConfigHistoryItem>(configHistoryRef);
 
   const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
@@ -256,31 +258,28 @@ export default function App() {
     setSelectedParticipant(null);
   };
 
-  const handleUpdateConfig = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveConfig = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(!firestore) return;
+    if(!firestore || !user) return;
   
     const formData = new FormData(e.currentTarget);
     const data = {
+      mes: parseInt(formData.get('mes') as string),
+      anio: parseInt(formData.get('anio') as string),
+      actoAdministrativo: formData.get('actoAdministrativo') as string,
       tutorias: {
         senior: parseFloat(formData.get('senior') as string || '0'),
         estandar: parseFloat(formData.get('estandar') as string || '0'),
         junior: parseFloat(formData.get('junior') as string || '0'),
       },
       joven: { monto: parseFloat(formData.get('joven') as string || '0') },
-      tecno: { monto: parseFloat(formData.get('tecno') as string || '0') }
+      tecno: { monto: parseFloat(formData.get('tecno') as string || '0') },
+      fechaCarga: serverTimestamp(),
+      ownerId: user.uid,
     };
-    const configCollectionRef = collection(firestore, 'config');
 
-  
-    if (!configData || configData.length === 0) {
-      await addDoc(configCollectionRef, { ...data, timestamp: serverTimestamp() });
-      toast({ title: "Configuración Creada" });
-    } else {
-      const configDocRef = doc(configCollectionRef, configData[0].id);
-      await updateDoc(configDocRef, { ...data, timestamp: serverTimestamp() });
-      toast({ title: "Montos Actualizados" });
-    }
+    await addDoc(collection(firestore, 'configHistory'), data);
+    toast({ title: "Configuración Guardada", description: "Se ha creado un nuevo registro en el historial de montos." });
   };
   
   if (isUserLoading || !user) {
@@ -375,31 +374,78 @@ export default function App() {
   };
 
   const renderConfig = () => {
-    const config = configData?.[0] || { tutorias: { senior: 0, estandar: 0, junior: 0 }, joven: { monto: 0 }, tecno: { monto: 0 } };
+    const latestConfig = configHistory?.[0] || { tutorias: { senior: 0, estandar: 0, junior: 0 }, joven: { monto: 0 }, tecno: { monto: 0 } };
     
-    if(configLoading) return <div className="p-8 text-center text-gray-400">Cargando...</div>;
-
     return(
-        <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Configuración de Montos</h2>
-            <form onSubmit={handleUpdateConfig} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">Registrar Nueva Configuración de Montos</h2>
+              <p className="text-gray-500 text-sm mt-1">Guardar una nueva configuración creará un registro histórico y pasará a ser la configuración activa.</p>
+            </div>
+            <form onSubmit={handleSaveConfig} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                  <Card>
-                    <CardHeader><CardTitle>Tutorías (Por Categoría)</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Valores para Programas</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div><label className="block text-sm mb-1">Senior</label><Input name="senior" type="number" defaultValue={config.tutorias.senior} /></div>
-                        <div><label className="block text-sm mb-1">Estándar</label><Input name="estandar" type="number" defaultValue={config.tutorias.estandar} /></div>
-                        <div><label className="block text-sm mb-1">Junior</label><Input name="junior" type="number" defaultValue={config.tutorias.junior} /></div>
+                        <h3 className="font-semibold text-gray-600">Tutorías (Por Categoría)</h3>
+                        <div><label className="block text-sm mb-1">Senior</label><Input name="senior" type="number" step="0.01" defaultValue={latestConfig.tutorias.senior} /></div>
+                        <div><label className="block text-sm mb-1">Estándar</label><Input name="estandar" type="number" step="0.01" defaultValue={latestConfig.tutorias.estandar} /></div>
+                        <div><label className="block text-sm mb-1">Junior</label><Input name="junior" type="number" step="0.01" defaultValue={latestConfig.tutorias.junior} /></div>
+                        <hr className="my-4" />
+                        <h3 className="font-semibold text-gray-600">Otros Programas (Fijo)</h3>
+                        <div><label className="block text-sm mb-1">Empleo Joven</label><Input name="joven" type="number" step="0.01" defaultValue={latestConfig.joven.monto} /></div>
+                        <div><label className="block text-sm mb-1">Tecnoempleo</label><Input name="tecno" type="number" step="0.01" defaultValue={latestConfig.tecno.monto} /></div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardHeader><CardTitle>Otros Programas (Fijo)</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Datos del Registro</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <div><label className="block text-sm mb-1">Empleo Joven</label><Input name="joven" type="number" defaultValue={config.joven.monto} /></div>
-                        <div><label className="block text-sm mb-1">Tecnoempleo</label><Input name="tecno" type="number" defaultValue={config.tecno.monto} /></div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm mb-1">Mes de Vigencia</label>
+                            <Select name="mes" defaultValue={String(new Date().getMonth())}>
+                              <SelectTrigger><SelectValue/></SelectTrigger>
+                              <SelectContent>{MONTHS.map((m,i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="block text-sm mb-1">Año</label>
+                            <Select name="anio" defaultValue={String(new Date().getFullYear())}>
+                              <SelectTrigger><SelectValue/></SelectTrigger>
+                              <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm mb-1">Acto Administrativo / Decreto</label>
+                          <Input name="actoAdministrativo" placeholder="Ej: Dec. N° 123/25" required/>
+                        </div>
+                         <Button type="submit" className="w-full mt-4" disabled={!isAdmin}>Guardar Nueva Configuración</Button>
                     </CardContent>
                 </Card>
-                <div className="md:col-span-2"><Button type="submit" className="w-full" disabled={!isAdmin}>Guardar Todos los Cambios</Button></div>
             </form>
+
+            <div className="border-t pt-8">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><History/> Historial de Configuraciones</h2>
+               <Card className="mt-4">
+                {configLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/> Cargando historial...</div> : (
+                   <Table>
+                     <TableHeader><TableRow><TableHead>Vigencia</TableHead><TableHead>Acto Adm.</TableHead><TableHead>Tutoría Estándar</TableHead><TableHead>Empleo Joven</TableHead><TableHead>Fecha de Carga</TableHead></TableRow></TableHeader>
+                     <TableBody>
+                        {configHistory?.map(item => (
+                            <TableRow key={item.id}>
+                                <TableCell className="font-bold">{MONTHS[item.mes]}/{item.anio}</TableCell>
+                                <TableCell>{item.actoAdministrativo}</TableCell>
+                                <TableCell>${item.tutorias.estandar}</TableCell>
+                                <TableCell>${item.joven.monto}</TableCell>
+                                <TableCell>{item.fechaCarga ? new Date((item.fechaCarga as any).seconds * 1000).toLocaleDateString() : 'N/A'}</TableCell>
+                            </TableRow>
+                        ))}
+                        {(!configHistory || configHistory.length === 0) && <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay historial de configuraciones.</TableCell></TableRow>}
+                     </TableBody>
+                   </Table>
+                )}
+               </Card>
+            </div>
         </div>
     );
   }
@@ -474,7 +520,7 @@ export default function App() {
       </Dialog>
 
       <Dialog open={isParticipantUploadOpen} onOpenChange={setIsParticipantUploadOpen}>
-        <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Carga Masiva de Participantes</DialogTitle><DialogDescription>Pegue el contenido de su archivo CSV para registrar nuevos participantes.</DialogDescription></DialogHeader>
+        <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Carga Masiva de Participantes</DialogTitle><DialogDescription>Siga los pasos para cargar un archivo CSV para registrar nuevos participantes.</DialogDescription></DialogHeader>
           <ParticipantUploadWizard allParticipants={participants || []} onClose={() => setIsParticipantUploadOpen(false)} />
         </DialogContent>
       </Dialog>

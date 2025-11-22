@@ -221,6 +221,41 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "name", "role", "createdAt"]
+    },
+    "ConfigHistoryItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ConfigHistoryItem",
+      "type": "object",
+      "description": "Represents a historical record of application configuration settings for amounts.",
+      "properties": {
+        "id": { "type": "string" },
+        "mes": { "type": "number" },
+        "anio": { "type": "number" },
+        "actoAdministrativo": { "type": "string" },
+        "fechaCarga": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" },
+        "tutorias": {
+          "type": "object",
+          "properties": {
+            "senior": { "type": "number" },
+            "estandar": { "type": "number" },
+            "junior": { "type": "number" }
+          }
+        },
+        "joven": {
+          "type": "object",
+          "properties": {
+            "monto": { "type": "number" }
+          }
+        },
+        "tecno": {
+          "type": "object",
+          "properties": {
+            "monto": { "type": "number" }
+          }
+        }
+      },
+      "required": ["id", "mes", "anio", "fechaCarga", "ownerId"]
     }
   },
   "auth": {
@@ -272,13 +307,13 @@
         }
       },
       {
-        "path": "config/{configId}",
+        "path": "configHistory/{configId}",
         "definition": {
-          "entityName": "config",
+          "entityName": "ConfigHistoryItem",
           "schema": {
-            "$ref": "#/entities/config"
+            "$ref": "#/entities/ConfigHistoryItem"
           },
-          "description": "Stores configuration settings."
+          "description": "Stores the history of configuration settings for amounts."
         }
       },
        {
