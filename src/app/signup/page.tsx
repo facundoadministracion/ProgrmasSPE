@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,36 +35,35 @@ export default function SignUpPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden.');
-      setIsSubmitting(false);
       return;
     }
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
-      setIsSubmitting(false);
       return;
     }
     if (!name.trim()) {
       setError('Por favor, ingrese su nombre y apellido.');
-      setIsSubmitting(false);
       return;
     }
 
     if (!auth || !firestore) {
       setError('Los servicios de Firebase no están disponibles.');
-      setIsSubmitting(false);
       return;
     }
 
+    setIsSubmitting(true);
     try {
       // Step 1: Create user in Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Step 2: Create user profile data
+      // Step 2: Update Firebase Auth profile with display name
+      await updateProfile(newUser, { displayName: name });
+
+      // Step 3: Create user profile data for Firestore
       const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
       const userProfileData: Omit<UserRole, 'createdAt'> & { createdAt: string } = {
         uid: newUser.uid,
@@ -74,35 +73,32 @@ export default function SignUpPage() {
         createdAt: new Date().toISOString(),
       };
 
-      // Step 3: Write user profile to Firestore
+      // Step 4: Write user profile to Firestore
       const userDocRef = doc(firestore, 'users', newUser.uid);
       await setDoc(userDocRef, userProfileData);
 
       toast({
         title: "¡Registro Exitoso!",
-        description: `La cuenta para ${email} ha sido creada. Será redirigido a la lista de usuarios.`,
+        description: `La cuenta para ${email} ha sido creada. Será redirigido.`,
       });
       router.push('/');
 
     } catch (err: any) {
       console.error("SignUp Error:", err);
+      let friendlyError = 'Ocurrió un error inesperado durante el registro.';
       if (err.code === 'auth/email-already-in-use') {
-        setError('El correo electrónico ya está en uso. Si es usted, por favor inicie sesión.');
+        friendlyError = 'El correo electrónico ya está en uso por otra cuenta.';
       } else if (err.code === 'permission-denied') {
-         setError('Error de permisos. Verifique las reglas de seguridad de Firestore.');
-         // Emit contextual error for debugging
+         friendlyError = 'Error de permisos al crear el perfil. Verifique las reglas de seguridad.';
          const permissionError = new FirestorePermissionError({
             path: `users/${(auth.currentUser?.uid || 'unknown')}`,
             operation: 'create',
-            requestResourceData: { name, email, role: 'data_entry' }, // Example data
+            requestResourceData: { name, email, role: 'data_entry' },
         });
         errorEmitter.emit('permission-error', permissionError);
-
-      } else {
-        setError(`Ocurrió un error: ${err.message}`);
       }
+      setError(friendlyError);
     } finally {
-        // This will always run, ensuring the button is re-enabled
         setIsSubmitting(false);
     }
   };
@@ -179,3 +175,4 @@ export default function SignUpPage() {
     </div>
   );
 }
+
