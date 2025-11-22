@@ -21,9 +21,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // A user can only read and write to their own profile. Admins are handled by other rules.
-      // This is the most direct and fail-safe rule.
-      allow read, write: if request.auth.uid == userId;
+      // A user can only read their own profile.
+      allow read: if request.auth.uid == userId;
+      // A user can only write to their own profile.
+      allow write: if request.auth.uid == userId;
     }
 
     match /participants/{docId} {
