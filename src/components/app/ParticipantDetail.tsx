@@ -20,7 +20,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PROGRAMAS } from '@/lib/constants';
+
+const DetailItem = ({ label, value, className }: { label: string, value: React.ReactNode, className?: string }) => (
+    <div className={cn("flex flex-col justify-center rounded-lg p-3", className)}>
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-base font-bold">{value}</span>
+    </div>
+);
 
 const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
@@ -74,41 +80,33 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
       <Tabs defaultValue="general">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="pagos">Historial Pagos</TabsTrigger>
+          <TabsTrigger value="pagos">Historial Pagos ({currentYear})</TabsTrigger>
           <TabsTrigger value="novedades">Novedades</TabsTrigger>
         </TabsList>
         <div className="min-h-[300px] pt-4">
             <TabsContent value="general">
-              <div className="space-y-4">
-                {alertStatus && alertStatus.type !== 'blue' && (
-                  <div className={`p-4 rounded border-l-4 ${alertStatus.type === 'red' ? 'bg-red-50 border-red-500 text-red-700' : 'bg-yellow-50 border-yellow-500 text-yellow-700'}`}>
-                    <h4 className="font-bold flex items-center gap-2"><AlertTriangle size={18} /> Atención</h4>
-                    <p>{alertStatus.msg}</p>
-                    {participant.programa !== PROGRAMAS.TUTORIAS && <p className="text-sm mt-1">Pagos acumulados: <strong>{participant.pagosAcumulados || 0}</strong></p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <DetailItem label="Edad" value={age > 0 ? `${age} años` : 'N/D'} className="bg-gray-50"/>
+                <DetailItem label="Fecha Ingreso" value={formatDateToDDMMYYYY(participant.fechaIngreso as string)} className="bg-gray-50 text-indigo-700"/>
+                <DetailItem label="Categoría" value={participant.categoria || 'N/A'} className="bg-gray-50" />
+                <DetailItem label="Lugar de Trabajo" value={participant.lugarTrabajo || '-'} className="bg-gray-50" />
+                <DetailItem label="Email" value={participant.email || '-'} className="bg-gray-50" />
+                <DetailItem label="Teléfono" value={participant.telefono || '-'} className="bg-gray-50" />
+                <DetailItem label="Último Pago" value={participant.ultimoPago || 'Sin registros'} className="bg-gray-50 col-span-2"/>
+
+                {alertStatus && (
+                  <div className={`md:col-span-2 mt-2 p-3 rounded-lg border-l-4 flex items-start gap-3 text-sm ${
+                    alertStatus.type === 'red' ? 'bg-red-50 border-red-500 text-red-800' :
+                    alertStatus.type === 'yellow' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' :
+                    'bg-green-50 border-green-500 text-green-800'
+                  }`}>
+                    <AlertTriangle size={20} className="mt-0.5"/>
+                    <div>
+                      <h4 className="font-bold">Estado Administrativo</h4>
+                      <p>{alertStatus.msg}</p>
+                    </div>
                   </div>
                 )}
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                   <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Edad</p><p className="font-bold">{age > 0 ? `${age} años` : 'N/D'}</p></div>
-                   <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Fecha Ingreso</p><p className="font-bold text-indigo-700">{formatDateToDDMMYYYY(participant.fechaIngreso as string)}</p></div>
-                   <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Categoría</p><p className="font-bold">{participant.categoria || 'N/A'}</p></div>
-                   <div className="p-3 bg-gray-50 rounded"><p className="text-gray-500">Lugar Trabajo</p><p className="font-bold">{participant.lugarTrabajo || '-'}</p></div>
-                   <div className="p-3 bg-gray-50 rounded col-span-2"><p className="text-gray-500">Último Pago Registrado</p><p className="font-bold text-lg">{participant.ultimoPago || 'Sin registros'}</p></div>
-                </div>
-
-                <div className="mt-4 border-t pt-4">
-                    <h4 className="font-bold text-gray-700 mb-2 flex items-center gap-2"><FileText size={16}/> Datos de Contacto</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                            <Mail size={16} />
-                            <span>{participant.email || "Sin email"}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                            <Phone size={16} />
-                            <span>{participant.telefono || "Sin teléfono"}</span>
-                        </div>
-                    </div>
-                </div>
               </div>
             </TabsContent>
             <TabsContent value="pagos">
