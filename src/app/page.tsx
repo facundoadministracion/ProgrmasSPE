@@ -11,7 +11,7 @@ import {
   errorEmitter,
   FirestorePermissionError,
 } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import {
@@ -93,32 +93,52 @@ export default function App() {
     }
   }, [isUserLoading, user, router]);
 
-  // Effect for fetching the user's specific profile role
+  // Effect for fetching or creating the user's profile
   useEffect(() => {
     if (!user || !firestore) {
       setUserProfile(null);
       return;
     }
+    
     const userDocRef = doc(firestore, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (doc) => {
-      if (doc.exists()) {
-        const userData = doc.data() as UserRole;
-        setUserProfile(userData);
-        if (userData.role === 'admin' && activeTab !== 'dashboard' && activeTab !== 'participants' && activeTab !== 'users' && activeTab !== 'config') {
-            setActiveTab('dashboard');
+
+    const manageUserProfile = async () => {
+      try {
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const userData = docSnap.data() as UserRole;
+          setUserProfile(userData);
+        } else {
+          // --- Perfil no existe, se crea al primer inicio de sesión ---
+          const isAdmin = user.email === 'crnunezfacundo@gmail.com';
+          const newUserProfile: UserRole = {
+            uid: user.uid,
+            name: user.displayName || user.email?.split('@')[0] || 'Nuevo Usuario',
+            email: user.email || '',
+            role: isAdmin ? 'admin' : 'data_entry',
+            createdAt: new Date().toISOString(),
+          };
+          await setDoc(userDocRef, newUserProfile);
+          setUserProfile(newUserProfile);
         }
-      } else {
-         console.error("User profile document not found for UID:", user.uid);
-         if (auth) signOut(auth);
+      } catch (error: any) {
+        console.error("Error managing user profile:", error);
+        const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        if (auth) signOut(auth);
       }
-    }, (error) => {
-      console.error("Error fetching user profile:", error);
-      const permissionError = new FirestorePermissionError({
-          path: userDocRef.path,
-          operation: 'get',
-      });
-      errorEmitter.emit('permission-error', permissionError);
-      if (auth) signOut(auth);
+    };
+
+    manageUserProfile();
+
+    // Opcional: Escuchar cambios en el perfil si es necesario
+    const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+            setUserProfile(doc.data() as UserRole);
+        }
     });
 
     return () => unsubscribe();

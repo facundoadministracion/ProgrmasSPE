@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -58,29 +57,12 @@ export default function SignUpPage() {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const newUser = userCredential.user;
-
-      // Forzar la actualización del token para que Firestore lo reconozca
-      await newUser.getIdToken(true);
-
-      const userDocRef = doc(firestore, 'users', newUser.uid);
-      const isAdmin = newUser.email === 'crnunezfacundo@gmail.com';
-
-      const userProfileData = {
-        uid: newUser.uid,
-        name: name,
-        email: newUser.email,
-        role: isAdmin ? 'admin' : 'data_entry',
-        createdAt: new Date().toISOString(),
-      };
-      
-      // Ahora Firestore debería tener la autenticación correcta
-      await setDoc(userDocRef, userProfileData);
+      // SOLO CREA EL USUARIO, NO ESCRIBE EN FIRESTORE
+      await createUserWithEmailAndPassword(auth, email, password);
 
       toast({
         title: "¡Registro Exitoso!",
-        description: `La cuenta para ${email} ha sido creada. Ahora puede iniciar sesión.`,
+        description: `La cuenta para ${email} ha sido creada. Ahora será redirigido para iniciar sesión.`,
       });
       router.push('/login');
 
