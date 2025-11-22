@@ -1,9 +1,22 @@
 export const DEPARTAMENTOS = [
-  "Capital", "Chilecito", "Arauco", "Famatina", "Chamical", 
-  "General Belgrano", "General Ocampo", "General San Martín", 
-  "Vinchina", "Independencia", "Castro Barros", "San Blas de los Sauces",
-  "Felipe Varela", "Rosario Vera Peñaloza", "Facundo Quiroga", 
-  "General Lamadrid", "Sanagasta", "Ángel Vicente Peñaloza"
+  "Ángel Vicente Peñaloza",
+  "Arauco",
+  "Capital",
+  "Castro Barros",
+  "Chamical",
+  "Chilecito",
+  "Facundo Quiroga",
+  "Famatina",
+  "Felipe Varela",
+  "General Belgrano",
+  "General Lamadrid",
+  "General Ocampo",
+  "General San Martín",
+  "Independencia",
+  "Rosario Vera Peñaloza",
+  "San Blas de los Sauces",
+  "Sanagasta",
+  "Vinchina",
 ];
 
 export const PROGRAMAS = {
