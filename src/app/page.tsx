@@ -93,6 +93,46 @@ import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import { useToast } from '@/hooks/use-toast';
 
+
+const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void }) => {
+    const [selectedProgram, setSelectedProgram] = useState(PROGRAMAS.TUTORIAS);
+    return (
+        <form onSubmit={onFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="text-sm">Nombre</label><Input name="nombre" required /></div>
+                <div><label className="text-sm">DNI</label><Input name="dni" required /></div>
+                <div><label className="text-sm">Fecha Nacimiento</label><Input name="fechaNacimiento" type="date" required /></div>
+                <div><label className="text-sm">Acto Adm. Alta</label><Input name="actoAdministrativo" placeholder="Res. Nº..." /></div>
+                <div>
+                    <label className="text-sm">Programa</label>
+                    <Select name="programa" value={selectedProgram} onValueChange={(value) => setSelectedProgram(value)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
+                <div><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
+                
+                {selectedProgram === PROGRAMAS.TUTORIAS && (
+                    <div>
+                        <label className="text-sm">Categoría (Tutorías)</label>
+                        <Select name="categoria">
+                            <SelectTrigger><SelectValue placeholder="-"/></SelectTrigger>
+                            <SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                )}
+                
+                <div><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
+                <div><label className="text-sm">Email</label><Input name="email" type="email" /></div>
+                <div><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
+            </div>
+            <div className="flex items-center gap-2 mt-2 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
+            <Button type="submit" className="w-full mt-4">Guardar</Button>
+        </form>
+    )
+}
+
 export default function App() {
   const { auth } = useFirebase();
   const firestore = useFirestore();
@@ -415,23 +455,7 @@ export default function App() {
 
       <Dialog open={selectedParticipant === 'new'} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Nuevo Participante</DialogTitle><DialogDescription>Complete el formulario para agregar un nuevo participante.</DialogDescription></DialogHeader>
-          <form onSubmit={handleAddParticipant} className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div><label className="text-sm">Nombre</label><Input name="nombre" required /></div>
-                  <div><label className="text-sm">DNI</label><Input name="dni" required /></div>
-                  <div><label className="text-sm">Fecha Nacimiento</label><Input name="fechaNacimiento" type="date" required /></div>
-                  <div><label className="text-sm">Acto Adm. Alta</label><Input name="actoAdministrativo" placeholder="Res. Nº..." /></div>
-                  <div><label className="text-sm">Programa</label><Select name="programa" defaultValue={PROGRAMAS.TUTORIAS}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
-                  <div><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
-                  <div><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
-                  <div><label className="text-sm">Categoría (Tutorías)</label><Select name="categoria"><SelectTrigger><SelectValue placeholder="-"/></SelectTrigger><SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
-                  <div><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
-                  <div><label className="text-sm">Email</label><Input name="email" type="email" /></div>
-                  <div><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
-              </div>
-              <div className="flex items-center gap-2 mt-2 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
-              <Button type="submit" className="w-full mt-4">Guardar</Button>
-          </form>
+          <NewParticipantForm onFormSubmit={handleAddParticipant} />
         </DialogContent>
       </Dialog>
       

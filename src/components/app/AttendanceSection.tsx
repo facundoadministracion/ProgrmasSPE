@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import { Participant } from '@/lib/types';
-import { MONTHS } from '@/lib/constants';
+import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { getPaymentStatus } from '@/lib/logic';
 import { useFirebase, useUser } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
@@ -37,7 +37,11 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
   const filteredPeople = useMemo(() => {
       if(searchTerm.length < 3) return [];
       const lower = searchTerm.toLowerCase();
-      return participants.filter(p => p.nombre.toLowerCase().includes(lower) || p.dni.includes(lower));
+      // Filtra solo por el programa de tutorías
+      return participants.filter(p => 
+          p.programa === PROGRAMAS.TUTORIAS && 
+          (p.nombre.toLowerCase().includes(lower) || p.dni.includes(lower))
+      );
   }, [searchTerm, participants]);
 
   const handleSelectPerson = async (p: Participant) => {
@@ -116,15 +120,15 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
       {!selectedPerson ? (
           <Card className="p-8 text-center max-w-2xl mx-auto">
             <CardContent>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Carga de Asistencia</h2>
-              <p className="text-gray-500 mb-6">Busque al participante para ingresar los datos de su planilla mensual.</p>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Carga de Asistencia de Tutorías</h2>
+              <p className="text-gray-500 mb-6">Busque al tutor para ingresar los datos de su planilla mensual.</p>
               
               <div className="relative max-w-md mx-auto">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                   <Input 
                       type="text" 
                       className="pl-10 p-3"
-                      placeholder="Ingrese DNI o Apellido..."
+                      placeholder="Ingrese DNI o Apellido del Tutor..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       autoFocus
@@ -153,7 +157,7 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                           );
                       })}
                       {filteredPeople.length === 0 && (
-                          <div className="p-4 text-center text-gray-400">No se encontraron resultados.</div>
+                          <div className="p-4 text-center text-gray-400">No se encontraron tutores con ese criterio.</div>
                       )}
                   </div>
               )}
