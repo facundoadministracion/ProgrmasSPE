@@ -15,6 +15,8 @@ import {
   Loader2,
   UserX,
   UserCheck,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,6 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import BajaForm from './BajaForm';
 
 const DetailItem = ({ label, value, className }: { label: string, value: React.ReactNode, className?: string }) => (
     <div className={cn("flex flex-col justify-center rounded-lg p-3", className)}>
@@ -43,6 +46,7 @@ const DetailItem = ({ label, value, className }: { label: string, value: React.R
 const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
   const currentYear = new Date().getFullYear().toString();
+  const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   
   const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades'), where('participantId', '==', participant.id)) : null, [firestore, participant.id]);
   const { data: novedadesData, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
@@ -67,6 +71,24 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
     setNewNovedad({ ...newNovedad, descripcion: '' });
   };
   
+  const handleBajaConfirm = async (bajaData: any) => {
+    if (!firestore) return;
+
+    // 1. Update participant status
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, { activo: false });
+
+    // 2. Add a new "novedad" with the baja details
+    const descripcion = `Baja registrada. Motivo: ${bajaData.motivo} - ${bajaData.detalle}. Período de baja: ${bajaData.mesBaja}/${bajaData.anioBaja}`;
+    await addDoc(collection(firestore, 'novedades'), {
+      ...bajaData,
+      descripcion,
+      fechaRealCarga: serverTimestamp(),
+    });
+
+    setIsBajaDialogOpen(false);
+  };
+
   const toggleParticipantStatus = async () => {
     if (!firestore) return;
     const newStatus = !participant.activo;
@@ -104,27 +126,46 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
               </div>
             </div>
         </div>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant={participant.activo ? "destructive" : "outline"} size="sm">
-              {participant.activo ? <UserX/> : <UserCheck/>}
-              {participant.activo ? 'Dar de Baja' : 'Reactivar'}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Confirmar cambio de estado?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción marcará al participante como <strong>{participant.activo ? 'INACTIVO' : 'ACTIVO'}</strong>. 
-                Esto afectará su visibilidad en los reportes y liquidaciones. Se registrará una novedad con el cambio.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={toggleParticipantStatus}>Confirmar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm">
+            <Pencil size={16} className="mr-1" />
+            Editar
+          </Button>
+          <Button variant="outline" size="sm">
+            <Trash2 size={16} className="mr-1" />
+            Borrar
+          </Button>
+          <AlertDialog open={isBajaDialogOpen} onOpenChange={setIsBajaDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant={participant.activo ? "destructive" : "outline"} size="sm">
+                {participant.activo ? <UserX/> : <UserCheck/>}
+                {participant.activo ? 'Dar de Baja' : 'Reactivar'}
+              </Button>
+            </AlertDialogTrigger>
+            {participant.activo ? (
+              <BajaForm 
+                participantId={participant.id}
+                participantName={participant.nombre}
+                ownerId={participant.ownerId}
+                onConfirm={handleBajaConfirm}
+              />
+            ) : (
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Confirmar cambio de estado?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción marcará al participante como <strong>ACTIVO</strong>. 
+                    Esto afectará su visibilidad en los reportes y liquidaciones. Se registrará una novedad con el cambio.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={toggleParticipantStatus}>Confirmar Reactivación</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            )}
+          </AlertDialog>
+        </div>
       </div>
 
       <Tabs defaultValue="general">
