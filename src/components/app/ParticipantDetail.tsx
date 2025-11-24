@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
@@ -44,8 +44,14 @@ const DetailItem = ({ label, value, className }: { label: string, value: React.R
     </div>
 );
 
-const ParticipantDetail = ({ participant }: { participant: Participant }) => {
+const ParticipantDetail = ({ participant: initialParticipant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
+  const [participant, setParticipant] = useState(initialParticipant);
+
+  useEffect(() => {
+    setParticipant(initialParticipant);
+  }, [initialParticipant]);
+
   const currentYear = new Date().getFullYear().toString();
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -79,6 +85,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
 
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: false });
+    setParticipant(prev => ({...prev, activo: false}));
 
     const descripcion = `Baja registrada. Motivo: ${bajaData.motivo} - ${bajaData.detalle}. Período de baja: ${bajaData.mesBaja}/${bajaData.anioBaja}`;
     await addDoc(collection(firestore, 'novedades'), {
@@ -95,6 +102,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
     const newStatus = !participant.activo;
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: newStatus });
+    setParticipant(prev => ({...prev, activo: newStatus}));
 
     await addDoc(collection(firestore, 'novedades'), {
       participantId: participant.id,
@@ -120,7 +128,6 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
 
     const partRef = doc(firestore, 'participants', participant.id);
     await deleteDoc(partRef);
-
     setIsDeleteDialogOpen(false);
   };
 
@@ -135,6 +142,7 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
 
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedData);
+    setParticipant(prev => ({...prev, ...updatedData}));
 
     await addDoc(collection(firestore, 'novedades'), {
       participantId: participant.id,
