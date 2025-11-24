@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
-import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
+import { getAlertStatus } from '@/lib/logic';
 import { calculateAge, formatDateToDDMMYYYY } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
@@ -44,6 +44,11 @@ const DetailItem = ({ label, value, className }: { label: string, value: React.R
     </div>
 );
 
+const meses = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
 const ParticipantDetail = ({ participant: initialParticipant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
   const [participant, setParticipant] = useState(initialParticipant);
@@ -65,6 +70,11 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
   const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
 
   const [newNovedad, setNewNovedad] = useState({ descripcion: '', fecha: new Date().toISOString().split('T')[0] });
+
+  const bajaNovedad = useMemo(() => {
+    if (participant.activo || !novedades) return null;
+    return novedades.find(nov => nov.motivo) || null;
+  }, [novedades, participant.activo]);
   
   const handleAddNovedad = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +97,16 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
     await updateDoc(partRef, { activo: false });
     setParticipant(prev => ({...prev, activo: false}));
 
-    const descripcion = `Baja registrada. Motivo: ${bajaData.motivo} - ${bajaData.detalle}. Período de baja: ${bajaData.mesBaja}/${bajaData.anioBaja}`;
+    let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}.`;
+    if (bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'SINTyS') {
+      descripcion += ` ${bajaData.tipoActo} N° ${bajaData.numeroActo}.`;
+    }
+    if (bajaData.detalle) {
+      descripcion += ` Detalle: ${bajaData.detalle}.`;
+    }
+    const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
+    descripcion += ` Período de baja: ${monthName} - ${bajaData.anioBaja}.`;
+
     await addDoc(collection(firestore, 'novedades'), {
       ...bajaData,
       descripcion,
@@ -176,7 +195,9 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
               <div className="flex gap-2 mt-1">
                 <Badge variant="blue">{participant.programa}</Badge>
                 {participant.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}
-                <Badge variant={alertStatus.type as any}>{alertStatus.msg}</Badge>
+                <Badge variant={!participant.activo ? 'destructive' : alertStatus.type as any}>
+                  {!participant.activo ? 'Inactivo' : alertStatus.msg}
+                </Badge>
               </div>
             </div>
         </div>
@@ -255,7 +276,20 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
                 <DetailItem label="Teléfono" value={participant.telefono || '-'} className="bg-gray-50" />
                 <DetailItem label="Último Pago Registrado" value={participant.ultimoPago || 'Sin registros'} className="bg-gray-50 col-span-2"/>
 
-                {alertStatus && (alertStatus.type === 'yellow' || alertStatus.type === 'red') && (
+                {!participant.activo && bajaNovedad ? (
+                  <div className="md:col-span-2 mt-2 p-3 rounded-lg border-l-4 flex items-start gap-3 text-sm bg-gray-100 border-gray-500 text-gray-800">
+                      <UserX size={20} className="mt-0.5 text-gray-600"/>
+                      <div>
+                          <h4 className="font-bold">Información de la Baja</h4>
+                          <p><strong>Motivo:</strong> {bajaNovedad.motivo}</p>
+                          {(bajaNovedad.motivo === 'Acto Administrativo' || bajaNovedad.motivo === 'SINTyS') && bajaNovedad.tipoActo && (
+                            <p><strong>Acto:</strong> {bajaNovedad.tipoActo} N° {bajaNovedad.numeroActo}</p>
+                          )}
+                          {bajaNovedad.detalle && <p><strong>Detalle:</strong> {bajaNovedad.detalle}</p>}
+                          {bajaNovedad.mesBaja && bajaNovedad.anioBaja && <p><strong>Período:</strong> {meses[parseInt(bajaNovedad.mesBaja, 10) - 1]} - {bajaNovedad.anioBaja}</p>}
+                      </div>
+                  </div>
+                ) : participant.activo && alertStatus && (alertStatus.type === 'yellow' || alertStatus.type === 'red') && (
                   <div className={`md:col-span-2 mt-2 p-3 rounded-lg border-l-4 flex items-start gap-3 text-sm ${
                     alertStatus.type === 'red' ? 'bg-red-50 border-red-500 text-red-800' : 'bg-yellow-50 border-yellow-500 text-yellow-800'
                   }`}>

@@ -35,10 +35,13 @@ const BajaForm: React.FC<BajaFormProps> = ({
   const [anioBaja, setAnioBaja] = useState(new Date().getFullYear().toString());
   const [mesBaja, setMesBaja] = useState((new Date().getMonth() + 1).toString());
   const [motivo, setMotivo] = useState('');
+  const [tipoActo, setTipoActo] = useState('');
+  const [numeroActo, setNumeroActo] = useState('');
   const [detalle, setDetalle] = useState('');
-  const [otras, setOtras] = useState('');
+  const [otrasDetalle, setOtrasDetalle] = useState('');
 
   const handleConfirm = () => {
+    const finalDetalle = detalle === 'Otras' ? otrasDetalle : detalle;
     const bajaData = {
       participantId,
       participantName,
@@ -47,25 +50,22 @@ const BajaForm: React.FC<BajaFormProps> = ({
       anioBaja,
       mesBaja,
       motivo,
-      detalle: detalle === 'Otras' ? otras : detalle,
+      detalle: finalDetalle,
+      ...((motivo === 'Acto Administrativo' || motivo === 'SINTyS') && { tipoActo, numeroActo }),
     };
     onConfirm(bajaData);
   };
 
   const meses = [
-    { value: '1', label: 'Enero' },
-    { value: '2', label: 'Febrero' },
-    { value: '3', label: 'Marzo' },
-    { value: '4', label: 'Abril' },
-    { value: '5', label: 'Mayo' },
-    { value: '6', label: 'Junio' },
-    { value: '7', label: 'Julio' },
-    { value: '8', label: 'Agosto' },
-    { value: '9', label: 'Septiembre' },
-    { value: '10', label: 'Octubre' },
-    { value: '11', label: 'Noviembre' },
-    { value: '12', label: 'Diciembre' },
+    { value: '1', label: 'Enero' }, { value: '2', label: 'Febrero' }, { value: '3', label: 'Marzo' },
+    { value: '4', label: 'Abril' }, { value: '5', label: 'Mayo' }, { value: '6', label: 'Junio' },
+    { value: '7', label: 'Julio' }, { value: '8', label: 'Agosto' }, { value: '9', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' }, { value: '11', label: 'Noviembre' }, { value: '12', label: 'Diciembre' },
   ];
+
+  const motivosBaja = ['Acto Administrativo', 'RRHH Vinculados', 'SINTyS'].sort();
+  const tiposActoAdmin = ['Decreto', 'Resolución'].sort();
+  const detallesBaja = ['Horas Docentes', 'Otras', 'Renuncia', 'Trabajo Registrado'].sort();
 
   return (
     <AlertDialogContent>
@@ -76,82 +76,65 @@ const BajaForm: React.FC<BajaFormProps> = ({
           <strong>{participantName}</strong>.
         </AlertDialogDescription>
       </AlertDialogHeader>
-      <div className="space-y-4">
+      <div className="space-y-4 py-4">
         <div className="flex items-center gap-4">
-            <label htmlFor="anioBaja" className="w-1/4 text-sm font-medium">
-                Año de Baja
-            </label>
-            <Input
-                id="anioBaja"
-                value={anioBaja}
-                onChange={(e) => setAnioBaja(e.target.value)}
-                className="w-3/4"
-            />
+          <label className="w-1/4 text-sm font-medium">Año de Baja</label>
+          <Input value={anioBaja} onChange={(e) => setAnioBaja(e.target.value)} className="w-3/4" />
         </div>
         <div className="flex items-center gap-4">
-            <label htmlFor="mesBaja" className="w-1/4 text-sm font-medium">
-                Mes de Baja
-            </label>
-            <Select value={mesBaja} onValueChange={setMesBaja}>
-                <SelectTrigger className="w-3/4">
-                    <SelectValue placeholder="Seleccione un mes" />
-                </SelectTrigger>
-                <SelectContent>
-                    {meses.map((mes) => (
-                        <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+          <label className="w-1/4 text-sm font-medium">Mes de Baja</label>
+          <Select value={mesBaja} onValueChange={setMesBaja}>
+            <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un mes" /></SelectTrigger>
+            <SelectContent>
+              {meses.map((mes) => <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-4">
-          <label htmlFor="motivo" className="w-1/4 text-sm font-medium">
-            Motivo
-          </label>
+          <label className="w-1/4 text-sm font-medium">Motivo</label>
           <Select value={motivo} onValueChange={setMotivo}>
-            <SelectTrigger className="w-3/4">
-              <SelectValue placeholder="Seleccione un motivo" />
-            </SelectTrigger>
+            <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un motivo" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="RRHH VInculados">RRHH VInculados</SelectItem>
-              <SelectItem value="SINTyS">SINTyS</SelectItem>
+              {motivosBaja.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
 
-              <SelectItem value="Decreto">Decreto</SelectItem>
-              <SelectItem value="Resolucion">Resolucion</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {(motivo === 'Acto Administrativo' || motivo === 'SINTyS') && (
+          <>
+            <div className="flex items-center gap-4">
+              <label className="w-1/4 text-sm font-medium">Tipo de Acto</label>
+              <Select value={tipoActo} onValueChange={setTipoActo}>
+                <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
+                <SelectContent>
+                  {tiposActoAdmin.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="w-1/4 text-sm font-medium">Número</label>
+              <Input value={numeroActo} onChange={(e) => setNumeroActo(e.target.value)} className="w-3/4" placeholder="Ingrese el número" />
+            </div>
+          </>
+        )}
+
         <div className="flex items-center gap-4">
-          <label htmlFor="detalle" className="w-1/4 text-sm font-medium">
-            Detalle
-          </label>
+          <label className="w-1/4 text-sm font-medium">Detalle</label>
           <Select value={detalle} onValueChange={setDetalle}>
-            <SelectTrigger className="w-3/4">
-              <SelectValue placeholder="Seleccione un detalle" />
-            </SelectTrigger>
+            <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un detalle" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="Renuncia">Renuncia</SelectItem>
-              <SelectItem value="Trabajo Registrado">
-                Trabajo Registrado
-              </SelectItem>
-              <SelectItem value="Incompatibilidad">Incompatibilidad</SelectItem>
-              <SelectItem value="Otras">Otras</SelectItem>
+              {detallesBaja.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
+
         {detalle === 'Otras' && (
           <div className="flex items-center gap-4">
-            <label htmlFor="otras" className="w-1/4 text-sm font-medium">
-              Especifique
-            </label>
-            <Input
-              id="otras"
-              value={otras}
-              onChange={(e) => setOtras(e.target.value)}
-              className="w-3/4"
-              placeholder="Ingrese el motivo"
-            />
+            <label className="w-1/4 text-sm font-medium">Especifique</label>
+            <Input value={otrasDetalle} onChange={(e) => setOtrasDetalle(e.target.value)} className="w-3/4" placeholder="Ingrese el detalle" />
           </div>
         )}
+
       </div>
       <AlertDialogFooter>
         <AlertDialogCancel>Cancelar</AlertDialogCancel>
