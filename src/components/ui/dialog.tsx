@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
@@ -78,7 +78,7 @@ const DialogFooter = ({
     )}
     {...props}
   />
-))
+)
 DialogFooter.displayName = "DialogFooter"
 
 const DialogTitle = React.forwardRef<

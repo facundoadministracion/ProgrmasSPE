@@ -222,7 +222,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
               >
                 <SelectTrigger>
                   <SelectValue />
-                </Trigger>
+                </SelectTrigger>
                 <SelectContent>
                   {MONTHS.map((m, i) => (
                     <SelectItem key={i} value={String(i)}>
@@ -240,7 +240,7 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
               >
                 <SelectTrigger>
                   <SelectValue />
-                </Trigger>
+                </SelectTrigger>
                 <SelectContent>
                   {[2023, 2024, 2025, 2026].map((y) => (
                     <SelectItem key={y} value={String(y)}>
