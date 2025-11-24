@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus, getPaymentStatus } from '@/lib/logic';
 import { calculateAge, formatDateToDDMMYYYY } from '@/lib/utils';
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import BajaForm from './BajaForm';
+import EditParticipantForm from './EditParticipantForm';
 
 const DetailItem = ({ label, value, className }: { label: string, value: React.ReactNode, className?: string }) => (
     <div className={cn("flex flex-col justify-center rounded-lg p-3", className)}>
@@ -47,7 +48,9 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const { firestore } = useFirebase();
   const currentYear = new Date().getFullYear().toString();
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
-  
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
   const novedadesRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'novedades'), where('participantId', '==', participant.id)) : null, [firestore, participant.id]);
   const { data: novedadesData, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   const novedades = useMemo(() => (novedadesData || []).sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [novedadesData]);
@@ -74,11 +77,9 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
   const handleBajaConfirm = async (bajaData: any) => {
     if (!firestore) return;
 
-    // 1. Update participant status
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: false });
 
-    // 2. Add a new "novedad" with the baja details
     const descripcion = `Baja registrada. Motivo: ${bajaData.motivo} - ${bajaData.detalle}. Período de baja: ${bajaData.mesBaja}/${bajaData.anioBaja}`;
     await addDoc(collection(firestore, 'novedades'), {
       ...bajaData,
@@ -105,9 +106,54 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
     });
   }
 
+  const handleDeleteParticipant = async () => {
+    if (!firestore) return;
+
+    await addDoc(collection(firestore, 'novedades'), {
+      participantId: participant.id,
+      participantName: participant.nombre,
+      descripcion: `Participante ELIMINADO de la base de datos.`,
+      fecha: new Date().toISOString().split('T')[0],
+      fechaRealCarga: serverTimestamp(),
+      ownerId: participant.ownerId,
+    });
+
+    const partRef = doc(firestore, 'participants', participant.id);
+    await deleteDoc(partRef);
+
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleSaveEdit = async (updatedData: Partial<Participant>) => {
+    if (!firestore) return;
+
+    const changesDescription = Object.keys(updatedData).map(key => {
+        const oldValue = participant[key as keyof Participant] || 'N/A';
+        const newValue = updatedData[key as keyof Partial<Participant>] || 'N/A';
+        return `${key} (de '${oldValue}' a '${newValue}')`;
+    }).join(', ');
+
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, updatedData);
+
+    await addDoc(collection(firestore, 'novedades'), {
+      participantId: participant.id,
+      participantName: updatedData.nombre || participant.nombre,
+      descripcion: `Se modificaron los siguientes campos: ${changesDescription}`,
+      fecha: new Date().toISOString().split('T')[0],
+      fechaRealCarga: serverTimestamp(),
+      ownerId: participant.ownerId,
+    });
+
+    setIsEditing(false);
+  };
+
   const alertStatus = getAlertStatus(participant);
   const age = calculateAge(participant.fechaNacimiento);
-  const paymentStatus = getPaymentStatus(participant.ultimoPago);
+  
+  if (isEditing) {
+    return <EditParticipantForm participant={participant} onSave={handleSaveEdit} onCancel={() => setIsEditing(false)} />
+  }
 
   return (
     <div className="space-y-6">
@@ -127,14 +173,30 @@ const ParticipantDetail = ({ participant }: { participant: Participant }) => {
             </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
             <Pencil size={16} className="mr-1" />
             Editar
           </Button>
-          <Button variant="outline" size="sm">
-            <Trash2 size={16} className="mr-1" />
-            Borrar
-          </Button>
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Trash2 size={16} className="mr-1" />
+                Borrar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Está seguro que desea eliminar a {participant.nombre}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. Se eliminará al participante de forma permanente de la base de datos.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteParticipant}>Confirmar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <AlertDialog open={isBajaDialogOpen} onOpenChange={setIsBajaDialogOpen}>
             <AlertDialogTrigger asChild>
               <Button variant={participant.activo ? "destructive" : "outline"} size="sm">
