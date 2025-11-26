@@ -70,7 +70,112 @@ const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEve
             <Button type="submit" className="w-full mt-4">Guardar</Button>
         </form>
     )
-}
+};
+
+// --- COMPONENTE AISLADO PARA LA PESTAÑA DE PARTICIPANTES ---
+const ParticipantsTab = ({ participants, isLoading, onAdd, onUpload, onSelect, onOpenUploadWizard, onOpenParticipantWizard } : {
+    participants: Participant[],
+    isLoading: boolean,
+    onAdd: (e: React.FormEvent<HTMLFormElement>) => void,
+    onUpload: () => void,
+    onSelect: (p: Participant | 'new') => void,
+    onOpenUploadWizard: () => void,
+    onOpenParticipantWizard: () => void
+}) => {
+    const [inputValue, setInputValue] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setSearchTerm(inputValue);
+            setCurrentPage(1);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [inputValue]);
+
+    const paginatedParticipants = useMemo(() => {
+        if (!participants) return { paginated: [], totalPages: 0 };
+
+        const filtered = participants
+            .filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+        const totalPages = Math.ceil(filtered.length / itemsPerPage);
+        const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+        
+        return { paginated, totalPages };
+    }, [participants, searchTerm, currentPage]);
+
+    const { paginated, totalPages } = paginatedParticipants;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-4">
+                <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <Input 
+                            type="text" 
+                            placeholder="Buscar DNI/Nombre..." 
+                            className="pl-10" 
+                            value={inputValue} 
+                            onChange={(e) => setInputValue(e.target.value)} 
+                        />
+                    </div>
+                    <Button onClick={onOpenParticipantWizard} variant="outline"><Upload className="mr-2 h-4 w-4" /> Carga Masiva</Button>
+                    <Button onClick={() => onSelect('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo</Button>
+                </div>
+            </div>
+            <Card>
+                {isLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/> Cargando participantes...</div> : (
+                    <>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead>Programa</TableHead>
+                                <TableHead>Depto</TableHead><TableHead>Estado</TableHead><TableHead>Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {paginated.map(p => {
+                                const alert = getAlertStatus(p);
+                                return (
+                                    <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
+                                        <TableCell>
+                                            <span className="block text-sm">{p.programa}</span>
+                                            {p.esEquipoTecnico ? (
+                                                <Badge variant="indigo">Equipo Técnico</Badge>
+                                            ) : p.programa === PROGRAMAS.TUTORIAS ? (
+                                                <span className="text-xs text-gray-400">{p.categoria}</span>
+                                            ) : null}
+                                        </TableCell>
+                                        <TableCell>{p.departamento}</TableCell>
+                                        <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
+                                        <TableCell><Button variant="link" size="sm" onClick={() => onSelect(p)}>Ver Legajo</Button></TableCell>
+                                    </TableRow>
+                                )
+                            })}
+                            {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados.</TableCell></TableRow>}
+                        </TableBody>
+                    </Table>
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-end space-x-2 p-4 border-t">
+                            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /> Anterior</Button>
+                            <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</div>
+                            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente <ChevronRight className="h-4 w-4" /></Button>
+                        </div>
+                    )}
+                    </>
+                )}
+            </Card>
+        </div>
+    );
+};
+
 
 export default function App() {
   const { auth } = useFirebase();
@@ -134,12 +239,10 @@ export default function App() {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  // --- CARGA DE DATOS OPTIMIZADA ---
-  // Las queries no se ejecutan hasta que el usuario esté autenticado.
+  // --- CARGA DE DATOS ---
   const participantsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, 'participants')) : null, [firestore, user]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  // La carga de usuarios solo se activa para Administradores
   const usersRef = useMemoFirebase(() => (firestore && user && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, user, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
@@ -168,31 +271,16 @@ export default function App() {
   // --- UI STATE ---
   const isAdmin = userProfile?.role === ROLES.ADMIN;
   const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
-  const [searchTerm, setSearchTerm] = useState('');
+  
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
   const [isPaymentUploadOpen, setIsPaymentUploadOpen] = useState(false);
   const [isParticipantUploadOpen, setIsParticipantUploadOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
   useEffect(() => {
      if (userProfile?.role === ROLES.DATA_ENTRY) {
         setActiveTab('attendance');
     }
   }, [userProfile]);
-  
-  const paginatedParticipants = useMemo(() => {
-    if (!participants) return { paginated: [], totalPages: 0 };
-
-    const filtered = participants
-      .filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-    const totalPages = Math.ceil(filtered.length / itemsPerPage);
-    const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    
-    return { paginated, totalPages };
-  }, [participants, searchTerm, currentPage]);
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -255,67 +343,7 @@ export default function App() {
       </div>
     );
   };
-
-  const renderParticipants = () => {
-    const { paginated, totalPages } = paginatedParticipants;
-
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><Input type="text" placeholder="Buscar DNI/Nombre..." className="pl-10" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} /></div>
-            <Button onClick={() => setIsParticipantUploadOpen(true)} variant="outline"><Upload className="mr-2 h-4 w-4" /> Carga Masiva</Button>
-            <Button onClick={() => setSelectedParticipant('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo</Button>
-          </div>
-        </div>
-        <Card>
-          {participantsLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/> Cargando participantes...</div> : (
-            <>
-            <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead>Programa</TableHead>
-                    <TableHead>Depto</TableHead><TableHead>Estado</TableHead><TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {paginated.map(p => {
-                        const alert = getAlertStatus(p);
-                        return (
-                            <TableRow key={p.id}>
-                                <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
-                                <TableCell>
-                                    <span className="block text-sm">{p.programa}</span>
-                                    {p.esEquipoTecnico ? (
-                                        <Badge variant="indigo">Equipo Técnico</Badge>
-                                    ) : p.programa === PROGRAMAS.TUTORIAS ? (
-                                        <span className="text-xs text-gray-400">{p.categoria}</span>
-                                    ) : null}
-                                </TableCell>
-                                <TableCell>{p.departamento}</TableCell>
-                                <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
-                                <TableCell><Button variant="link" size="sm" onClick={() => setSelectedParticipant(p)}>Ver Legajo</Button></TableCell>
-                            </TableRow>
-                        )
-                    })}
-                     {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados.</TableCell></TableRow>}
-                </TableBody>
-            </Table>
-            {totalPages > 1 && (
-                <div className="flex items-center justify-end space-x-2 p-4 border-t">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /> Anterior</Button>
-                    <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</div>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente <ChevronRight className="h-4 w-4" /></Button>
-                </div>
-            )}
-            </>
-           )}
-        </Card>
-      </div>
-    );
-  };
-
+  
   const renderConfig = () => {
     return (
         <div className="space-y-8">
@@ -346,7 +374,7 @@ export default function App() {
   const ActiveTabContent = () => {
     switch (activeTab) {
       case 'dashboard': return isAdmin ? renderDashboard() : null;
-      case 'participants': return isAdmin ? renderParticipants() : null;
+      case 'participants': return isAdmin ? <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onAdd={handleAddParticipant} onSelect={setSelectedParticipant} onOpenUploadWizard={() => setIsPaymentUploadOpen(true)} onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} onUpload={() => {}} /> : null;
       case 'attendance': return (isAdmin || isDataEntry) ? <AttendanceSection participants={participants || []} /> : null;
       case 'users': return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
       case 'config': return isAdmin ? renderConfig() : null;
