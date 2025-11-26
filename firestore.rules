@@ -1,8 +1,40 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Helper function to get the role of the requesting user.
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    // Users can read/update their own profile. Admins can manage all users.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && 
+                          (request.auth.uid == userId || getUserRole(request.auth.uid) == 'Admin');
+    }
+
+    // Participants can be read by any authenticated user.
+    // Only Admins and Data Entry can create, update, or delete.
+    match /participants/{participantId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && getUserRole(request.auth.uid) in ['Admin', 'Data Entry'];
+
+      // Attendance can be managed by Admins and Data Entry roles.
+      match /attendance/{attendanceId} {
+        allow read, write: if request.auth != null && getUserRole(request.auth.uid) in ['Admin', 'Data Entry'];
+      }
+    }
+
+    // Config history is restricted to Admins.
+    match /configHistory/{configId} {
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'Admin';
+    }
+
+    // Payments are restricted to Admins.
+    match /payments/{paymentId} {
+        allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'Admin';
     }
   }
 }
