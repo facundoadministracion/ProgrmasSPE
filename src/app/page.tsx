@@ -1,91 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  useFirebase,
-  useUser,
-  useMemoFirebase,
-  useFirestore,
-  useCollection,
-} from '@/firebase';
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  serverTimestamp,
-  query,
-  onSnapshot,
-  setDoc,
-  deleteDoc,
-  where,
-  writeBatch,
-  getDocs,
-  getCountFromServer,
-  orderBy,
-} from 'firebase/firestore';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useFirebase, useUser, useMemoFirebase, useFirestore, useCollection } from '@/firebase';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import {
-  Users,
-  DollarSign,
-  AlertTriangle,
-  Search,
-  Menu,
-  Calendar,
-  Briefcase,
-  Settings,
-  UserCheck,
-  PlusCircle,
-  Shield,
-  Trash2,
-  Edit,
-  LogOut,
-  Info,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Upload,
-  History,
-} from 'lucide-react';
+import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight } from 'lucide-react';
 
-import type { Participant, Payment, Novedad, ConfigHistoryItem, UserRole } from '@/lib/types';
+import type { Participant, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES, MONTHS } from '@/lib/constants';
+import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarTrigger,
-  SidebarInset,
-} from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { useToast } from '@/hooks/use-toast';
 
+// Componentes de la App
 import ParticipantDetail from '@/components/app/ParticipantDetail';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import AttendanceSection from '@/components/app/AttendanceSection';
@@ -93,8 +30,8 @@ import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import ParticipantUploadWizard from '@/components/app/ParticipantUploadWizard';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
-import { useToast } from '@/hooks/use-toast';
-
+import ConfiguracionForm from '@/components/app/ConfiguracionForm';
+import ConfiguracionHistorial from '@/components/app/ConfiguracionHistorial';
 
 const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void }) => {
     const [selectedProgram, setSelectedProgram] = useState(PROGRAMAS.TUTORIAS);
@@ -148,6 +85,12 @@ export default function App() {
   
   const currentYear = new Date().getFullYear().toString();
 
+  // --- Lógica para refrescar historial de configuración ---
+  const [forceUpdateKey, setForceUpdateKey] = useState(0);
+  const handleConfigSave = useCallback(() => {
+      setForceUpdateKey(prev => prev + 1); 
+  }, []);
+
   // --- AUTENTICACIÓN & PERFIL ---
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -192,13 +135,12 @@ export default function App() {
   }, [user, firestore]);
 
   // --- CARGA DE DATOS OPTIMIZADA ---
-  const participantsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'participants')) : null, [firestore]);
+  // Las queries no se ejecutan hasta que el usuario esté autenticado.
+  const participantsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, 'participants')) : null, [firestore, user]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  const configHistoryRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'configHistory'), orderBy('fechaCarga', 'desc')) : null, [firestore]);
-  const { data: configHistory, isLoading: configLoading } = useCollection<ConfigHistoryItem>(configHistoryRef);
-
-  const usersRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+  // La carga de usuarios solo se activa para Administradores
+  const usersRef = useMemoFirebase(() => (firestore && user && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, user, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
   const [paymentCount, setPaymentCount] = useState(0);
@@ -263,7 +205,6 @@ export default function App() {
         data[key] = value;
     });
 
-    // Ensure DNI is a string
     if (data.dni) {
         data.dni = String(data.dni);
     }
@@ -278,30 +219,6 @@ export default function App() {
     });
     toast({ title: "Participante Agregado", description: "El nuevo participante ha sido registrado." });
     setSelectedParticipant(null);
-  };
-
-  const handleSaveConfig = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if(!firestore || !user) return;
-  
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      mes: parseInt(formData.get('mes') as string),
-      anio: parseInt(formData.get('anio') as string),
-      actoAdministrativo: formData.get('actoAdministrativo') as string,
-      tutorias: {
-        senior: parseFloat(formData.get('senior') as string || '0'),
-        estandar: parseFloat(formData.get('estandar') as string || '0'),
-        junior: parseFloat(formData.get('junior') as string || '0'),
-      },
-      joven: { monto: parseFloat(formData.get('joven') as string || '0') },
-      tecno: { monto: parseFloat(formData.get('tecno') as string || '0') },
-      fechaCarga: serverTimestamp(),
-      ownerId: user.uid,
-    };
-
-    await addDoc(collection(firestore, 'configHistory'), data);
-    toast({ title: "Configuración Guardada", description: "Se ha creado un nuevo registro en el historial de montos." });
   };
   
   if (isUserLoading || !user) {
@@ -400,78 +317,28 @@ export default function App() {
   };
 
   const renderConfig = () => {
-    const latestConfig = configHistory?.[0] || { tutorias: { senior: 0, estandar: 0, junior: 0 }, joven: { monto: 0 }, tecno: { monto: 0 } };
-    
-    return(
+    return (
         <div className="space-y-8">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Registrar Nueva Configuración de Montos</h2>
-              <p className="text-gray-500 text-sm mt-1">Guardar una nueva configuración creará un registro histórico y pasará a ser la configuración activa.</p>
-            </div>
-            <form onSubmit={handleSaveConfig} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                 <Card>
-                    <CardHeader><CardTitle>Valores para Programas</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <h3 className="font-semibold text-gray-600">Tutorías (Por Categoría)</h3>
-                        <div><label className="block text-sm mb-1">Senior</label><Input name="senior" type="number" step="0.01" defaultValue={latestConfig.tutorias.senior} /></div>
-                        <div><label className="block text-sm mb-1">Estándar</label><Input name="estandar" type="number" step="0.01" defaultValue={latestConfig.tutorias.estandar} /></div>
-                        <div><label className="block text-sm mb-1">Junior</label><Input name="junior" type="number" step="0.01" defaultValue={latestConfig.tutorias.junior} /></div>
-                        <hr className="my-4" />
-                        <h3 className="font-semibold text-gray-600">Otros Programas (Fijo)</h3>
-                        <div><label className="block text-sm mb-1">Empleo Joven</label><Input name="joven" type="number" step="0.01" defaultValue={latestConfig.joven.monto} /></div>
-                        <div><label className="block text-sm mb-1">Tecnoempleo</label><Input name="tecno" type="number" step="0.01" defaultValue={latestConfig.tecno.monto} /></div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader><CardTitle>Datos del Registro</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm mb-1">Mes de Vigencia</label>
-                            <Select name="mes" defaultValue={String(new Date().getMonth())}>
-                              <SelectTrigger><SelectValue/></SelectTrigger>
-                              <SelectContent>{MONTHS.map((m,i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="block text-sm mb-1">Año</label>
-                            <Select name="anio" defaultValue={String(new Date().getFullYear())}>
-                              <SelectTrigger><SelectValue/></SelectTrigger>
-                              <SelectContent>{[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm mb-1">Acto Administrativo / Decreto</label>
-                          <Input name="actoAdministrativo" placeholder="Ej: Dec. N° 123/25" required/>
-                        </div>
-                         <Button type="submit" className="w-full mt-4" disabled={!isAdmin}>Guardar Nueva Configuración</Button>
-                    </CardContent>
-                </Card>
-            </form>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Registrar Nueva Configuración de Montos</CardTitle>
+                    <CardDescription>
+                        Guardar una nueva configuración creará un registro histórico y pasará a ser la configuración activa.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ConfiguracionForm onConfigSave={handleConfigSave} />
+                </CardContent>
+            </Card>
 
-            <div className="border-t pt-8">
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><History/> Historial de Configuraciones</h2>
-               <Card className="mt-4">
-                {configLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/> Cargando historial...</div> : (
-                   <Table>
-                     <TableHeader><TableRow><TableHead>Vigencia</TableHead><TableHead>Acto Adm.</TableHead><TableHead>Tutoría Estándar</TableHead><TableHead>Empleo Joven</TableHead><TableHead>Fecha de Carga</TableHead></TableRow></TableHeader>
-                     <TableBody>
-                        {configHistory?.map(item => (
-                            <TableRow key={item.id}>
-                                <TableCell className="font-bold">{MONTHS[item.mes]}/{item.anio}</TableCell>
-                                <TableCell>{item.actoAdministrativo}</TableCell>
-                                <TableCell>${item.tutorias.estandar}</TableCell>
-                                <TableCell>${item.joven.monto}</TableCell>
-                                <TableCell>{item.fechaCarga ? new Date((item.fechaCarga as any).seconds * 1000).toLocaleDateString() : 'N/A'}</TableCell>
-                            </TableRow>
-                        ))}
-                        {(!configHistory || configHistory.length === 0) && <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay historial de configuraciones.</TableCell></TableRow>}
-                     </TableBody>
-                   </Table>
-                )}
-               </Card>
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><History/> Historial de Configuraciones</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ConfiguracionHistorial key={forceUpdateKey} />
+                </CardContent>
+            </Card>
         </div>
     );
   }
@@ -522,6 +389,7 @@ export default function App() {
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Hola, {userProfile.name}</h1>
                 {activeTab === 'dashboard' && <p className="text-gray-500">Resumen de la actividad reciente del sistema.</p>}
+                 {activeTab === 'config' && <p className="text-gray-500">Gestión de montos y valores de los programas.</p>} { /* Mensaje para la pestaña de config */}
             </div>
           <ActiveTabContent />
         </main>
@@ -539,7 +407,7 @@ export default function App() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isPaymentUploadOpen} onOpenChange={setIsPaymentUploadOpen}>
+      <Dialog open={isPaymentUploadOpen} onOpenChange={setIsPaymentUploadOpen}> 
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Carga Masiva de Pagos</DialogTitle><DialogDescription>Siga los pasos para cargar un archivo CSV de pagos.</DialogDescription></DialogHeader>
           <PaymentUploadWizard participants={participants || []} onClose={() => setIsPaymentUploadOpen(false)} />
         </DialogContent>
