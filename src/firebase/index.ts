@@ -12,11 +12,11 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  // Conecta explícitamente a la base de datos con nombre.
+  // Conecta a la base de datos por defecto (default)
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp, "progrmas-spe")
+    firestore: getFirestore(firebaseApp)
   };
 }
 

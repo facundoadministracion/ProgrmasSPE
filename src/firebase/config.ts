@@ -1,9 +1,9 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyCpj3Wr4OLepz8M333F5pJytAaDViw0YLk",
-  authDomain: "programas-spe.firebaseapp.com",
-  projectId: "programas-spe",
-  storageBucket: "programas-spe.appspot.com",
-  messagingSenderId: "1083251126",
-  appId: "1:1083251126:web:d1660b9524c30db29ec917",
-  measurementId: "G-9C2YFCK2L4"
+  apiKey: "AIzaSyAIAoyr8-zy0_TpU3jvXZ52e3Rfza_ViCc",
+  authDomain: "programas-de-empleo-lr.firebaseapp.com",
+  projectId: "programas-de-empleo-lr",
+  storageBucket: "programas-de-empleo-lr.firebasestorage.app",
+  messagingSenderId: "193300807292",
+  appId: "1:193300807292:web:a7e93290204796e65cd3f9",
+  measurementId: "G-9381S3P20H"
 };
