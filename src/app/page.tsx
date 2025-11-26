@@ -238,6 +238,19 @@ export default function App() {
         setActiveTab('attendance');
     }
   }, [userProfile]);
+  
+  const paginatedParticipants = useMemo(() => {
+    if (!participants) return { paginated: [], totalPages: 0 };
+
+    const filtered = participants
+      .filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    
+    return { paginated, totalPages };
+  }, [participants, searchTerm, currentPage]);
 
   const handleAddParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -327,10 +340,7 @@ export default function App() {
   };
 
   const renderParticipants = () => {
-    const filtered = (participants || []).filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
-    
-    const totalPages = Math.ceil(filtered.length / itemsPerPage);
-    const paginatedData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const { paginated, totalPages } = paginatedParticipants;
 
     return (
       <div className="space-y-6">
@@ -353,19 +363,26 @@ export default function App() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {paginatedData.map(p => {
+                    {paginated.map(p => {
                         const alert = getAlertStatus(p);
                         return (
                             <TableRow key={p.id}>
                                 <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
-                                <TableCell><span className="block text-sm">{p.programa}</span>{p.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}{!p.esEquipoTecnico && p.programa === PROGRAMAS.TUTORIAS && <span className="text-xs text-gray-400">{p.categoria}</span>}</TableCell>
+                                <TableCell>
+                                    <span className="block text-sm">{p.programa}</span>
+                                    {p.esEquipoTecnico ? (
+                                        <Badge variant="indigo">Equipo Técnico</Badge>
+                                    ) : p.programa === PROGRAMAS.TUTORIAS ? (
+                                        <span className="text-xs text-gray-400">{p.categoria}</span>
+                                    ) : null}
+                                </TableCell>
                                 <TableCell>{p.departamento}</TableCell>
                                 <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
                                 <TableCell><Button variant="link" size="sm" onClick={() => setSelectedParticipant(p)}>Ver Legajo</Button></TableCell>
                             </TableRow>
                         )
                     })}
-                     {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados.</TableCell></TableRow>}
+                     {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados.</TableCell></TableRow>}
                 </TableBody>
             </Table>
             {totalPages > 1 && (
@@ -503,7 +520,7 @@ export default function App() {
         </header>
         <main className="flex-1 p-4 md:p-8 bg-gray-50/50">
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-800">Bienvenido, {userProfile.name}</h1>
+                <h1 className="text-3xl font-bold text-gray-800">Hola, {userProfile.name}</h1>
                 {activeTab === 'dashboard' && <p className="text-gray-500">Resumen de la actividad reciente del sistema.</p>}
             </div>
           <ActiveTabContent />
@@ -536,5 +553,3 @@ export default function App() {
     </SidebarProvider>
   );
 }
-
-    

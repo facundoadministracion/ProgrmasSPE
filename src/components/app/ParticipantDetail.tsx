@@ -179,7 +179,7 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
   const age = calculateAge(participant.fechaNacimiento);
   
   if (isEditing) {
-    return <EditParticipantForm participant={participant} onSave={handleSaveEdit} onCancel={() => setIsEditing(false)} />
+    return <EditParticipantForm key={participant.id} participant={participant} onSave={handleSaveEdit} onCancel={() => setIsEditing(false)} />
   }
 
   return (

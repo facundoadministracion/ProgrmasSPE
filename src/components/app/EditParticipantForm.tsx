@@ -35,7 +35,21 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
   });
 
   useEffect(() => {
-    // Si el programa no es Tutorías, limpiar la categoría
+    setFormData({
+      nombre: participant.nombre || '',
+      fechaNacimiento: participant.fechaNacimiento || '',
+      fechaIngreso: participant.fechaIngreso || '',
+      programa: participant.programa || '',
+      categoria: participant.categoria || '',
+      lugarTrabajo: participant.lugarTrabajo || '',
+      email: participant.email || '',
+      telefono: participant.telefono || '',
+      esEquipoTecnico: participant.esEquipoTecnico || false,
+    });
+  }, [participant]);
+
+
+  useEffect(() => {
     if (formData.programa !== PROGRAMAS.TUTORIAS) {
       setFormData(prev => ({ ...prev, categoria: '' }));
     }
@@ -58,23 +72,23 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
     e.preventDefault();
     
     const changes: Partial<Participant> = {};
-    // Create a copy of formData to potentially modify before submission
     let submissionData = { ...formData };
 
-    // If program is not Tutorias, ensure categoria is not sent
     if (submissionData.programa !== PROGRAMAS.TUTORIAS) {
         submissionData.categoria = '';
     }
 
     for (const key in submissionData) {
         const participantKey = key as keyof Participant;
-        if (submissionData[participantKey] !== participant[participantKey]) {
-            (changes as any)[participantKey] = submissionData[participantKey];
+        if (submissionData[participantKey as keyof typeof submissionData] !== participant[participantKey]) {
+            (changes as any)[participantKey] = submissionData[participantKey as keyof typeof submissionData];
         }
     }
 
     if (Object.keys(changes).length > 0) {
         onSave(changes);
+    } else {
+        onCancel();
     }
   };
 

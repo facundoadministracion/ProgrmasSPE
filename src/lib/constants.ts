@@ -20,7 +20,7 @@ export const DEPARTAMENTOS = [
 ];
 
 export const PROGRAMAS = {
-  TUTORIAS: 'Tutorías',
+  TUTORIAS: 'Tutorias',
   JOVEN: 'Empleo Joven',
   TECNO: 'Tecnoempleo'
 } as const;
