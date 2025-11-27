@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import type { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { useFirebase, useUser } from '@/firebase';
-import { writeBatch, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { ArrowRight, AlertTriangle, Upload, CheckCircle, XCircle, UserCheck, FileSignature } from 'lucide-react';
+import { writeBatch, collection, doc, serverTimestamp, increment, getDocs, query, where } from 'firebase/firestore';
+import { ArrowRight, AlertTriangle, Upload, XCircle, UserCheck, FileSignature, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-const PaymentUploadWizard = ({ participants, onClose }: { participants: Participant[]; onClose: () => void; }) => {
+const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participants: Participant[]; onClose: () => void; onFindDni: (dni: string) => void; }) => {
   const { firestore } = useFirebase();
   const { user } = useUser();
   const [step, setStep] = useState(1);
@@ -36,9 +36,10 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
     totalCsv: number;
   } | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [altaResolution, setAltaResolution] = useState('');
   const [flagMissing, setFlagMissing] = useState(true);
-
+  
   const cleanDNI = (value: any): string => {
     return String(value)
       .normalize("NFD")
@@ -73,20 +74,37 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
     return result;
   };
 
-  const handleAnalyze = () => {
-    if (!selectedFile) return;
+  const handleAnalyze = async () => {
+    if (!selectedFile || !firestore) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      let text = e.target?.result as string;
+    setAnalyzing(true);
+    try {
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          let result = e.target?.result as string;
+          if (result && result.charCodeAt(0) === 0xFEFF) {
+            result = result.slice(1);
+          }
+          resolve(result);
+        };
+        reader.onerror = reject;
+        reader.readAsText(selectedFile, 'UTF-8');
+      });
 
-      if (text && text.charCodeAt(0) === 0xFEFF) {
-        text = text.slice(1);
-      }
-      
       const records = parseCSV(text);
       const csvDnis = new Set(records.map(r => cleanDNI(r.dni)));
       
+      // Get payments from previous month
+      const prevMonthDate = new Date(config.anio, config.mes - 1);
+      const prevMes = String(prevMonthDate.getMonth() + 1);
+      const prevAnio = String(prevMonthDate.getFullYear());
+
+      const paymentsRef = collection(firestore, 'payments');
+      const q = query(paymentsRef, where('mes', '==', prevMes), where('anio', '==', prevAnio));
+      const querySnapshot = await getDocs(q);
+      const paidLastMonthIds = new Set(querySnapshot.docs.map(doc => doc.data().participantId));
+
       const allProgramParticipants = participants.filter(p => p.programa === config.programa);
 
       const matched: any[] = [];
@@ -109,12 +127,20 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
         }
       });
       
-      const toDeactivate = allProgramParticipants.filter(p => p.activo && !csvDnis.has(cleanDNI(p.dni)));
+      const toDeactivate = allProgramParticipants.filter(p => 
+        p.activo && 
+        !csvDnis.has(cleanDNI(p.dni)) && 
+        paidLastMonthIds.has(p.id)
+      );
 
       setAnalysis({ matched, unknown, toDeactivate, toReactivate, totalCsv: records.length });
       setStep(3);
-    };
-    reader.readAsText(selectedFile, 'UTF-8');
+    } catch (e) {
+      console.error("Error analyzing file:", e);
+      alert("Ocurrió un error al analizar el archivo.");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleExecute = async () => {
@@ -168,6 +194,15 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
               ownerId: user.uid,
             });
         });
+      }
+
+      const totalPaymentsToAdd = participantsToProcess.length;
+      if (totalPaymentsToAdd > 0) {
+        const statsRef = doc(firestore, 'stats', 'global');
+        batch.set(statsRef, { 
+            totalPayments: increment(totalPaymentsToAdd),
+            lastUpdated: serverTimestamp()
+        }, { merge: true });
       }
 
       await batch.commit();
@@ -286,8 +321,8 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
             <Button variant="ghost" onClick={() => setStep(1)}>
               Atrás
             </Button>
-            <Button onClick={handleAnalyze} disabled={!selectedFile}>
-              Analizar
+            <Button onClick={handleAnalyze} disabled={!selectedFile || analyzing}>
+              {analyzing ? 'Analizando...' : 'Analizar'}
             </Button>
           </div>
         </div>
@@ -322,100 +357,108 @@ const PaymentUploadWizard = ({ participants, onClose }: { participants: Particip
              </Card>
           </div>
 
-          {analysis.matched.some((m) => m.isNew) && (
-            <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4">
-              <h4 className="font-bold text-indigo-800 flex items-center gap-2">
-                <FileSignature size={18} /> Nuevas Altas Detectadas (
-                {analysis.matched.filter((m) => m.isNew).length})
-              </h4>
-              <p className="text-sm text-indigo-700 mt-1 mb-2">
-                Se detectaron participantes que recibirán su primer pago. Ingrese
-                el Acto Administrativo si corresponde para actualizarlos
-                masivamente.
-              </p>
-              <Input
-                type="text"
-                placeholder="Ej: Resolución Min. N° 123/2024"
-                value={altaResolution}
-                onChange={(e) => setAltaResolution(e.target.value)}
-              />
-            </div>
-          )}
-          
-          {analysis.toReactivate.length > 0 && (
-            <Card>
-              <CardHeader className="bg-blue-50">
-                <CardTitle className="text-blue-800 flex items-center gap-2 text-base"><UserCheck />Participantes a Reactivar</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 text-sm text-blue-700">
-                <p>Hay {analysis.toReactivate.length} participantes que figuran como inactivos en el sistema pero aparecen en el nuevo archivo de pago. Se marcarán como activos.</p>
-                <div className="max-h-40 overflow-y-auto mt-4 border bg-white p-2 rounded">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>DNI</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {analysis.toReactivate.map(u => (
-                        <TableRow key={u.dni}><TableCell>{u.participant.nombre}</TableCell><TableCell className="font-mono">{u.dni}</TableCell></TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {analysis.toDeactivate.length > 0 && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
-              <h4 className="font-bold text-yellow-800 flex items-center gap-2">
-                <AlertTriangle size={16} /> Gestión de Ausentes
-              </h4>
-              <p className="text-sm text-yellow-700 mt-1 mb-2">
-                Personas activas en el padrón del programa que no figuran en este
-                archivo de pago. Puede marcar una novedad y pasarlos a INACTIVO.
-              </p>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="flagMissing"
-                  checked={flagMissing}
-                  onCheckedChange={(c) => setFlagMissing(!!c)}
-                />
-                <label
-                  htmlFor="flagMissing"
-                  className="text-sm font-bold text-yellow-900 select-none"
-                >
-                  Dar de Baja y registrar una novedad por la ausencia
-                </label>
-              </div>
-            </div>
-          )}
-
-          {analysis.unknown.length > 0 && (
-            <Card>
-                <CardHeader className="bg-red-50">
-                    <CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>DNIs Desconocidos (Bloqueo de Seguridad)</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 text-sm text-red-700">
-                    <p>Hay {analysis.unknown.length} DNIs en el archivo CSV que no se encontraron en el Padrón General de Participantes. Debe cargarlos primero antes de poder liquidarles un pago.</p>
-                    <div className="max-h-40 overflow-y-auto mt-4 border bg-white p-2 rounded">
-                        <Table>
-                            <TableHeader><TableRow><TableHead>DNI Desconocido</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {analysis.unknown.map(u => (
-                                    <TableRow key={u.dni}><TableCell className="font-mono">{u.dni}</TableCell></TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div className="space-y-6">
+              {analysis.unknown.length > 0 && (
+                <Card className="border-red-500">
+                    <CardHeader className="bg-red-50">
+                        <CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>DNIs Desconocidos (Bloqueo)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 text-sm text-red-700">
+                        <p className='mb-4'>Hay {analysis.unknown.length} DNI que no se encontraron en el padrón. Debe cargarlos primero.</p>
+                        <div className="max-h-40 overflow-y-auto border bg-white p-2 rounded">
+                            <Table>
+                                <TableHeader><TableRow><TableHead>DNI Desconocido</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {analysis.unknown.map(u => (
+                                        <TableRow key={u.dni}>
+                                            <TableCell className="font-mono">{u.dni}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="outline" size="sm" onClick={() => onFindDni(u.dni)}>
+                                                    <Search className="h-4 w-4 mr-2"/>
+                                                    Buscar y Cargar
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+              )}
+              {analysis.toReactivate.length > 0 && (
+                <Card>
+                  <CardHeader className="bg-blue-50">
+                    <CardTitle className="text-blue-800 flex items-center gap-2 text-base"><UserCheck />Participantes a Reactivar</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 text-sm text-blue-700">
+                    <p>Se encontraron {analysis.toReactivate.length} participantes inactivos que figuran en el archivo. Se marcarán como activos.</p>
+                    <div className="max-h-40 overflow-y-auto mt-2 border bg-white p-2 rounded">
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>DNI</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {analysis.toReactivate.map(u => (
+                            <TableRow key={u.dni}><TableCell>{u.participant.nombre}</TableCell><TableCell className="font-mono">{u.dni}</TableCell></TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                </CardContent>
-            </Card>
-          )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-          <div className="flex justify-between pt-4 border-t">
+            <div className="space-y-6">
+              {analysis.matched.some((m) => m.isNew) && (
+                <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4">
+                  <h4 className="font-bold text-indigo-800 flex items-center gap-2">
+                    <FileSignature size={18} /> Nuevas Altas Detectadas ({analysis.matched.filter((m) => m.isNew).length})
+                  </h4>
+                  <p className="text-sm text-indigo-700 mt-1 mb-2">
+                    Participantes que reciben su primer pago. Ingrese el Acto Administrativo para actualizarlos.
+                  </p>
+                  <Input
+                    type="text"
+                    placeholder="Ej: Res. Min. N° 123/24"
+                    value={altaResolution}
+                    onChange={(e) => setAltaResolution(e.target.value)}
+                  />
+                </div>
+              )}
+              {analysis.toDeactivate.length > 0 && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                  <h4 className="font-bold text-yellow-800 flex items-center gap-2">
+                    <AlertTriangle size={16} /> Gestión de Ausentes
+                  </h4>
+                  <p className="text-sm text-yellow-700 mt-1 mb-2">
+                    Participantes no encontrados en el CSV. Puede darlos de baja y registrar una novedad.
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Checkbox
+                      id="flagMissing"
+                      checked={flagMissing}
+                      onCheckedChange={(c) => setFlagMissing(!!c)}
+                    />
+                    <label
+                      htmlFor="flagMissing"
+                      className="text-sm font-bold text-yellow-900 select-none"
+                    >
+                      Dar de Baja y registrar novedad
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex justify-between pt-6 border-t">
             <Button variant="ghost" onClick={() => setStep(2)}>
               Atrás
             </Button>
             <Button
               onClick={handleExecute}
-              disabled={processing || analysis.unknown.length > 0}
+              disabled={processing || analyzing || analysis.unknown.length > 0}
               variant="default"
               className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
             >

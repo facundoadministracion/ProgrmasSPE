@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase, useUser, useMemoFirebase, useFirestore, useCollection } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy, increment } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -37,55 +37,63 @@ const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEve
     const [selectedProgram, setSelectedProgram] = useState(PROGRAMAS.TUTORIAS);
     return (
         <form onSubmit={onFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="text-sm">Nombre</label><Input name="nombre" required /></div>
-                <div><label className="text-sm">DNI</label><Input name="dni" required /></div>
-                <div><label className="text-sm">Fecha Nacimiento</label><Input name="fechaNacimiento" type="date" required /></div>
-                <div><label className="text-sm">Acto Adm. Alta</label><Input name="actoAdministrativo" placeholder="Res. Nº..." /></div>
-                <div>
-                    <label className="text-sm">Programa</label>
-                    <Select name="programa" value={selectedProgram} onValueChange={(value) => setSelectedProgram(value)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <div><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
-                <div><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
-                
-                {selectedProgram === PROGRAMAS.TUTORIAS && (
-                    <div>
-                        <label className="text-sm">Categoría (Tutorías)</label>
-                        <Select name="categoria">
-                            <SelectTrigger><SelectValue placeholder="-"/></SelectTrigger>
-                            <SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                        </Select>
-                    </div>
-                )}
-                
-                <div><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
-                <div><label className="text-sm">Email</label><Input name="email" type="email" /></div>
-                <div><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
+             <div className="flex flex-wrap gap-4">
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Nombre</label><Input name="nombre" required /></div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">DNI</label><Input name="dni" required /></div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Fecha Nacimiento</label><Input name="fechaNacimiento" type="date" required /></div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Acto Adm. Alta</label><Input name="actoAdministrativo" placeholder="Res. Nº..." /></div>
+        <div className="flex-grow md:basis-1/3">
+            <label className="text-sm">Programa</label>
+            <Select name="programa" value={selectedProgram} onValueChange={(value) => setSelectedProgram(value)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+            </Select>
+        </div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
+        
+        {selectedProgram === PROGRAMAS.TUTORIAS && (
+            <div className="flex-grow md:basis-1/3">
+                <label className="text-sm">Categoría (Tutorías)</label>
+                <Select name="categoria">
+                    <SelectTrigger><SelectValue placeholder="-"/></SelectTrigger>
+                    <SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
             </div>
-            <div className="flex items-center gap-2 mt-2 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
-            <Button type="submit" className="w-full mt-4">Guardar</Button>
+        )}
+        
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Email</label><Input name="email" type="email" /></div>
+        <div className="flex-grow md:basis-1/3"><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
+    </div>
+    <div className="flex items-center gap-2 mt-4 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
+    <div className="flex justify-end mt-6">
+        <Button type="submit">Guardar</Button>
+    </div>
         </form>
     )
 };
 
 // --- COMPONENTE AISLADO PARA LA PESTAÑA DE PARTICIPANTES ---
-const ParticipantsTab = ({ participants, isLoading, onAdd, onUpload, onSelect, onOpenUploadWizard, onOpenParticipantWizard } : {
+const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled } : {
     participants: Participant[],
     isLoading: boolean,
-    onAdd: (e: React.FormEvent<HTMLFormElement>) => void,
-    onUpload: () => void,
     onSelect: (p: Participant | 'new') => void,
-    onOpenUploadWizard: () => void,
-    onOpenParticipantWizard: () => void
+    onOpenParticipantWizard: () => void,
+    initialSearchTerm?: string,
+    onSearchHandled?: () => void,
 }) => {
     const [inputValue, setInputValue] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    useEffect(() => {
+      if (initialSearchTerm) {
+        setInputValue(initialSearchTerm);
+        if (onSearchHandled) onSearchHandled();
+      }
+    }, [initialSearchTerm, onSearchHandled]);
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -115,7 +123,7 @@ const ParticipantsTab = ({ participants, isLoading, onAdd, onUpload, onSelect, o
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
                 <div className="flex gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
+                    <div className="relative flex-1 md:w-96">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <Input 
                             type="text" 
@@ -187,16 +195,15 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
+  const [initialSearch, setInitialSearch] = useState('');
   
   const currentYear = new Date().getFullYear().toString();
 
-  // --- Lógica para refrescar historial de configuración ---
   const [forceUpdateKey, setForceUpdateKey] = useState(0);
   const handleConfigSave = useCallback(() => {
       setForceUpdateKey(prev => prev + 1); 
   }, []);
 
-  // --- AUTENTICACIÓN & PERFIL ---
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
@@ -239,36 +246,35 @@ export default function App() {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  // --- CARGA DE DATOS ---
   const participantsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, 'participants')) : null, [firestore, user]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
   const usersRef = useMemoFirebase(() => (firestore && user && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, user, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
-  const [paymentCount, setPaymentCount] = useState(0);
-  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [stats, setStats] = useState({ totalPayments: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     if (!firestore || userProfile?.role !== ROLES.ADMIN) {
-        setPaymentsLoading(false);
+        setStatsLoading(false);
         return;
     };
     
-    setPaymentsLoading(true);
-    const q = query(collection(firestore, 'payments'), where('anio', '==', currentYear));
-    
-    getCountFromServer(q).then(snapshot => {
-      setPaymentCount(snapshot.data().count);
-      setPaymentsLoading(false);
-    }).catch(err => {
-      console.error("Error counting payments:", err);
-      setPaymentsLoading(false);
+    const statsDocRef = doc(firestore, 'stats', 'global');
+    const unsubscribe = onSnapshot(statsDocRef, (doc) => {
+        if (doc.exists()) {
+            setStats(doc.data() as any);
+        } else {
+            setStats({ totalPayments: 0 });
+        }
+        setStatsLoading(false);
     });
-  }, [firestore, currentYear, userProfile]);
+
+    return () => unsubscribe();
+  }, [firestore, userProfile]);
 
 
-  // --- UI STATE ---
   const isAdmin = userProfile?.role === ROLES.ADMIN;
   const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
   
@@ -308,6 +314,12 @@ export default function App() {
     toast({ title: "Participante Agregado", description: "El nuevo participante ha sido registrado." });
     setSelectedParticipant(null);
   };
+
+  const handleFindDni = (dni: string) => {
+    setIsPaymentUploadOpen(false);
+    setActiveTab('participants');
+    setInitialSearch(dni);
+  };
   
   if (isUserLoading || !user) {
     return <div className="flex flex-col items-center justify-center h-screen text-gray-500 gap-4"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p>Iniciando sesión...</p></div>;
@@ -329,7 +341,7 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
             <DashboardCard title="Inactivos" value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención o baja" isLoading={participantsLoading} />
-            <DashboardCard title="Pagos (Este Año)" value={paymentCount} icon={DollarSign} color="green" subtitle={`Transacciones en ${currentYear}`} isLoading={paymentsLoading} />
+            <DashboardCard title="Pagos Globales" value={stats.totalPayments} icon={DollarSign} color="green" subtitle={`Total histórico de pagos`} isLoading={statsLoading} />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
@@ -374,7 +386,7 @@ export default function App() {
   const ActiveTabContent = () => {
     switch (activeTab) {
       case 'dashboard': return isAdmin ? renderDashboard() : null;
-      case 'participants': return isAdmin ? <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onAdd={handleAddParticipant} onSelect={setSelectedParticipant} onOpenUploadWizard={() => setIsPaymentUploadOpen(true)} onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} onUpload={() => {}} /> : null;
+      case 'participants': return isAdmin ? <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={setSelectedParticipant} onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} initialSearchTerm={initialSearch} onSearchHandled={() => setInitialSearch('')} /> : null;
       case 'attendance': return (isAdmin || isDataEntry) ? <AttendanceSection participants={participants || []} /> : null;
       case 'users': return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
       case 'config': return isAdmin ? renderConfig() : null;
@@ -393,7 +405,7 @@ export default function App() {
               <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('participants')} isActive={activeTab === 'participants'}><UserCheck size={16} />Participantes</SidebarMenuButton></SidebarMenuItem>
               <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('users')} isActive={activeTab === 'users'}><Shield size={16} />Usuarios</SidebarMenuButton></SidebarMenuItem>
             </>}
-            {(isAdmin || isDataEntry) && <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</SidebarMenuButton></SidebarMenuItem>}
+            {(isAdmin || isDataEntry) && <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</Button></SidebarMenuItem>}
             {isAdmin && <>
               <SidebarMenuItem><SidebarMenuButton onClick={() => setIsPaymentUploadOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton></SidebarMenuItem>
               <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton></SidebarMenuItem>
@@ -417,7 +429,7 @@ export default function App() {
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Hola, {userProfile.name}</h1>
                 {activeTab === 'dashboard' && <p className="text-gray-500">Resumen de la actividad reciente del sistema.</p>}
-                 {activeTab === 'config' && <p className="text-gray-500">Gestión de montos y valores de los programas.</p>} { /* Mensaje para la pestaña de config */}
+                 {activeTab === 'config' && <p className="text-gray-500">Gestión de montos y valores de los programas.</p>}
             </div>
           <ActiveTabContent />
         </main>
@@ -437,7 +449,7 @@ export default function App() {
       
       <Dialog open={isPaymentUploadOpen} onOpenChange={setIsPaymentUploadOpen}> 
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Carga Masiva de Pagos</DialogTitle><DialogDescription>Siga los pasos para cargar un archivo CSV de pagos.</DialogDescription></DialogHeader>
-          <PaymentUploadWizard participants={participants || []} onClose={() => setIsPaymentUploadOpen(false)} />
+          <PaymentUploadWizard participants={participants || []} onClose={() => setIsPaymentUploadOpen(false)} onFindDni={handleFindDni} />
         </DialogContent>
       </Dialog>
 
