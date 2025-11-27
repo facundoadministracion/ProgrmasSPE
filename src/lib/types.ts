@@ -1,7 +1,12 @@
-import { Timestamp } from 'firebase/firestore';
-import { ROLES } from './constants';
+export type UserRole = {
+  uid: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'data-entry';
+  createdAt: string;
+};
 
-export interface Participant {
+export type Participant = {
   id: string;
   nombre: string;
   dni: string;
@@ -10,89 +15,76 @@ export interface Participant {
   programa: string;
   fechaIngreso: string;
   departamento: string;
-  categoria?: string;
   lugarTrabajo?: string;
+  categoria?: string;
   email?: string;
   telefono?: string;
   esEquipoTecnico: boolean;
   pagosAcumulados: number;
-  fechaAlta: string | Timestamp;
   activo: boolean;
-  ultimoPago?: string;
-  ownerId?: string;
+  ownerId: string;
+  fechaAlta: string;
+  ultimoPago?: string; // Format "MM/YYYY"
+  estado?: 'Activo' | 'Ingresado' | 'Baja' | 'Requiere Atención';
+  mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
+};
+
+export type Payment = {
+    id: string;
+    participantId: string;
+    dni: string;
+    monto: number;
+    mes: string;
+    anio: string;
+    programa: string;
+    fechaCarga: any; // serverTimestamp
+    ownerId: string;
+    paymentRecordId: string;
+};
+
+export type PaymentRecord = {
+    id: string;
+    programa: string;
+    mes: string;
+    anio: string;
+    participantes: { id: string, dni: string, nombre: string, pagosAcumuladosPrev: number, estadoPrev: string }[];
+    ausentes: { id: string, dni: string, nombre: string, estadoPrev: string }[];
+    fechaCarga: any; // serverTimestamp
+    ownerId: string;
+    ownerName: string;
 }
 
-export interface Payment {
-  id: string;
-  participantId: string;
-  participantName: string;
-  dni: string;
-  monto: number;
-  mes: string;
-  anio: string;
-  fechaCarga: Timestamp;
-}
-
-export interface Novedad {
-  id: string;
-  participantId: string;
-  participantName: string;
-  descripcion: string;
-  fecha: string;
-  fechaRealCarga: Timestamp;
-}
-
-export interface Asistencia {
+export type Novedad = {
     id: string;
     participantId: string;
     participantName: string;
     dni: string;
+    descripcion: string;
+    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA';
+    fecha: string; // YYYY-MM-DD
+    fechaRealCarga: any; // serverTimestamp
+    ownerId: string;
+}
+
+export type Asistencia = {
+    id: string;
+    participantId: string;
+    dni: string;
     mes: number;
     anio: number;
-    lugarTrabajo: string;
-    responsable: string;
-    metodo: string;
-    emailPresentacion?: string;
-    tardanza: boolean;
-    certificado: boolean;
-    observaciones?: string;
-    fechaCarga: Timestamp;
-    ownerId?: string;
+    programa: string;
+    horas: number;
+    observaciones: string;
+    metodo: 'MANUAL' | 'PLANILLA';
+    fechaCarga: any;
+    ownerId: string;
 }
 
-export interface AppConfig {
-  id: string;
-  tutorias: {
-    senior: number;
-    estandar: number;
-    junior: number;
-  };
-  joven: {
+export type MontoPrograma = {
+    id: string; 
+    programa: string;
     monto: number;
-  };
-  tecno: {
-    monto: number;
-  };
-}
-
-export interface ConfigHistoryItem extends AppConfig {
-  id: string;
-  mes: number;
-  anio: number;
-  actoAdministrativo: string;
-  fechaCarga: Timestamp;
-  ownerId: string;
-}
-
-
-type ObjectValues<T> = T[keyof T];
-export type Role = ObjectValues<typeof ROLES>;
-
-export interface UserRole {
-  uid: string;
-  email: string;
-  name: string;
-  role: Role;
-  createdAt: string;
-  departamento?: string;
+    fechaVigencia: string; // YYYY-MM-DD
+    ownerId: string;
+    createdAt: any;
 }

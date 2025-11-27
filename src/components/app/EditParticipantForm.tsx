@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
+import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,7 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
     email: participant.email || '',
     telefono: participant.telefono || '',
     esEquipoTecnico: participant.esEquipoTecnico || false,
+    estado: participant.estado || 'Activo',
   });
 
   useEffect(() => {
@@ -45,6 +46,7 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
       email: participant.email || '',
       telefono: participant.telefono || '',
       esEquipoTecnico: participant.esEquipoTecnico || false,
+      estado: participant.estado || 'Activo',
     });
   }, [participant]);
 
@@ -92,8 +94,6 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
     }
   };
 
-  const programas = Object.values(PROGRAMAS);
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50">
         <h3 className="text-lg font-bold mb-4">Editar Participante</h3>
@@ -119,7 +119,16 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
                 <Select value={formData.programa} onValueChange={(value) => handleSelectChange('programa', value)}>
                     <SelectTrigger><SelectValue placeholder="Seleccione un programa" /></SelectTrigger>
                     <SelectContent>
-                        {programas.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        {Object.values(PROGRAMAS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+             <div>
+                <Label htmlFor="estado">Estado</Label>
+                <Select value={formData.estado} onValueChange={(value) => handleSelectChange('estado', value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {ESTADOS_PARTICIPANTE.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>

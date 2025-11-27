@@ -3,18 +3,21 @@ import type { Participant } from './types';
 import { calculateAgeAtEndOfMonth } from './utils';
 
 export const getAlertStatus = (participant: Participant) => {
-  // La lógica principal ahora se basa en el campo `activo`.
   if (!participant.activo) {
     return { type: 'red', msg: 'Baja' };
   }
 
-  // Nuevo: Chequeo específico para el estado 'Requiere Atención'
+  // Chequeo de estados prioritarios
+  if (participant.estado === 'Ingresado') {
+    return { type: 'blue', msg: 'Ingresado' };
+  }
   if (participant.estado === 'Requiere Atención') {
     return { type: 'yellow', msg: 'Requiere Atención' };
   }
   
   if (participant.esEquipoTecnico) return { type: 'indigo', msg: 'Equipo Técnico' };
 
+  // Alertas por programa y edad/pagos
   if (participant.programa === PROGRAMAS.JOVEN) {
      const edad = calculateAgeAtEndOfMonth(participant.fechaNacimiento);
      if (edad >= 28) return { type: 'red', msg: `Límite de Edad (${edad} años)` };
@@ -28,7 +31,7 @@ export const getAlertStatus = (participant: Participant) => {
     if (count > 12) return { type: 'purple', msg: 'Excedido (Revisar)' };
   }
   
-  // Si no hay ninguna alerta, pero el estado no es el por defecto, mostrarlo.
+  // Fallback para otros estados no manejados explícitamente
   if (participant.estado && participant.estado !== 'Activo') {
       return { type: 'yellow', msg: participant.estado };
   }

@@ -22,10 +22,8 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
     
     const result: Omit<Participant, 'id'>[] = [];
     
-    // Detectar separador (coma o punto y coma)
     const separator = lines[0].includes(';') ? ';' : ',';
 
-    // Detección de encabezado: si la primera línea contiene 'dni' o 'nombre', la omitimos.
     const firstLineLower = lines[0].toLowerCase();
     if (firstLineLower.includes('dni') || firstLineLower.includes('nombre')) {
       lines.shift();
@@ -38,7 +36,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
 
             const participant = {
                 nombre: values[0] || '',
-                dni: String(values[1]?.replace(/\./g, '') || ''), // Ensure DNI is a string
+                dni: String(values[1]?.replace(/\./g, '') || ''),
                 fechaNacimiento: values[2] || '',
                 programa: values[3] || '',
                 fechaIngreso: values[4] || '',
@@ -48,7 +46,8 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
                 email: values[8] || '',
                 telefono: values[9] || '',
                 pagosAcumulados: 0,
-                activo: true,
+                activo: true, // El participante está en el sistema
+                estado: 'Ingresado', // Nuevo estado por defecto
                 esEquipoTecnico: false,
                 fechaAlta: new Date().toISOString(),
                 ownerId: user?.uid,
@@ -217,5 +216,3 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   );
 };
 export default ParticipantUploadWizard;
-
-    

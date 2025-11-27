@@ -33,6 +33,7 @@ import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial from '@/components/app/ConfiguracionHistorial';
+import DataFixComponent from '@/components/app/DataFixComponent';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
@@ -114,10 +115,7 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
         let filtered = participants.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
 
         if (activeFilter === 'requiresAttention') {
-            filtered = filtered.filter(p => {
-                const status = getAlertStatus(p);
-                return p.activo && (status.type === 'red' || status.type === 'yellow');
-            });
+            filtered = filtered.filter(p => p.estado === 'Requiere Atención');
         } else if (activeFilter === 'paymentAlert') {
             filtered = filtered.filter(p => {
                 const status = getAlertStatus(p);
@@ -180,7 +178,7 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead>Programa</TableHead>
-                                <TableHead>Depto</TableHead><TableHead>Estado</TableHead><TableHead>Acciones</TableHead>
+                                <TableHead>Estado</TableHead><TableHead>Mes Ausencia</TableHead><TableHead>Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -197,8 +195,8 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                                                 <span className="text-xs text-gray-400">{p.categoria}</span>
                                             ) : null}
                                         </TableCell>
-                                        <TableCell>{p.departamento}</TableCell>
                                         <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
+                                        <TableCell className="text-sm">{p.estado === 'Requiere Atención' ? p.mesAusencia || 'N/A' : '-'}</TableCell>
                                         <TableCell><Button variant="link" size="sm" onClick={() => onSelect(p)}>Ver Legajo</Button></TableCell>
                                     </TableRow>
                                 )
@@ -233,6 +231,7 @@ export default function App() {
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
   const [initialSearch, setInitialSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ParticipantFilter>(null);
+  const [showDataFix, setShowDataFix] = useState(true); // Controla la visibilidad del componente de reparación
   
   const currentYear = new Date().getFullYear().toString();
 
@@ -346,6 +345,7 @@ export default function App() {
       pagosAcumulados: 0, 
       fechaAlta: new Date().toISOString(), 
       activo: true,
+      estado: 'Ingresado', // Nuevo estado por defecto
       ownerId: user.uid
     });
     toast({ title: "Participante Agregado", description: "El nuevo participante ha sido registrado." });
@@ -380,21 +380,18 @@ export default function App() {
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
     }
     
-    const attentionRequiredCount = (participants || []).filter(p => {
-        const status = getAlertStatus(p);
-        return p.activo && (status.type === 'red' || status.type === 'yellow');
-    }).length;
+    const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
 
     const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
     
     const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
 
-    const activeParticipants = (participants || []).filter(p => p.activo).length;
+    const activeParticipants = (participants || []).filter(p => p.estado === 'Activo' || p.estado === 'Requiere Atención').length;
 
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
+            <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón liquidado" isLoading={participantsLoading} />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => handleSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Pagos" value={paymentAlertCount} icon={DollarSign} color="yellow" subtitle="Próximos a vencer/vencidos" isLoading={participantsLoading} onClick={() => handleSetFilter('paymentAlert')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => handleSetFilter('ageAlert')} actionText="Ver Lista" />
@@ -403,7 +400,7 @@ export default function App() {
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {Object.values(PROGRAMAS).map(prog => {
-                    const count = (participants || []).filter(p => p.programa === prog && p.activo).length;
+                    const count = (participants || []).filter(p => p.programa === prog && (p.estado === 'Activo' || p.estado === 'Requiere Atención')).length;
                     return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo" isLoading={participantsLoading}/>;
                 })}
             </div>
@@ -415,6 +412,8 @@ export default function App() {
   const renderConfig = () => {
     return (
         <div className="space-y-8">
+            {showDataFix && <DataFixComponent onFixComplete={() => setShowDataFix(false)} />}
+
             <Card>
                 <CardHeader>
                     <CardTitle>Registrar Nueva Configuración de Montos</CardTitle>

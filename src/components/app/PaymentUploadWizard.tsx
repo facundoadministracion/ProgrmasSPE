@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import type { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { useFirebase, useUser } from '@/firebase';
-import { writeBatch, collection, doc, serverTimestamp, increment, getDocs, query, where } from 'firebase/firestore';
-import { ArrowRight, AlertTriangle, Upload, XCircle, UserPlus, FileSignature, Search, UserX, Users } from 'lucide-react';
+import { writeBatch, collection, doc, serverTimestamp, increment, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { ArrowRight, AlertTriangle, Upload, XCircle, FileSignature, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -16,10 +16,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 
 const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participants: Participant[]; onClose: () => void; onFindDni: (dni: string) => void; }) => {
   const { firestore } = useFirebase();
   const { user } = useUser();
+  const { toast } = useToast();
+  
   const [step, setStep] = useState(1);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [config, setConfig] = useState({
@@ -82,9 +85,13 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
       const prevMonthDate = new Date(config.anio, config.mes - 1);
       const prevMes = String(prevMonthDate.getMonth() + 1);
       const prevAnio = String(prevMonthDate.getFullYear());
+      
       const paymentsRef = collection(firestore, 'payments');
-      // FIX: Query for previous month payments should not filter by program to find old records or cause issues
-      const q = query(paymentsRef, where('mes', '==', prevMes), where('anio', '==', prevAnio));
+      const q = query(paymentsRef, 
+        where('mes', '==', prevMes), 
+        where('anio', '==', prevAnio),
+        where('programa', '==', config.programa)
+      );
       const prevPaymentsSnapshot = await getDocs(q);
       const paidLastMonthIds = new Set(prevPaymentsSnapshot.docs.map(doc => doc.data().participantId));
 
@@ -110,6 +117,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
       
       const absent = allProgramParticipants.filter(p =>
         p.activo &&
+        p.estado !== 'Ingresado' &&
         !p.esEquipoTecnico &&
         paidLastMonthIds.has(p.id) &&
         !csvDnis.has(p.dni)
@@ -119,7 +127,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
       setStep(3);
     } catch (e) {
       console.error("Error analyzing file:", e);
-      alert("Ocurrió un error al analizar el archivo.");
+      toast({ title: 'Error de Análisis', description: 'Ocurrió un error al analizar el archivo.', variant: 'destructive' });
     } finally {
       setAnalyzing(false);
     }
@@ -128,11 +136,12 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
   const handleExecute = async () => {
     if (!analysis || !firestore || !user) return;
     setProcessing(true);
+    
+    const paymentId = `${config.programa}-${config.mes + 1}-${config.anio}`;
+    const paymentMonthStr = `${config.mes + 1}/${config.anio}`;
 
     try {
       const batch = writeBatch(firestore);
-      const paymentMonthStr = `${config.mes + 1}/${config.anio}`;
-      
       const allPayments = [...analysis.regulars, ...analysis.newlyPaid];
 
       allPayments.forEach((item) => {
@@ -141,58 +150,68 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
           pagosAcumulados: increment(1),
           ultimoPago: paymentMonthStr,
           activo: true,
-          estado: 'Activo'
+          estado: 'Activo',
+          mesAusencia: null // Limpiar el mes de ausencia si está cobrando
         };
-
         if (analysis.newlyPaid.some(np => np.participant.id === item.participant.id) && altaResolution) {
           updates.actoAdministrativo = altaResolution;
         }
         batch.update(partRef, updates);
-
-        const payRef = doc(collection(firestore, 'payments'));
-        batch.set(payRef, {
-          participantId: item.participant.id,
-          participantName: item.participant.nombre,
-          dni: item.dni,
-          monto: item.monto,
-          mes: String(config.mes + 1),
-          anio: String(config.anio),
-          programa: config.programa,
-          fechaCarga: serverTimestamp(),
-          ownerId: user.uid,
-        });
       });
 
       analysis.absent.forEach(p => {
         const partRef = doc(firestore, 'participants', p.id);
-        batch.update(partRef, { estado: 'Requiere Atención' });
-
-        const novRef = doc(collection(firestore, 'novedades'));
-        batch.set(novRef, {
-          participantId: p.id,
-          participantName: p.nombre,
-          dni: p.dni,
-          descripcion: `Ausente en liquidación ${MONTHS[config.mes]} ${config.anio}. Posible baja.`,
-          type: 'POSIBLE_BAJA',
-          fecha: new Date().toISOString().split('T')[0],
-          fechaRealCarga: serverTimestamp(),
-          ownerId: user.uid,
+        batch.update(partRef, { 
+            estado: 'Requiere Atención', 
+            mesAusencia: `${config.mes + 1}/${config.anio}` // Guardar el mes de ausencia
         });
       });
 
-      if (allPayments.length > 0) {
-        const statsRef = doc(firestore, 'stats', 'global');
-        batch.set(statsRef, { totalPayments: increment(allPayments.length) }, { merge: true });
-      }
-
       await batch.commit();
-      alert(
-        `¡Proceso finalizado!\n- Pagos Regulares: ${analysis.regulars.length}\n- Nuevas Altas: ${analysis.newlyPaid.length}\n- Ausentes (Posible Baja): ${analysis.absent.length}`
-      );
+
+      const historyBatch = writeBatch(firestore);
+      const paymentRecordRef = doc(firestore, "paymentRecords", paymentId);
+      historyBatch.set(paymentRecordRef, {
+        id: paymentId,
+        programa: config.programa,
+        mes: String(config.mes + 1),
+        anio: String(config.anio),
+        participantes: allPayments.map(p => ({ id: p.participant.id, dni: p.dni, nombre: p.participant.nombre, pagosAcumuladosPrev: p.participant.pagosAcumulados, estadoPrev: p.participant.estado || 'Activo' })),
+        ausentes: analysis.absent.map(p => ({ id: p.id, dni: p.dni, nombre: p.nombre, estadoPrev: p.estado || 'Activo' })),
+        fechaCarga: serverTimestamp(),
+        ownerId: user.uid,
+        ownerName: user.displayName || user.email
+      });
+
+      allPayments.forEach(item => {
+        const payRef = doc(collection(firestore, 'payments'));
+        historyBatch.set(payRef, {
+          participantId: item.participant.id,
+          dni: item.dni, monto: item.monto, mes: String(config.mes + 1), anio: String(config.anio),
+          programa: config.programa, fechaCarga: serverTimestamp(), ownerId: user.uid, paymentRecordId: paymentId
+        });
+      });
+
+      analysis.absent.forEach(p => {
+        const novRef = doc(collection(firestore, 'novedades'));
+        historyBatch.set(novRef, {
+          participantId: p.id, participantName: p.nombre, dni: p.dni,
+          descripcion: `Ausente en liquidación ${MONTHS[config.mes]} ${config.anio}.`,
+          type: 'POSIBLE_BAJA', fecha: new Date().toISOString().split('T')[0], 
+          fechaRealCarga: serverTimestamp(), ownerId: user.uid, paymentRecordId: paymentId
+        });
+      });
+
+      await historyBatch.commit();
+
+      toast({ title: "¡Proceso de Pago Finalizado!", 
+        description: `Regulares: ${analysis.regulars.length}, Altas: ${analysis.newlyPaid.length}, Ausentes: ${analysis.absent.length}`
+      });
+
       onClose();
     } catch (e) {
       console.error(e);
-      alert('Error procesando. Verifique la consola.');
+      toast({ title: 'Error en la Ejecución', description: 'Error procesando. Verifique la consola.', variant: 'destructive' });
     } finally {
       setProcessing(false);
     }
@@ -210,7 +229,6 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
 
       {step === 1 && (
         <div className="space-y-4 pt-4">
-          {/* UI for Step 1 */}
           <div>
             <label className="block text-sm font-bold mb-1">Programa</label>
             <Select value={config.programa} onValueChange={(v) => setConfig({ ...config, programa: v as any })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.values(PROGRAMAS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>

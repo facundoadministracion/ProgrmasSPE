@@ -27,6 +27,8 @@ export const PROGRAMAS = {
 
 export const CATEGORIAS_TUTORIAS = ['Senior', 'Estandar', 'Junior'];
 
+export const ESTADOS_PARTICIPANTE = ['Activo', 'Ingresado', 'Baja', 'Requiere Atención'] as const;
+
 export const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
