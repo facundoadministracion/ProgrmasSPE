@@ -5,7 +5,7 @@ import { useFirebase, useUser, useMemoFirebase, useFirestore, useCollection } fr
 import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy, increment } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
 
 import type { Participant, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
@@ -32,6 +32,8 @@ import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial from '@/components/app/ConfiguracionHistorial';
+
+type ParticipantFilter = 'requiresAttention' | null;
 
 const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void }) => {
     const [selectedProgram, setSelectedProgram] = useState(PROGRAMAS.TUTORIAS);
@@ -75,13 +77,15 @@ const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEve
 };
 
 // --- COMPONENTE AISLADO PARA LA PESTAÑA DE PARTICIPANTES ---
-const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled } : {
+const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled, activeFilter, onClearFilter } : {
     participants: Participant[],
     isLoading: boolean,
     onSelect: (p: Participant | 'new') => void,
     onOpenParticipantWizard: () => void,
     initialSearchTerm?: string,
     onSearchHandled?: () => void,
+    activeFilter: ParticipantFilter,
+    onClearFilter: () => void,
 }) => {
     const [inputValue, setInputValue] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -106,17 +110,24 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     const paginatedParticipants = useMemo(() => {
         if (!participants) return { paginated: [], totalPages: 0 };
 
-        const filtered = participants
-            .filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm))
-            .sort((a, b) => a.nombre.localeCompare(b.nombre));
+        let filtered = participants.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
+
+        if (activeFilter === 'requiresAttention') {
+            filtered = filtered.filter(p => {
+                const status = getAlertStatus(p);
+                return p.activo && (status.type === 'red' || status.type === 'yellow');
+            });
+        }
+
+        filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
         const totalPages = Math.ceil(filtered.length / itemsPerPage);
         const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
         
-        return { paginated, totalPages };
-    }, [participants, searchTerm, currentPage]);
+        return { paginated, totalPages, filteredCount: filtered.length };
+    }, [participants, searchTerm, currentPage, activeFilter]);
 
-    const { paginated, totalPages } = paginatedParticipants;
+    const { paginated, totalPages, filteredCount } = paginatedParticipants;
 
     return (
         <div className="space-y-6">
@@ -137,6 +148,20 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                     <Button onClick={() => onSelect('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo</Button>
                 </div>
             </div>
+
+            {activeFilter && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md flex justify-between items-center">
+                    <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 mr-3" />
+                        <div>
+                            <p className="font-bold">Filtro Activo</p>
+                            <p>Mostrando {filteredCount} participantes que requieren atención.</p>
+                        </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={onClearFilter} className="text-yellow-800 hover:bg-yellow-200"><XCircle className="mr-2 h-4 w-4"/> Limpiar</Button>
+                </div>
+            )}
+
             <Card>
                 {isLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/> Cargando participantes...</div> : (
                     <>
@@ -196,6 +221,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
   const [initialSearch, setInitialSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<ParticipantFilter>(null);
   
   const currentYear = new Date().getFullYear().toString();
 
@@ -320,6 +346,15 @@ export default function App() {
     setActiveTab('participants');
     setInitialSearch(dni);
   };
+
+  const handleSetFilter = (filter: ParticipantFilter) => {
+      setActiveFilter(filter);
+      setActiveTab('participants');
+  };
+
+  const handleClearFilter = () => {
+      setActiveFilter(null);
+  };
   
   if (isUserLoading || !user) {
     return <div className="flex flex-col items-center justify-center h-screen text-gray-500 gap-4"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p>Iniciando sesión...</p></div>;
@@ -333,14 +368,19 @@ export default function App() {
     if (selectedProgramDetail) {
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
     }
-    const alerts = (participants || []).filter(p => !p.activo).length;
+    
+    const attentionRequiredCount = (participants || []).filter(p => {
+        const status = getAlertStatus(p);
+        return p.activo && (status.type === 'red' || status.type === 'yellow');
+    }).length;
+
     const activeParticipants = (participants || []).filter(p => p.activo).length;
 
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
-            <DashboardCard title="Inactivos" value={alerts} icon={AlertTriangle} color="red" subtitle="Requieren atención o baja" isLoading={participantsLoading} />
+            <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => handleSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Pagos Globales" value={stats.totalPayments} icon={DollarSign} color="green" subtitle={`Total histórico de pagos`} isLoading={statsLoading} />
         </div>
         <div className="border-t pt-6">
@@ -386,11 +426,19 @@ export default function App() {
   const ActiveTabContent = () => {
     switch (activeTab) {
       case 'dashboard': return isAdmin ? renderDashboard() : null;
-      case 'participants': return isAdmin ? <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={setSelectedParticipant} onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} initialSearchTerm={initialSearch} onSearchHandled={() => setInitialSearch('')} /> : null;
+      case 'participants': return isAdmin ? <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={setSelectedParticipant} onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} initialSearchTerm={initialSearch} onSearchHandled={() => setInitialSearch('')} activeFilter={activeFilter} onClearFilter={handleClearFilter} /> : null;
       case 'attendance': return (isAdmin || isDataEntry) ? <AttendanceSection participants={participants || []} /> : null;
       case 'users': return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
       case 'config': return isAdmin ? renderConfig() : null;
       default: return null;
+    }
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSelectedProgramDetail(null);
+    if (tab !== 'participants') {
+      setActiveFilter(null); 
     }
   };
 
@@ -401,14 +449,14 @@ export default function App() {
         <SidebarContent>
           <SidebarMenu>
             {isAdmin && <>
-              <SidebarMenuItem><SidebarMenuButton onClick={() => { setActiveTab('dashboard'); setSelectedProgramDetail(null); }} isActive={activeTab === 'dashboard'}><Users size={16} />Resumen Gral.</SidebarMenuButton></SidebarMenuItem>
-              <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('participants')} isActive={activeTab === 'participants'}><UserCheck size={16} />Participantes</SidebarMenuButton></SidebarMenuItem>
-              <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('users')} isActive={activeTab === 'users'}><Shield size={16} />Usuarios</SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('dashboard')} isActive={activeTab === 'dashboard'}><Users size={16} />Resumen Gral.</SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('participants')} isActive={activeTab === 'participants'}><UserCheck size={16} />Participantes</SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('users')} isActive={activeTab === 'users'}><Shield size={16} />Usuarios</SidebarMenuButton></SidebarMenuItem>
             </>}
-            {(isAdmin || isDataEntry) && <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</Button></SidebarMenuItem>}
+            {(isAdmin || isDataEntry) && <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</SidebarMenuButton></SidebarMenuItem>}
             {isAdmin && <>
               <SidebarMenuItem><SidebarMenuButton onClick={() => setIsPaymentUploadOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton></SidebarMenuItem>
-              <SidebarMenuItem><SidebarMenuButton onClick={() => setActiveTab('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton></SidebarMenuItem>
             </>}
           </SidebarMenu>
         </SidebarContent>

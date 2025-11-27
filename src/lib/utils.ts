@@ -88,3 +88,26 @@ export const formatDateToDDMMYYYY = (dateString: string | undefined | null): str
         return dateString; // Si falla, devuelve el string original
     }
 }
+
+const meses = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+export const formatMonthYear = (dateString: string | undefined | null): string => {
+    if (!dateString) return 'Sin registros';
+    try {
+        const parts = dateString.split('/');
+        if (parts.length !== 2) return dateString;
+
+        const monthIndex = parseInt(parts[0], 10) - 1;
+        const year = parts[1];
+
+        if (monthIndex >= 0 && monthIndex < 12) {
+            return `${meses[monthIndex]} ${year}`;
+        }
+        return dateString;
+    } catch (e) {
+        return dateString;
+    }
+};

@@ -5,7 +5,7 @@ import { calculateAge } from './utils';
 export const getAlertStatus = (participant: Participant) => {
   // La lógica principal ahora se basa en el campo `activo`.
   if (!participant.activo) {
-    return { type: 'red', msg: 'Inactivo' };
+    return { type: 'red', msg: 'Baja' };
   }
   
   if (participant.esEquipoTecnico) return { type: 'indigo', msg: 'Equipo Técnico' };

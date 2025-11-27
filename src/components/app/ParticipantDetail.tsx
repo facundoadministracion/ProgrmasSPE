@@ -5,7 +5,7 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { calculateAge, formatDateToDDMMYYYY } from '@/lib/utils';
+import { calculateAge, formatDateToDDMMYYYY, formatMonthYear } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -196,7 +196,7 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
                 <Badge variant="blue">{participant.programa}</Badge>
                 {participant.esEquipoTecnico && <Badge variant="indigo">Equipo Técnico</Badge>}
                 <Badge variant={!participant.activo ? 'destructive' : alertStatus.type as any}>
-                  {!participant.activo ? 'Inactivo' : alertStatus.msg}
+                  {!participant.activo ? 'Baja' : alertStatus.msg}
                 </Badge>
               </div>
             </div>
@@ -274,7 +274,7 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
                 <DetailItem label="Lugar de Trabajo" value={participant.lugarTrabajo || '-'} className="bg-gray-50" />
                 <DetailItem label="Email" value={participant.email || '-'} className="bg-gray-50" />
                 <DetailItem label="Teléfono" value={participant.telefono || '-'} className="bg-gray-50" />
-                <DetailItem label="Último Pago Registrado" value={participant.ultimoPago || 'Sin registros'} className="bg-gray-50 col-span-2"/>
+                <DetailItem label="Último Pago Registrado" value={formatMonthYear(participant.ultimoPago)} className="bg-gray-50 col-span-2"/>
 
                 {!participant.activo && bajaNovedad ? (
                   <div className="md:col-span-2 mt-2 p-3 rounded-lg border-l-4 flex items-start gap-3 text-sm bg-gray-100 border-gray-500 text-gray-800">
