@@ -138,7 +138,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
     setProcessing(true);
     
     const paymentId = `${config.programa}-${config.mes + 1}-${config.anio}`;
-    const paymentMonthStr = `${config.mes + 1}/${config.anio}`;
+    const paymentMonthStr = `${MONTHS[config.mes]}/${config.anio}`;
 
     try {
       const batch = writeBatch(firestore);
@@ -163,7 +163,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         const partRef = doc(firestore, 'participants', p.id);
         batch.update(partRef, { 
             estado: 'Requiere Atención', 
-            mesAusencia: `${config.mes + 1}/${config.anio}` // Guardar el mes de ausencia
+            mesAusencia: paymentMonthStr // Guardar el mes de ausencia con el nombre
         });
       });
 
