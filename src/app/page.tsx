@@ -10,6 +10,7 @@ import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings
 import type { Participant, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
 import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES } from '@/lib/constants';
+import { calculateAge } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -223,8 +224,6 @@ export default function App() {
   const [initialSearch, setInitialSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ParticipantFilter>(null);
   
-  const currentYear = new Date().getFullYear().toString();
-
   const [forceUpdateKey, setForceUpdateKey] = useState(0);
   const handleConfigSave = useCallback(() => {
       setForceUpdateKey(prev => prev + 1); 
@@ -277,29 +276,6 @@ export default function App() {
   
   const usersRef = useMemoFirebase(() => (firestore && user && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, user, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
-
-  const [stats, setStats] = useState({ totalPayments: 0 });
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!firestore || userProfile?.role !== ROLES.ADMIN) {
-        setStatsLoading(false);
-        return;
-    };
-    
-    const statsDocRef = doc(firestore, 'stats', 'global');
-    const unsubscribe = onSnapshot(statsDocRef, (doc) => {
-        if (doc.exists()) {
-            setStats(doc.data() as any);
-        } else {
-            setStats({ totalPayments: 0 });
-        }
-        setStatsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [firestore, userProfile]);
-
 
   const isAdmin = userProfile?.role === ROLES.ADMIN;
   const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
@@ -368,6 +344,24 @@ export default function App() {
     if (selectedProgramDetail) {
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
     }
+
+    const specialSituations = useMemo(() => {
+      if (!participants) return { count6: 0, count12: 0, countExcedidos: 0, countEdad: 0 };
+  
+      const activeP = participants.filter(p => p.activo);
+  
+      const relevantPrograms = [PROGRAMAS.JOVEN, PROGRAMAS.TECNOEMPLEO];
+      const paymentAlerts = activeP.filter(p => relevantPrograms.includes(p.programa));
+  
+      const count6 = paymentAlerts.filter(p => p.pagosAcumulados === 6).length;
+      const count12 = paymentAlerts.filter(p => p.pagosAcumulados === 12).length;
+      const countExcedidos = paymentAlerts.filter(p => p.pagosAcumulados > 12).length;
+  
+      const jovenP = activeP.filter(p => p.programa === PROGRAMAS.JOVEN);
+      const countEdad = jovenP.filter(p => calculateAge(p.fechaNacimiento) >= 28).length;
+  
+      return { count6, count12, countExcedidos, countEdad };
+    }, [participants]);
     
     const attentionRequiredCount = (participants || []).filter(p => {
         const status = getAlertStatus(p);
@@ -381,7 +375,37 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => handleSetFilter('requiresAttention')} actionText="Ver Lista" />
-            <DashboardCard title="Pagos Globales" value={stats.totalPayments} icon={DollarSign} color="green" subtitle={`Total histórico de pagos`} isLoading={statsLoading} />
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Situaciones Especiales</CardTitle>
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <p className="text-xs text-muted-foreground mb-4">Alertas de seguimiento críticas.</p>
+                    {participantsLoading ? (
+                        <div className="h-24 flex items-center justify-center"><Loader2 className="animate-spin"/></div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between text-sm">
+                                <span>Participantes con 6 pagos</span>
+                                <Badge variant="yellow">{specialSituations.count6}</Badge>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span>Participantes con 12 pagos</span>
+                                <Badge variant="yellow">{specialSituations.count12}</Badge>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span>Participantes Excedidos</span>
+                                <Badge variant="purple">{specialSituations.countExcedidos}</Badge>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span>Límite de Edad (+28)</span>
+                                <Badge variant="red">{specialSituations.countEdad}</Badge>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
