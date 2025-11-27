@@ -7,6 +7,11 @@ export const getAlertStatus = (participant: Participant) => {
   if (!participant.activo) {
     return { type: 'red', msg: 'Baja' };
   }
+
+  // Nuevo: Chequeo específico para el estado 'Requiere Atención'
+  if (participant.estado === 'Requiere Atención') {
+    return { type: 'yellow', msg: 'Requiere Atención' };
+  }
   
   if (participant.esEquipoTecnico) return { type: 'indigo', msg: 'Equipo Técnico' };
 
@@ -21,6 +26,11 @@ export const getAlertStatus = (participant: Participant) => {
     if (count === 6) return { type: 'yellow', msg: 'Requiere Autorización (6 Pagos)' };
     if (count === 12) return { type: 'yellow', msg: 'Fin de Ciclo / Pase a Planta' };
     if (count > 12) return { type: 'purple', msg: 'Excedido (Revisar)' };
+  }
+  
+  // Si no hay ninguna alerta, pero el estado no es el por defecto, mostrarlo.
+  if (participant.estado && participant.estado !== 'Activo') {
+      return { type: 'yellow', msg: participant.estado };
   }
   
   return { type: 'green', msg: 'Activo' };

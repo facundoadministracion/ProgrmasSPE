@@ -28,6 +28,7 @@ import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import ParticipantUploadWizard from '@/components/app/ParticipantUploadWizard';
+import PaymentHistory from '@/components/app/PaymentHistory';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
@@ -434,6 +435,8 @@ export default function App() {
                     <ConfiguracionHistorial key={forceUpdateKey} />
                 </CardContent>
             </Card>
+            
+            <PaymentHistory />
         </div>
     );
   }
