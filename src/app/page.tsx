@@ -33,7 +33,7 @@ import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial from '@/components/app/ConfiguracionHistorial';
 
-type ParticipantFilter = 'requiresAttention' | null;
+type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
 const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void }) => {
     const [selectedProgram, setSelectedProgram] = useState(PROGRAMAS.TUTORIAS);
@@ -116,6 +116,16 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
             filtered = filtered.filter(p => {
                 const status = getAlertStatus(p);
                 return p.activo && (status.type === 'red' || status.type === 'yellow');
+            });
+        } else if (activeFilter === 'paymentAlert') {
+            filtered = filtered.filter(p => {
+                const status = getAlertStatus(p);
+                return p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12) 
+            });
+        } else if (activeFilter === 'ageAlert') {
+             filtered = filtered.filter(p => {
+                const status = getAlertStatus(p);
+                return p.activo && p.programa === PROGRAMAS.JOVEN && status.msg.includes('Límite de Edad');
             });
         }
 
@@ -374,14 +384,19 @@ export default function App() {
         return p.activo && (status.type === 'red' || status.type === 'yellow');
     }).length;
 
+    const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
+    
+    const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
+
     const activeParticipants = (participants || []).filter(p => p.activo).length;
 
     return (
       <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón total consolidado" isLoading={participantsLoading} />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => handleSetFilter('requiresAttention')} actionText="Ver Lista" />
-            <DashboardCard title="Pagos Globales" value={stats.totalPayments} icon={DollarSign} color="green" subtitle={`Total histórico de pagos`} isLoading={statsLoading} />
+            <DashboardCard title="Alerta de Pagos" value={paymentAlertCount} icon={DollarSign} color="yellow" subtitle="Próximos a vencer/vencidos" isLoading={participantsLoading} onClick={() => handleSetFilter('paymentAlert')} actionText="Ver Lista" />
+            <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => handleSetFilter('ageAlert')} actionText="Ver Lista" />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>

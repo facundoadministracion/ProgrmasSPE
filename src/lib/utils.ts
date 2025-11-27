@@ -66,6 +66,23 @@ export const calculateAge = (birthDateString: string | null | undefined): number
   return age;
 };
 
+export const calculateAgeAtEndOfMonth = (birthDateString: string | null | undefined): number => {
+  if (!birthDateString) return 0;
+  
+  const birthDate = parseDate(birthDateString);
+  if (!birthDate) return 0;
+
+  const today = new Date();
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  let age = lastDayOfMonth.getFullYear() - birthDate.getFullYear();
+  const m = lastDayOfMonth.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && lastDayOfMonth.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 
 export const formatDateToDDMMYYYY = (dateString: string | undefined | null): string => {
     if (!dateString) return '-';

@@ -1,6 +1,6 @@
 import { PROGRAMAS } from './constants';
 import type { Participant } from './types';
-import { calculateAge } from './utils';
+import { calculateAgeAtEndOfMonth } from './utils';
 
 export const getAlertStatus = (participant: Participant) => {
   // La lógica principal ahora se basa en el campo `activo`.
@@ -11,17 +11,16 @@ export const getAlertStatus = (participant: Participant) => {
   if (participant.esEquipoTecnico) return { type: 'indigo', msg: 'Equipo Técnico' };
 
   if (participant.programa === PROGRAMAS.JOVEN) {
-     const edad = calculateAge(participant.fechaNacimiento);
+     const edad = calculateAgeAtEndOfMonth(participant.fechaNacimiento);
      if (edad >= 28) return { type: 'red', msg: `Límite de Edad (${edad} años)` };
   }
 
-  // La lógica de conteo de pagos sigue siendo una alerta secundaria si están activos.
-  if (participant.programa !== PROGRAMAS.TUTORIAS) {
+  if (participant.programa === PROGRAMAS.JOVEN || participant.programa === PROGRAMAS.TECNO) {
     const count = participant.pagosAcumulados || 0;
+    if (count === 5 || count === 11) return { type: 'yellow', msg: 'Próximo a Vencimiento' };
     if (count === 6) return { type: 'yellow', msg: 'Requiere Autorización (6 Pagos)' };
     if (count === 12) return { type: 'yellow', msg: 'Fin de Ciclo / Pase a Planta' };
     if (count > 12) return { type: 'purple', msg: 'Excedido (Revisar)' };
-    if (count === 5 || count === 11) return { type: 'yellow', msg: 'Próximo a Vencimiento' };
   }
   
   return { type: 'green', msg: 'Activo' };
