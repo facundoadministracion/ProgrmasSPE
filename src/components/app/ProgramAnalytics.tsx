@@ -3,14 +3,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Novedad, Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { formatDateToDDMMYYYY } from '@/lib/utils';
-import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Users, Wrench, Loader2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Users, Wrench, Loader2, Coins } from 'lucide-react';
 import { Card as UICard, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
     <UICard>
@@ -25,12 +25,55 @@ const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string
     </UICard>
 );
 
+interface LatestPaymentInfo {
+  count: number;
+  monthName: string;
+  year: string;
+  participantIds: string[];
+}
+
 const ProgramAnalytics = ({ programName, participants, onBack }: { programName: string; participants: Participant[]; onBack: () => void; }) => {
   const [month, setMonth] = useState(String(new Date().getMonth()));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const { firestore } = useFirebase();
 
-  // Carga de novedades bajo demanda
+  const [latestPayment, setLatestPayment] = useState<LatestPaymentInfo | null>(null);
+  const [latestPaymentLoading, setLatestPaymentLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLatestPayment = async () => {
+      if (!firestore) return;
+      setLatestPaymentLoading(true);
+      try {
+        const paymentRecordsRef = collection(firestore, 'paymentRecords');
+        const q = query(
+          paymentRecordsRef,
+          where('programa', '==', programName),
+          orderBy('fechaCarga', 'desc'),
+          limit(1)
+        );
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const lastPaymentDoc = snapshot.docs[0].data();
+          const participantIds = lastPaymentDoc.participantes?.map((p: any) => p.id) || [];
+          const count = participantIds.length;
+          const monthName = MONTHS[parseInt(lastPaymentDoc.mes) - 1] || 'N/A';
+          const yearValue = lastPaymentDoc.anio;
+          setLatestPayment({ count, monthName, year: yearValue, participantIds });
+        } else {
+          setLatestPayment(null);
+        }
+      } catch (error) {
+        console.error("Error fetching latest payment:", error);
+        setLatestPayment(null);
+      } finally {
+        setLatestPaymentLoading(false);
+      }
+    };
+
+    fetchLatestPayment();
+  }, [firestore, programName]);
+
   const novedadesRef = useMemoFirebase(() => {
     if (!firestore) return null;
     const startDate = new Date(parseInt(year), parseInt(month), 1).toISOString().split('T')[0];
@@ -64,24 +107,22 @@ const ProgramAnalytics = ({ programName, participants, onBack }: { programName: 
         const isBaja = n.descripcion.toLowerCase().includes('baja');
         return isThisProgram && isBaja;
     });
-
-    const endOfMonth = new Date(y, m + 1, 0);
-    const activos = programParticipants.filter(p => {
-        const d = getRefDate(p);
-        return !d || d <= endOfMonth;
-    });
-
+    
     const equipoTecnico = programParticipants.filter(p => p.esEquipoTecnico).length;
     
     const categorias: { [key: string]: number } = {};
     if(programName === PROGRAMAS.TUTORIAS) {
-        activos.forEach(p => {
+        const participantsForCategory = latestPayment 
+            ? programParticipants.filter(p => latestPayment.participantIds.includes(p.id))
+            : [];
+
+        participantsForCategory.forEach(p => {
             const cat = p.categoria || 'Sin Categoría';
             categorias[cat] = (categorias[cat] || 0) + 1;
         });
     }
-    return { altas, bajasNovedades, activos, categorias, equipoTecnico };
-  }, [programName, participants, allNovedades, month, year]);
+    return { altas, bajasNovedades, categorias, equipoTecnico };
+  }, [programName, participants, allNovedades, month, year, latestPayment]);
 
   return (
     <div className="space-y-6">
@@ -100,23 +141,34 @@ const ProgramAnalytics = ({ programName, participants, onBack }: { programName: 
         </div>
         <h2 className="text-2xl font-bold text-gray-800">Análisis: {programName}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card title="Total Activos" value={analytics.activos.length} icon={Users} subtitle={`Acumulado a ${MONTHS[parseInt(month)]}`} />
+            <Card 
+                title="Participantes Pagados"
+                value={latestPayment ? latestPayment.count : 0} 
+                icon={Coins} 
+                subtitle={latestPayment ? `Liquidación ${latestPayment.monthName} ${latestPayment.year}` : 'Sin pagos registrados'}
+                isLoading={latestPaymentLoading}
+            />
             <Card title="Equipo Técnico" value={analytics.equipoTecnico} icon={Wrench} subtitle="Personal de Staff" />
-            <Card title="Altas del Mes" value={analytics.altas.length} icon={UserPlus} subtitle="Nuevos ingresos" />
+            <Card title="Altas del Mes" value={analytics.altas.length} icon={UserPlus} subtitle={`En ${MONTHS[parseInt(month)]}`} />
             <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" isLoading={novedadesLoading}/>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {programName === PROGRAMAS.TUTORIAS && (
                 <UICard>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 size={20}/> Distribución por Categoría</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 size={20}/> Distribución por Categoría (Último Pago)</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        {Object.entries(analytics.categorias).map(([cat, count]: [string, number]) => (
-                            <div key={cat}>
-                                <div className="flex justify-between text-sm mb-1"><span>{cat}</span><span className="font-bold">{count}</span></div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${(count / analytics.activos.length) * 100}%` }}></div></div>
-                            </div>
-                        ))}
-                        {Object.keys(analytics.categorias).length === 0 && <p className="text-gray-400 text-sm">Sin datos para mostrar.</p>}
+                        {latestPaymentLoading ? (
+                            <div className="h-24 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin mr-2"/> Cargando...</div>
+                        ) : Object.keys(analytics.categorias).length > 0 ? (
+                            Object.entries(analytics.categorias).map(([cat, count]: [string, number]) => (
+                                <div key={cat}>
+                                    <div className="flex justify-between text-sm mb-1"><span>{cat}</span><span className="font-bold">{count}</span></div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${(count / (latestPayment?.count || 1)) * 100}%` }}></div></div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-gray-400 text-sm text-center py-8">No hay datos de pago para mostrar la distribución.</p>
+                        )}
                     </CardContent>
                 </UICard>
             )}
