@@ -176,7 +176,15 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         programa: config.programa,
         mes: String(config.mes + 1),
         anio: String(config.anio),
-        participantes: allPayments.map(p => ({ id: p.participant.id, dni: p.dni, nombre: p.participant.nombre, pagosAcumuladosPrev: p.participant.pagosAcumulados, estadoPrev: p.participant.estado || 'Activo' })),
+        participantes: allPayments.map(p => ({ 
+            id: p.participant.id, 
+            dni: p.dni, 
+            nombre: p.participant.nombre, 
+            pagosAcumuladosPrev: p.participant.pagosAcumulados, 
+            estadoPrev: p.participant.estado || 'Activo',
+            categoria: p.participant.categoria, 
+            programa: p.participant.programa
+        })),
         ausentes: analysis.absent.map(p => ({ id: p.id, dni: p.dni, nombre: p.nombre, estadoPrev: p.estado || 'Activo' })),
         fechaCarga: serverTimestamp(),
         ownerId: user.uid,
@@ -188,7 +196,11 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         historyBatch.set(payRef, {
           participantId: item.participant.id,
           dni: item.dni, monto: item.monto, mes: String(config.mes + 1), anio: String(config.anio),
-          programa: config.programa, fechaCarga: serverTimestamp(), ownerId: user.uid, paymentRecordId: paymentId
+          programa: config.programa,
+          categoria: item.participant.categoria,
+          fechaCarga: serverTimestamp(), 
+          ownerId: user.uid, 
+          paymentRecordId: paymentId
         });
       });
 
@@ -292,4 +304,4 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
   );
 };
 
-export default PaymentUploadWizard;        
+export default PaymentUploadWizard;

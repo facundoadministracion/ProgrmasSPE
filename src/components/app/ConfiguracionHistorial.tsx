@@ -3,21 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { useToast } from '@/hooks/use-toast'; // <-- CORREGIDO
+import { useToast } from '@/hooks/use-toast';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Pencil } from 'lucide-react';
 
 // Tipos
-interface Montos {
-    [key: string]: number;
-}
-
-interface Configuracion {
+export interface Configuracion {
     id: string;
-    montos: Montos;
+    montos: { [key: string]: number };
     mesVigencia: number;
     anoVigencia: number;
     actoAdministrativo: string;
@@ -30,9 +28,13 @@ const MESES = [
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-const ConfiguracionHistorial = () => {
+interface Props {
+    onEditConfig: (config: Configuracion) => void;
+}
+
+const ConfiguracionHistorial = ({ onEditConfig }: Props) => {
     const db = useFirestore();
-    const { toast } = useToast(); // <-- CORREGIDO
+    const { toast } = useToast();
     const [historial, setHistorial] = useState<Configuracion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -54,7 +56,7 @@ const ConfiguracionHistorial = () => {
                 setHistorial(data);
             } catch (error) {
                 console.error("Error fetching history: ", error);
-                toast({ title: 'Error', description: 'No se pudo cargar el historial de configuraciones.', variant: 'destructive' }); // <-- CORREGIDO
+                toast({ title: 'Error', description: 'No se pudo cargar el historial de configuraciones.', variant: 'destructive' });
             }
             finally {
                 setIsLoading(false);
@@ -62,7 +64,7 @@ const ConfiguracionHistorial = () => {
         };
 
         fetchHistorial();
-    }, [db, toast]); // <-- CORREGIDO
+    }, [db, toast]);
 
     const formatMonto = (monto: number) => {
         return `$${monto.toLocaleString('es-AR')}`;
@@ -87,6 +89,7 @@ const ConfiguracionHistorial = () => {
                     <TableHead className="text-right">Monto Tutorías</TableHead>
                     <TableHead className="text-right">Monto Empleo Joven</TableHead>
                     <TableHead className="text-right">Monto Tecnoempleo</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -104,6 +107,11 @@ const ConfiguracionHistorial = () => {
                             <TableCell className="text-right">{formatMonto(montoTutorias || 0)}</TableCell>
                             <TableCell className="text-right">{formatMonto(config.montos['Empleo Joven'] || 0)}</TableCell>
                             <TableCell className="text-right">{formatMonto(config.montos.Tecnoempleo || 0)}</TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" onClick={() => onEditConfig(config)}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     )
                 })}

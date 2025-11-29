@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useFirebase, useUser, useMemoFirebase, useFirestore, useCollection } from '@/firebase';
+import { useFirebase, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy, increment } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
+import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight, XCircle, Pencil } from 'lucide-react';
 
 import type { Participant, UserRole } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
@@ -32,7 +32,7 @@ import PaymentHistory from '@/components/app/PaymentHistory';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
-import ConfiguracionHistorial from '@/components/app/ConfiguracionHistorial';
+import ConfiguracionHistorial, { type Configuracion } from '@/components/app/ConfiguracionHistorial';
 import DataFixComponent from '@/components/app/DataFixComponent';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
@@ -78,7 +78,6 @@ const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEve
     )
 };
 
-// --- COMPONENTE AISLADO PARA LA PESTAÑA DE PARTICIPANTES ---
 const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled, activeFilter, onClearFilter } : {
     participants: Participant[],
     isLoading: boolean,
@@ -231,9 +230,9 @@ export default function App() {
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
   const [initialSearch, setInitialSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ParticipantFilter>(null);
-  const [showDataFix, setShowDataFix] = useState(true); // Controla la visibilidad del componente de reparación
+  const [showDataFix, setShowDataFix] = useState(true);
   
-  const currentYear = new Date().getFullYear().toString();
+  const [editingConfig, setEditingConfig] = useState<Configuracion | null>(null);
 
   const [forceUpdateKey, setForceUpdateKey] = useState(0);
   const handleConfigSave = useCallback(() => {
@@ -257,16 +256,11 @@ export default function App() {
     const unsubscribe = onSnapshot(userDocRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
             const userData = docSnapshot.data() as UserRole;
-            if (user.email === 'crnunezfacundo@gmail.com' && userData.name !== 'Facundo') {
-              updateDoc(userDocRef, { name: 'Facundo' });
-              setUserProfile({ ...userData, name: 'Facundo' });
-            } else {
-              setUserProfile(userData);
-            }
+            setUserProfile(userData);
         } else {
             console.warn(`Creando perfil para ${user.uid}...`);
             const isAdmin = user.email === 'crnunezfacundo@gmail.com';
-            const name = user.email === 'crnunezfacundo@gmail.com' ? 'Facundo' : user.displayName || user.email?.split('@')[0] || 'Usuario';
+            const name = user.displayName || user.email?.split('@')[0] || 'Usuario';
             const newUserProfile: UserRole = {
                 uid: user.uid,
                 name: name,
@@ -282,34 +276,11 @@ export default function App() {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  const participantsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, 'participants')) : null, [firestore, user]);
+  const participantsRef = useMemoFirebase(() => (firestore) ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  const usersRef = useMemoFirebase(() => (firestore && user && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, user, userProfile]);
+  const usersRef = useMemoFirebase(() => (firestore && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
-
-  const [stats, setStats] = useState({ totalPayments: 0 });
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!firestore || userProfile?.role !== ROLES.ADMIN) {
-        setStatsLoading(false);
-        return;
-    };
-    
-    const statsDocRef = doc(firestore, 'stats', 'global');
-    const unsubscribe = onSnapshot(statsDocRef, (doc) => {
-        if (doc.exists()) {
-            setStats(doc.data() as any);
-        } else {
-            setStats({ totalPayments: 0 });
-        }
-        setStatsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [firestore, userProfile]);
-
 
   const isAdmin = userProfile?.role === ROLES.ADMIN;
   const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
@@ -345,7 +316,7 @@ export default function App() {
       pagosAcumulados: 0, 
       fechaAlta: new Date().toISOString(), 
       activo: true,
-      estado: 'Ingresado', // Nuevo estado por defecto
+      estado: 'Ingresado',
       ownerId: user.uid
     });
     toast({ title: "Participante Agregado", description: "El nuevo participante ha sido registrado." });
@@ -367,6 +338,14 @@ export default function App() {
       setActiveFilter(null);
   };
   
+  const handleEditConfig = (config: Configuracion) => {
+    setEditingConfig(config);
+  };
+
+  const handleFinishEditing = () => {
+    setEditingConfig(null);
+  };
+
   if (isUserLoading || !user) {
     return <div className="flex flex-col items-center justify-center h-screen text-gray-500 gap-4"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p>Iniciando sesión...</p></div>;
   }
@@ -377,7 +356,7 @@ export default function App() {
   
   const renderDashboard = () => {
     if (selectedProgramDetail) {
-        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} />;
+        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} onSelectParticipant={setSelectedParticipant}/>;
     }
     
     const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
@@ -416,13 +395,21 @@ export default function App() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Registrar Nueva Configuración de Montos</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      {editingConfig ? <><Pencil size={22}/> Editando Configuración</> : 'Registrar Nueva Configuración de Montos'}
+                    </CardTitle>
                     <CardDescription>
-                        Guardar una nueva configuración creará un registro histórico y pasará a ser la configuración activa.
+                        {editingConfig 
+                          ? `Está modificando los valores para la vigencia de ${editingConfig.mesVigencia}/${editingConfig.anoVigencia}. Los cambios se guardarán sobre este mismo registro.`
+                          : 'Guardar una nueva configuración creará un registro histórico y pasará a ser la configuración activa.'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ConfiguracionForm onConfigSave={handleConfigSave} />
+                    <ConfiguracionForm 
+                      onConfigSave={handleConfigSave} 
+                      configToEdit={editingConfig} 
+                      onFinishEditing={handleFinishEditing} 
+                    />
                 </CardContent>
             </Card>
 
@@ -431,7 +418,7 @@ export default function App() {
                     <CardTitle className="flex items-center gap-2"><History/> Historial de Configuraciones</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ConfiguracionHistorial key={forceUpdateKey} />
+                    <ConfiguracionHistorial key={forceUpdateKey} onEditConfig={handleEditConfig} />
                 </CardContent>
             </Card>
             
@@ -508,7 +495,7 @@ export default function App() {
       
       <Dialog open={!!(selectedParticipant && selectedParticipant !== 'new')} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Legajo Personal</DialogTitle><DialogDescription>Información del participante, pagos y novedades.</DialogDescription></DialogHeader>
-          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant} />}
+          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant} onSelectParticipant={setSelectedParticipant}/>}
         </DialogContent>
       </Dialog>
       
