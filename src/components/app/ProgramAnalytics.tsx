@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Novedad, Participant } from '@/lib/types';
-import { MONTHS, PROGRAMAS } from '@/lib/constants';
+import { MONTHS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
 import { formatDateToDDMMYYYY } from '@/lib/utils';
 import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Wrench, Loader2, Coins } from 'lucide-react';
 import { Card as UICard, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useConfiguracion } from '@/hooks/useConfiguracion';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
@@ -31,7 +32,7 @@ interface ProcessedPaymentData {
   count: number;
   monthName: string;
   year: string;
-  categorias: { [key: string]: number };
+  categorias: { [key: string]: { count: number; monto: number } };
   categorizedParticipants: { [key: string]: any[] };
 }
 
@@ -39,6 +40,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   const [month, setMonth] = useState(String(new Date().getMonth()));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const { firestore } = useFirebase();
+  const { findConfigForDate, isLoading: configLoading } = useConfiguracion();
 
   const [paymentData, setPaymentData] = useState<ProcessedPaymentData | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(true);
@@ -47,16 +49,23 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   useEffect(() => {
     const fetchPaymentData = async () => {
       if (!firestore) return;
+
       setPaymentLoading(true);
+      
+      const currentMonth = parseInt(month) + 1;
+      const currentYear = parseInt(year);
+      const config = findConfigForDate(currentMonth, currentYear);
+
       try {
         const paymentRecordsRef = collection(firestore, 'paymentRecords');
         const q = query(
           paymentRecordsRef,
           where('programa', '==', programName),
-          where('mes', '==', String(parseInt(month) + 1)),
-          where('anio', '==', year)
+          where('mes', '==', String(currentMonth)),
+          where('anio', '==', String(currentYear))
         );
         const snapshot = await getDocs(q);
+
         if (!snapshot.empty) {
           const paymentDoc = snapshot.docs[0].data();
           const paidParticipants = paymentDoc.participantes || [];
@@ -73,9 +82,20 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
             categorizedParticipants[cat].push(p);
           });
 
-          const categorias: { [key: string]: number } = {};
-          for (const cat in categorizedParticipants) {
-              categorias[cat] = categorizedParticipants[cat].length;
+          const categorias: ProcessedPaymentData['categorias'] = {};
+          if (programName === PROGRAMAS.TUTORIAS) {
+             CATEGORIAS_TUTORIAS.forEach(cat => {
+                const monto = config?.montos[cat] || 0;
+                const count = categorizedParticipants[cat]?.length || 0;
+                if(count > 0) {
+                  categorias[cat] = { count, monto };
+                }
+             });
+             if (categorizedParticipants['Sin Categoría']) {
+                 categorias['Sin Categoría'] = { count: categorizedParticipants['Sin Categoría'].length, monto: 0 };
+             }
+          } else if (config?.montos[programName]) {
+              categorias[programName] = { count: count, monto: config.montos[programName] };
           }
 
           setPaymentData({ count, monthName, year: yearValue, categorias, categorizedParticipants });
@@ -89,8 +109,11 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
         setPaymentLoading(false);
       }
     };
-    fetchPaymentData();
-  }, [firestore, programName, month, year]);
+
+    if (!configLoading) {
+        fetchPaymentData();
+    }
+  }, [firestore, programName, month, year, findConfigForDate, configLoading]);
 
   const novedadesRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -140,6 +163,10 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   };
 
   const selectedMonthName = MONTHS[parseInt(month)];
+  const totalLiquidado = useMemo(() => {
+      if (!paymentData) return 0;
+      return Object.values(paymentData.categorias).reduce((acc, { count, monto }) => acc + (count * monto), 0);
+  }, [paymentData]);
 
   return (
     <>
@@ -160,11 +187,11 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
           <h2 className="text-2xl font-bold text-gray-800">Análisis: {programName}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card 
-                  title="Participantes Pagados"
-                  value={paymentData ? paymentData.count : 0} 
+                  title="Total Liquidado"
+                  value={totalLiquidado.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
                   icon={Coins} 
-                  subtitle={paymentData ? `Liquidación ${paymentData.monthName} ${paymentData.year}` : 'Sin pago en este mes'}
-                  isLoading={paymentLoading}
+                  subtitle={paymentData ? `${paymentData.count} participantes` : 'Sin pago en este mes'}
+                  isLoading={paymentLoading || configLoading}
               />
               {programName !== PROGRAMAS.TUTORIAS &&
                   <Card title="Equipo Técnico" value={analytics.equipoTecnico} icon={Wrench} subtitle="Personal de Staff" />
@@ -177,12 +204,18 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
                   <UICard>
                       <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 size={20}/> Distribución por Categoría ({selectedMonthName})</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
-                          {paymentLoading ? (
+                          {paymentLoading || configLoading ? (
                               <div className="h-24 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin mr-2"/> Cargando...</div>
                           ) : paymentData && Object.keys(paymentData.categorias).length > 0 ? (
-                              Object.entries(paymentData.categorias).map(([cat, count]: [string, number]) => (
+                              Object.entries(paymentData.categorias).map(([cat, { count, monto }]: [string, { count: number; monto: number }]) => (
                                   <div key={cat} onClick={() => setSelectedCategory(cat)} className="cursor-pointer hover:opacity-80 p-2 rounded-lg transition-colors duration-150 hover:bg-gray-50">
-                                      <div className="flex justify-between text-sm mb-1"><span>{cat}</span><span className="font-bold">{count}</span></div>
+                                      <div className="flex justify-between items-center text-sm mb-1">
+                                          <div>
+                                              <span>{cat}</span>
+                                              <span className="text-xs text-gray-500 ml-2">({monto.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })})</span>
+                                          </div>
+                                          <span className="font-bold">{count}</span>
+                                      </div>
                                       <div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${(count / (paymentData?.count || 1)) * 100}%` }}></div></div>
                                   </div>
                               ))
