@@ -15,7 +15,6 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useConfiguracion } from '@/hooks/useConfiguracion';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
-// Card and ProcessedPaymentData interface remain the same
 const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
     <UICard>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -106,12 +105,13 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
 
   }, [firestore, programName, month, year]);
 
-  // Novedades and Analytics logic remains the same
   const novedadesRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    const startDate = new Date(parseInt(year), parseInt(month), 1).toISOString().split('T')[0];
-    const endDate = new Date(parseInt(year), parseInt(month) + 1, 0).toISOString().split('T')[0];
-    return query(collection(firestore, 'novedades'), where('fecha', '>=', startDate), where('fecha', '<=', endDate));
+    return query(
+        collection(firestore, 'novedades'), 
+        where('mesEvento', '==', String(parseInt(month) + 1)), 
+        where('anoEvento', '==', year)
+    );
   }, [firestore, year, month]);
 
   const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
@@ -132,7 +132,6 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
         return d.getMonth() === m && d.getFullYear() === y;
     });
     const bajasNovedades = (allNovedades || []).filter(n => {
-        if(!n.fecha) return false;
         const isThisProgram = programParticipants.some(p => p.id === n.participantId);
         const isBaja = n.descripcion.toLowerCase().includes('baja');
         return isThisProgram && isBaja;
@@ -154,7 +153,6 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   return (
     <>
       <div className="space-y-6">
-          {/* Header and Filters - No changes here */}
           <div className="flex items-center justify-between">
               <Button variant="ghost" onClick={onBack}><ArrowLeft size={20} className="mr-2" /> Volver al Resumen</Button>
               <div className="flex gap-4">
@@ -170,7 +168,6 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
           </div>
           <h2 className="text-2xl font-bold text-gray-800">Análisis: {programName}</h2>
 
-          {/* Main Analytics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card 
                   title="Total Liquidado"
@@ -186,7 +183,6 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
               <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" isLoading={novedadesLoading}/>
           </div>
 
-          {/* Details Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {programName === PROGRAMAS.TUTORIAS && (
                   <UICard>
@@ -232,7 +228,6 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
           </div>
       </div>
 
-      {/* Dialog for participant list - Updated to use new data structure */}
       <Dialog open={!!selectedCategory} onOpenChange={(isOpen) => !isOpen && setSelectedCategory(null)}>
           <DialogContent className="max-w-2xl">
               <DialogHeader>

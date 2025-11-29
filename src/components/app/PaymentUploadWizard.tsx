@@ -31,7 +31,6 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
   const [analyzing, setAnalyzing] = useState(false);
   const [altaResolution, setAltaResolution] = useState('');
 
-  // Universal DNI cleaning function
   const cleanDNI = (value: any): string => String(value || '').normalize("NFD").replace(/[\u0300-\u036f]/g, '').replace(/\D/g, '').trim();
 
   const parseCSV = (text: string): { dni: string; monto: number }[] => {
@@ -62,7 +61,6 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
     try {
       const text = await selectedFile.text();
       const records = parseCSV(text);
-      // All DNIs in csvDnis are guaranteed to be clean
       const csvDnis = new Set(records.map(r => r.dni));
       
       const configForMonth = findConfigForDate(config.mes + 1, config.anio);
@@ -84,17 +82,14 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         where('anio', '==', String(prevMonthDate.getFullYear())),
         where('programa', '==', config.programa)
       ));
-      // All DNIs in paidLastMonthDnis are guaranteed to be clean
       const paidLastMonthDnis = new Set(prevPaymentsSnapshot.docs.map(doc => cleanDNI(doc.data().dni)));
 
       const allProgramParticipants = participants.filter(p => p.programa === config.programa);
-      // Use CLEAN DNI as the key for the map
       const participantMap = new Map(allProgramParticipants.map(p => [cleanDNI(p.dni), p]));
 
       const regulars: any[] = [], newlyPaid: any[] = [], unknown: any[] = [];
 
       for (const rec of records) {
-        // Find participant using the CLEAN DNI from the CSV
         const participant = participantMap.get(rec.dni);
         let categoriaCalculada = null;
         if (config.programa === PROGRAMAS.TUTORIAS) {
@@ -104,7 +99,6 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         const paymentRecord = { ...rec, participant, categoriaCalculada };
 
         if (participant) {
-          // Compare using the CLEAN DNI from the previous month's payments
           if (paidLastMonthDnis.has(rec.dni)) {
             regulars.push(paymentRecord);
           } else {
@@ -162,7 +156,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         const payRef = doc(collection(firestore, 'pagosRegistrados'));
         batch.set(payRef, {
           participantId: item.participant.id,
-          dni: item.dni, // DNI is already clean from parseCSV
+          dni: item.dni,
           nombre: item.participant.nombre,
           montoPagado: item.monto, 
           mes: String(config.mes + 1), 
@@ -180,10 +174,16 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
 
         const novRef = doc(collection(firestore, 'novedades'));
         batch.set(novRef, {
-          participantId: p.id, participantName: p.nombre, dni: p.dni,
-          descripcion: `Ausente en liquidación ${MONTHS[config.mes]} ${config.anio}.`,
-          type: 'POSIBLE_BAJA', fecha: new Date().toISOString().split('T')[0], 
-          fechaRealCarga: serverTimestamp(), ownerId: user.uid
+          participantId: p.id, 
+          participantName: p.nombre, 
+          dni: p.dni,
+          descripcion: `Ausente en liquidación ${MONTHS[config.mes]} ${config.anio}. Posible baja.`,
+          type: 'POSIBLE_BAJA', 
+          fecha: new Date().toISOString().split('T')[0], 
+          mesEvento: String(config.mes + 1),
+          anoEvento: String(config.anio),
+          fechaRealCarga: serverTimestamp(), 
+          ownerId: user.uid
         });
       });
 
@@ -251,7 +251,6 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
              <Card className={`p-4 ${analysis.unknown.length > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-100'}`}><CardContent className="p-2"><h3 className={`text-2xl font-bold ${analysis.unknown.length > 0 ? 'text-red-700' : 'text-gray-500'}`}>{analysis.unknown.length}</h3><p className={`text-xs uppercase font-bold ${analysis.unknown.length > 0 ? 'text-red-600' : 'text-gray-500'}`}>Desconocidos</p></CardContent></Card>
            </div>
 
-          {/* VISUAL FIX: Changed to grid-cols-1 to stack cards vertically */}
           <div className="grid grid-cols-1 gap-6 items-start">
             {analysis.unknown.length > 0 && <Card className="border-red-500"><CardHeader className="bg-red-50"><CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>DNIs Desconocidos (Bloqueo)</CardTitle></CardHeader><CardContent className="p-4 text-sm text-red-700"><p className='mb-4'>Hay {analysis.unknown.length} DNI que no se encontraron. Debe cargarlos primero.</p><div className="max-h-40 overflow-y-auto border bg-white p-2 rounded"><Table><TableHeader><TableRow><TableHead>DNI</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader><TableBody>{analysis.unknown.map((u:any) => <TableRow key={u.dni}><TableCell className="font-mono">{u.dni}</TableCell><TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => onFindDni(u.dni)}><Search className="h-4 w-4 mr-2"/>Buscar</Button></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>}
             {analysis.absent.length > 0 && <Card className="border-yellow-200"><CardHeader className="bg-yellow-50"><CardTitle className="text-yellow-800 flex items-center gap-2 text-base"><AlertTriangle />Ausentes (Posible Baja)</CardTitle></CardHeader><CardContent className="p-4 text-sm text-yellow-800"><p>Se registrará una novedad para los <strong>{analysis.absent.length} participantes</strong> que cobraron el mes pasado pero no figuran en este archivo.</p></CardContent></Card>}
