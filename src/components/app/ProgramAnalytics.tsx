@@ -15,6 +15,7 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useConfiguracion } from '@/hooks/useConfiguracion';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
+// Card and ProcessedPaymentData interface remain the same
 const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
     <UICard>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -30,10 +31,8 @@ const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string
 
 interface ProcessedPaymentData {
   count: number;
-  monthName: string;
-  year: string;
-  categorias: { [key: string]: { count: number; monto: number } };
-  categorizedParticipants: { [key: string]: any[] };
+  totalMonto: number;
+  categorias: { [key: string]: { count: number; monto: number, total: number, participants: any[] } };
 }
 
 const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipant }: { programName: string; participants: Participant[]; onBack: () => void; onSelectParticipant: (p: Participant) => void; }) => {
@@ -49,56 +48,49 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   useEffect(() => {
     const fetchPaymentData = async () => {
       if (!firestore) return;
-
       setPaymentLoading(true);
       
       const currentMonth = parseInt(month) + 1;
       const currentYear = parseInt(year);
-      const config = findConfigForDate(currentMonth, currentYear);
 
       try {
-        const paymentRecordsRef = collection(firestore, 'paymentRecords');
+        const pagosRef = collection(firestore, 'pagosRegistrados');
         const q = query(
-          paymentRecordsRef,
+          pagosRef,
           where('programa', '==', programName),
           where('mes', '==', String(currentMonth)),
           where('anio', '==', String(currentYear))
         );
         const snapshot = await getDocs(q);
-
+        
         if (!snapshot.empty) {
-          const paymentDoc = snapshot.docs[0].data();
-          const paidParticipants = paymentDoc.participantes || [];
-          const count = paidParticipants.length;
-          const monthName = MONTHS[parseInt(paymentDoc.mes) - 1] || 'N/A';
-          const yearValue = paymentDoc.anio;
-
-          const categorizedParticipants: { [key: string]: any[] } = {};
-          paidParticipants.forEach((p: any) => {
-            const cat = p.categoria || 'Sin Categoría';
-            if (!categorizedParticipants[cat]) {
-                categorizedParticipants[cat] = [];
-            }
-            categorizedParticipants[cat].push(p);
-          });
+          const paidRecords = snapshot.docs.map(doc => doc.data());
+          const totalCount = paidRecords.length;
+          const totalMonto = paidRecords.reduce((sum, rec) => sum + rec.montoPagado, 0);
 
           const categorias: ProcessedPaymentData['categorias'] = {};
-          if (programName === PROGRAMAS.TUTORIAS) {
-             CATEGORIAS_TUTORIAS.forEach(cat => {
-                const monto = config?.montos[cat] || 0;
-                const count = categorizedParticipants[cat]?.length || 0;
-                if(count > 0) {
-                  categorias[cat] = { count, monto };
-                }
-             });
-             if (categorizedParticipants['Sin Categoría']) {
-                 categorias['Sin Categoría'] = { count: categorizedParticipants['Sin Categoría'].length, monto: 0 };
-             }
-          } else if (config?.montos[programName]) {
-              categorias[programName] = { count: count, monto: config.montos[programName] };
-          }
 
-          setPaymentData({ count, monthName, year: yearValue, categorias, categorizedParticipants });
+          if (programName === PROGRAMAS.TUTORIAS) {
+            paidRecords.forEach(rec => {
+                const cat = rec.categoria || 'Sin Categoría';
+                if (!categorias[cat]) {
+                    categorias[cat] = { count: 0, monto: rec.montoPagado, total: 0, participants: [] };
+                }
+                categorias[cat].count++;
+                categorias[cat].total += rec.montoPagado;
+                categorias[cat].participants.push(rec);
+            });
+          } else {
+             const firstRecord = paidRecords[0];
+             categorias[programName] = {
+                count: totalCount,
+                monto: firstRecord ? firstRecord.montoPagado : 0,
+                total: totalMonto,
+                participants: paidRecords
+             }
+          }
+          
+          setPaymentData({ count: totalCount, totalMonto, categorias });
         } else {
           setPaymentData(null);
         }
@@ -110,11 +102,11 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
       }
     };
 
-    if (!configLoading) {
-        fetchPaymentData();
-    }
-  }, [firestore, programName, month, year, findConfigForDate, configLoading]);
+    fetchPaymentData();
 
+  }, [firestore, programName, month, year]);
+
+  // Novedades and Analytics logic remains the same
   const novedadesRef = useMemoFirebase(() => {
     if (!firestore) return null;
     const startDate = new Date(parseInt(year), parseInt(month), 1).toISOString().split('T')[0];
@@ -128,29 +120,24 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
     const programParticipants = participants.filter(p => p.programa === programName);
     const m = parseInt(month);
     const y = parseInt(year);
-    
     const getRefDate = (p: Participant): Date | null => {
         if (p.fechaIngreso) return new Date(p.fechaIngreso + 'T00:00:00');
         if (typeof p.fechaAlta === 'string') return new Date(p.fechaAlta);
         if (p.fechaAlta && 'seconds' in p.fechaAlta) return new Date((p.fechaAlta as any).seconds * 1000);
         return null; 
     };
-
     const altas = programParticipants.filter(p => {
         const d = getRefDate(p);
         if(!d) return false;
         return d.getMonth() === m && d.getFullYear() === y;
     });
-
     const bajasNovedades = (allNovedades || []).filter(n => {
         if(!n.fecha) return false;
         const isThisProgram = programParticipants.some(p => p.id === n.participantId);
         const isBaja = n.descripcion.toLowerCase().includes('baja');
         return isThisProgram && isBaja;
     });
-    
     const equipoTecnico = programParticipants.filter(p => p.esEquipoTecnico).length;
-
     return { altas, bajasNovedades, equipoTecnico };
   }, [programName, participants, allNovedades, month, year]);
 
@@ -163,14 +150,11 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   };
 
   const selectedMonthName = MONTHS[parseInt(month)];
-  const totalLiquidado = useMemo(() => {
-      if (!paymentData) return 0;
-      return Object.values(paymentData.categorias).reduce((acc, { count, monto }) => acc + (count * monto), 0);
-  }, [paymentData]);
 
   return (
     <>
       <div className="space-y-6">
+          {/* Header and Filters - No changes here */}
           <div className="flex items-center justify-between">
               <Button variant="ghost" onClick={onBack}><ArrowLeft size={20} className="mr-2" /> Volver al Resumen</Button>
               <div className="flex gap-4">
@@ -185,13 +169,15 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
               </div>
           </div>
           <h2 className="text-2xl font-bold text-gray-800">Análisis: {programName}</h2>
+
+          {/* Main Analytics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card 
                   title="Total Liquidado"
-                  value={totalLiquidado.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
+                  value={(paymentData?.totalMonto || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
                   icon={Coins} 
                   subtitle={paymentData ? `${paymentData.count} participantes` : 'Sin pago en este mes'}
-                  isLoading={paymentLoading || configLoading}
+                  isLoading={paymentLoading}
               />
               {programName !== PROGRAMAS.TUTORIAS &&
                   <Card title="Equipo Técnico" value={analytics.equipoTecnico} icon={Wrench} subtitle="Personal de Staff" />
@@ -199,19 +185,21 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
               <Card title="Altas del Mes" value={analytics.altas.length} icon={UserPlus} subtitle={`En ${selectedMonthName}`} />
               <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" isLoading={novedadesLoading}/>
           </div>
+
+          {/* Details Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {programName === PROGRAMAS.TUTORIAS && (
                   <UICard>
                       <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 size={20}/> Distribución por Categoría ({selectedMonthName})</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
-                          {paymentLoading || configLoading ? (
+                          {paymentLoading ? (
                               <div className="h-24 flex items-center justify-center text-gray-400"><Loader2 className="animate-spin mr-2"/> Cargando...</div>
                           ) : paymentData && Object.keys(paymentData.categorias).length > 0 ? (
-                              Object.entries(paymentData.categorias).map(([cat, { count, monto }]: [string, { count: number; monto: number }]) => (
-                                  <div key={cat} onClick={() => setSelectedCategory(cat)} className="cursor-pointer hover:opacity-80 p-2 rounded-lg transition-colors duration-150 hover:bg-gray-50">
+                              Object.entries(paymentData.categorias).sort(([,a],[,b]) => b.total - a.total).map(([cat, { count, monto }]) => (
+                                  <div key={cat} onClick={() => setSelectedCategory(cat)} className={`cursor-pointer p-2 rounded-lg transition-colors duration-150 hover:bg-gray-50 ${cat.includes('NO') ? 'bg-red-50' : ''}`}>
                                       <div className="flex justify-between items-center text-sm mb-1">
                                           <div>
-                                              <span>{cat}</span>
+                                              <span className={cat.includes('NO') ? 'font-bold text-red-700' : ''}>{cat}</span>
                                               <span className="text-xs text-gray-500 ml-2">({monto.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })})</span>
                                           </div>
                                           <span className="font-bold">{count}</span>
@@ -230,19 +218,12 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
                   <CardContent>
                       <div className="overflow-y-auto max-h-60 border rounded-lg">
                           <Table>
-                              <TableHeader className="bg-gray-50 sticky top-0">
-                                  <TableRow>
-                                      <TableHead>Tipo</TableHead>
-                                      <TableHead>Nombre</TableHead>
-                                      <TableHead>Detalle</TableHead>
-                                      <TableHead>Fecha</TableHead>
-                                  </TableRow>
-                              </TableHeader>
+                              <TableHeader className="bg-gray-50 sticky top-0"><TableRow><TableHead>Tipo</TableHead><TableHead>Nombre</TableHead><TableHead>Detalle</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
                               <TableBody>
-                                  {novedadesLoading && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400"><Loader2 className="animate-spin inline-block mr-2" />Cargando movimientos...</TableCell></TableRow>}
+                                  {novedadesLoading && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400"><Loader2 className="animate-spin inline-block mr-2" />Cargando...</TableCell></TableRow>}
                                   {!novedadesLoading && analytics.altas.map(p => (<TableRow key={'alta-'+p.id}><TableCell><Badge variant="green">Alta</Badge></TableCell><TableCell className="font-medium">{p.nombre}</TableCell><TableCell className="text-muted-foreground">Ingreso al programa</TableCell><TableCell>{formatDateToDDMMYYYY(p.fechaIngreso as string)}</TableCell></TableRow>))}
                                   {!novedadesLoading && analytics.bajasNovedades.map(n => (<TableRow key={'baja-'+n.id}><TableCell><Badge variant="destructive">Baja</Badge></TableCell><TableCell className="font-medium">{n.participantName}</TableCell><TableCell className="text-muted-foreground">{n.descripcion}</TableCell><TableCell>{formatDateToDDMMYYYY(n.fecha)}</TableCell></TableRow>))}
-                                  {!novedadesLoading && analytics.altas.length === 0 && analytics.bajasNovedades.length === 0 && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400">Sin movimientos este mes</TableCell></TableRow>}
+                                  {!novedadesLoading && analytics.altas.length === 0 && analytics.bajasNovedades.length === 0 && <TableRow><TableCell colSpan={4} className="p-4 text-center text-gray-400">Sin movimientos</TableCell></TableRow>}
                               </TableBody>
                           </Table>
                       </div>
@@ -251,31 +232,22 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
           </div>
       </div>
 
+      {/* Dialog for participant list - Updated to use new data structure */}
       <Dialog open={!!selectedCategory} onOpenChange={(isOpen) => !isOpen && setSelectedCategory(null)}>
           <DialogContent className="max-w-2xl">
               <DialogHeader>
-                  <DialogTitle>Participantes en Categoría: {selectedCategory}</DialogTitle>
-                  <DialogDescription>
-                      Lista de participantes para la categoría seleccionada. Puede hacer clic en "Ver Legajo" para editar.
-                  </DialogDescription>
+                  <DialogTitle>Participantes en: {selectedCategory}</DialogTitle>
+                  <DialogDescription>Lista de participantes para la categoría seleccionada.</DialogDescription>
               </DialogHeader>
               <div className="max-h-[60vh] overflow-y-auto mt-4">
                   <Table>
-                      <TableHeader>
-                          <TableRow>
-                              <TableHead>Nombre</TableHead>
-                              <TableHead>DNI</TableHead>
-                              <TableHead className="text-right">Acción</TableHead>
-                          </TableRow>
-                      </TableHeader>
+                      <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
                       <TableBody>
-                          {selectedCategory && paymentData?.categorizedParticipants[selectedCategory]?.sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => (
-                              <TableRow key={p.id}>
+                          {selectedCategory && paymentData?.categorias[selectedCategory]?.participants.sort((a,b) => a.nombre.localeCompare(b.nombre)).map(p => (
+                              <TableRow key={p.participantId}>
                                   <TableCell>{p.nombre}</TableCell>
                                   <TableCell>{p.dni}</TableCell>
-                                  <TableCell className="text-right">
-                                      <Button variant="link" onClick={() => handleParticipantSelect(p.dni)}>Ver Legajo</Button>
-                                  </TableCell>
+                                  <TableCell className="text-right"><Button variant="link" onClick={() => handleParticipantSelect(p.dni)}>Ver Legajo</Button></TableCell>
                               </TableRow>
                           ))}
                       </TableBody>
