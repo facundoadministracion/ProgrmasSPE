@@ -5,7 +5,7 @@ import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import type { Novedad, Participant, Payment } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { calculateAge, formatDateToDDMMYYYY, formatMonthYear } from '@/lib/utils';
+import { calculateAge, formatDateToDDMMYYYY, formatMonthYear, formatCurrency } from '@/lib/utils'; // IMPORTED formatCurrency
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -57,7 +57,6 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
     setParticipant(initialParticipant);
   }, [initialParticipant]);
 
-  const currentYear = new Date().getFullYear().toString();
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -66,8 +65,9 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
   const { data: novedadesData, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
   const novedades = useMemo(() => (novedadesData || []).sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [novedadesData]);
 
-  const paymentsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'payments'), where('dni', '==', participant.dni), where('anio', '==', currentYear)) : null, [firestore, participant.dni, currentYear]);
-  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsRef);
+  const paymentsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'pagosRegistrados'), where('dni', '==', participant.dni)) : null, [firestore, participant.dni]);
+  const { data: paymentsData, isLoading: paymentsLoading } = useCollection<any>(paymentsRef);
+  const payments = useMemo(() => (paymentsData || []).sort((a,b) => parseInt(b.anio, 10) - parseInt(a.anio, 10) || parseInt(b.mes, 10) - parseInt(a.mes, 10)), [paymentsData]);
 
   const [newNovedad, setNewNovedad] = useState({ descripcion: '', fecha: new Date().toISOString().split('T')[0] });
 
@@ -262,7 +262,7 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
       <Tabs defaultValue="general">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="pagos">Historial Pagos ({currentYear})</TabsTrigger>
+          <TabsTrigger value="pagos">Historial de Pagos</TabsTrigger>
           <TabsTrigger value="novedades">Novedades</TabsTrigger>
         </TabsList>
         <div className="min-h-[300px] pt-4">
@@ -314,14 +314,14 @@ const ParticipantDetail = ({ participant: initialParticipant }: { participant: P
                     </TableHeader>
                     <TableBody>
                         {paymentsLoading && <TableRow><TableCell colSpan={3} className="h-24 text-center"><Loader2 className="animate-spin inline-block mr-2"/>Cargando pagos...</TableCell></TableRow>}
-                        {!paymentsLoading && (payments || []).map(pay => (
+                        {!paymentsLoading && payments.map(pay => (
                             <TableRow key={pay.id}>
-                                <TableCell>{pay.mes}/{pay.anio}</TableCell>
-                                <TableCell className="font-mono font-bold text-green-700">${pay.monto}</TableCell>
+                                <TableCell>{meses[parseInt(pay.mes) - 1]} {pay.anio}</TableCell>
+                                <TableCell className="font-mono font-bold text-green-700">{formatCurrency(pay.monto)}</TableCell>
                                 <TableCell className="text-gray-500">{pay.fechaCarga?.seconds ? new Date(pay.fechaCarga.seconds * 1000).toLocaleDateString('es-AR') : 'Reciente'}</TableCell>
                             </TableRow>
                         ))}
-                        {!paymentsLoading && (!payments || payments.length === 0) && <TableRow><TableCell colSpan={3} className="h-24 text-center">No hay pagos registrados este año.</TableCell></TableRow>}
+                        {!paymentsLoading && (!payments || payments.length === 0) && <TableRow><TableCell colSpan={3} className="h-24 text-center">No hay pagos registrados.</TableCell></TableRow>}
                     </TableBody>
                 </Table>
               </div>

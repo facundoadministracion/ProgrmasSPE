@@ -33,7 +33,6 @@ import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial, { type Configuracion } from '@/components/app/ConfiguracionHistorial';
-import DataFixComponent from '@/components/app/DataFixComponent';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
@@ -122,8 +121,8 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
             });
         } else if (activeFilter === 'ageAlert') {
              filtered = filtered.filter(p => {
-                const status = getAlertStatus(p);
-                return p.activo && p.programa === PROGRAMAS.JOVEN && status.msg.includes('Límite de Edad');
+                const edad = getAlertStatus(p);
+                return p.activo && p.programa === PROGRAMAS.JOVEN && edad.msg.includes('Límite de Edad');
             });
         }
 
@@ -230,7 +229,6 @@ export default function App() {
   const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
   const [initialSearch, setInitialSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ParticipantFilter>(null);
-  const [showDataFix, setShowDataFix] = useState(true);
   
   const [editingConfig, setEditingConfig] = useState<Configuracion | null>(null);
 
@@ -391,8 +389,6 @@ export default function App() {
   const renderConfig = () => {
     return (
         <div className="space-y-8">
-            {showDataFix && <DataFixComponent onFixComplete={() => setShowDataFix(false)} />}
-
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -495,7 +491,7 @@ export default function App() {
       
       <Dialog open={!!(selectedParticipant && selectedParticipant !== 'new')} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Legajo Personal</DialogTitle><DialogDescription>Información del participante, pagos y novedades.</DialogDescription></DialogHeader>
-          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant} onSelectParticipant={setSelectedParticipant}/>}
+          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant}/>}
         </DialogContent>
       </Dialog>
       

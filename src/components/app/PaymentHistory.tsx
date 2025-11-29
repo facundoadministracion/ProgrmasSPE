@@ -1,12 +1,13 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, writeBatch, query, where, doc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, Loader } from 'lucide-react';
+import { Trash2, Loader, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 
+// (Interfaces no modificadas)
 interface Payment {
   id: string;
   mes: string;
@@ -25,16 +26,19 @@ interface GroupedPayment {
   participantsToUpdate: string[];
 }
 
+const ITEMS_PER_PAGE = 4;
+
 const PaymentHistory = () => {
   const { firestore } = useFirebase();
   const [history, setHistory] = useState<GroupedPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchHistory = async () => {
     if (!firestore) return;
     setLoading(true);
-    const paymentsSnapshot = await getDocs(collection(firestore, 'payments'));
+    const paymentsSnapshot = await getDocs(collection(firestore, 'pagosRegistrados'));
     const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Payment[];
 
     const grouped = payments.reduce((acc, payment) => {
@@ -51,7 +55,9 @@ const PaymentHistory = () => {
       }
       acc[key].count++;
       acc[key].paymentIds.push(payment.id);
-      acc[key].participantsToUpdate.push(payment.participantId);
+      if (payment.participantId) {
+          acc[key].participantsToUpdate.push(payment.participantId);
+      }
       return acc;
     }, {} as { [key: string]: GroupedPayment });
 
@@ -68,6 +74,13 @@ const PaymentHistory = () => {
     fetchHistory();
   }, [firestore]);
 
+  const { paginatedHistory, totalPages } = useMemo(() => {
+    const totalPages = Math.ceil(history.length / ITEMS_PER_PAGE);
+    const paginated = history.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    return { paginatedHistory: paginated, totalPages };
+  }, [history, currentPage]);
+
+
   const handleDeleteBatch = async (batchData: GroupedPayment) => {
     if (!firestore || !window.confirm(`¿Estás seguro de que quieres eliminar ${batchData.count} pagos de ${MONTHS[parseInt(batchData.mes) - 1]} ${batchData.anio} para el programa ${batchData.programa}? Esta acción no se puede deshacer.`)) {
       return;
@@ -79,23 +92,28 @@ const PaymentHistory = () => {
     try {
       const batch = writeBatch(firestore);
 
-      // Decrement the payment count for each participant
       const uniqueParticipantIds = [...new Set(batchData.participantsToUpdate)];
       uniqueParticipantIds.forEach(participantId => {
-        const participantRef = doc(firestore, 'participants', participantId);
-        batch.update(participantRef, { pagosAcumulados: increment(-1) });
+        if (participantId) {
+            const participantRef = doc(firestore, 'participants', participantId);
+            batch.update(participantRef, { pagosAcumulados: increment(-1) });
+        }
       });
 
-      // Delete each payment document
       batchData.paymentIds.forEach(paymentId => {
-        const paymentRef = doc(firestore, 'payments', paymentId);
+        const paymentRef = doc(firestore, 'pagosRegistrados', paymentId);
         batch.delete(paymentRef);
       });
 
       await batch.commit();
       
       alert('Lote de pagos eliminado exitosamente.');
-      fetchHistory(); // Refresh the list
+      await fetchHistory(); 
+      
+      if ((currentPage - 1) * ITEMS_PER_PAGE >= history.length - batchData.paymentIds.length && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+
     } catch (error) {
       console.error("Error eliminando el lote de pagos: ", error);
       alert('Ocurrió un error al eliminar el lote de pagos.');
@@ -118,7 +136,7 @@ const PaymentHistory = () => {
           <p className="text-sm text-gray-500">No se encontraron cargas de pago masivas.</p>
         ) : (
           <div className="space-y-4">
-            {history.map(batch => {
+            {paginatedHistory.map(batch => {
               const key = `${batch.mes}-${batch.anio}-${batch.programa}`;
               const isDeleting = deleting === key;
               return (
@@ -142,6 +160,13 @@ const PaymentHistory = () => {
                 </div>
               );
             })}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end space-x-2 pt-4">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /> Anterior</Button>
+                <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</div>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente <ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

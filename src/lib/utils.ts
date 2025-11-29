@@ -128,3 +128,15 @@ export const formatMonthYear = (dateString: string | undefined | null): string =
         return dateString;
     }
 };
+
+export const formatCurrency = (value: number | null | undefined): string => {
+  if (value === null || typeof value === 'undefined') {
+    return '$ 0';
+  }
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
