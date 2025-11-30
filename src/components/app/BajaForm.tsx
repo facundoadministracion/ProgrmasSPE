@@ -1,146 +1,130 @@
 'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { Textarea } from '@/components/ui/textarea';
+import { MONTHS } from '@/lib/constants';
 
-interface BajaFormProps {
-  participantId: string;
-  participantName: string;
-  ownerId: string;
-  onConfirm: (bajaData: any) => void;
-}
+const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel, mesAusencia }: 
+  { participantId: string; participantName: string; ownerId: string; onConfirm: (data: any) => void; onCancel: () => void; mesAusencia?: string | null; }) => {
+  
+  const parseMesAusencia = (mesAusencia: string | null | undefined) => {
+    if (!mesAusencia) return { mes: new Date().getMonth() + 1, anio: new Date().getFullYear() };
+    const [mesStr, anioStr] = mesAusencia.split('/');
+    const mesIndex = MONTHS.findIndex(m => m.toLowerCase() === mesStr.toLowerCase());
+    return {
+      mes: mesIndex !== -1 ? mesIndex + 1 : new Date().getMonth() + 1,
+      anio: anioStr ? parseInt(anioStr) : new Date().getFullYear(),
+    };
+  };
 
-const BajaForm: React.FC<BajaFormProps> = ({
-  participantId,
-  participantName,
-  ownerId,
-  onConfirm,
-}) => {
-  const [anioBaja, setAnioBaja] = useState(new Date().getFullYear().toString());
-  const [mesBaja, setMesBaja] = useState((new Date().getMonth() + 1).toString());
+  const initialBajaState = parseMesAusencia(mesAusencia);
+
   const [motivo, setMotivo] = useState('');
   const [tipoActo, setTipoActo] = useState('');
   const [numeroActo, setNumeroActo] = useState('');
+  const [mesBaja, setMesBaja] = useState<string>(String(initialBajaState.mes));
+  const [anioBaja, setAnioBaja] = useState<string>(String(initialBajaState.anio));
   const [detalle, setDetalle] = useState('');
-  const [otrasDetalle, setOtrasDetalle] = useState('');
 
-  const handleConfirm = () => {
-    const finalDetalle = detalle === 'Otras' ? otrasDetalle : detalle;
+  const handleSubmit = () => {
     const bajaData = {
       participantId,
       participantName,
       ownerId,
-      fecha: new Date().toISOString().split('T')[0],
-      anioBaja,
-      mesBaja,
       motivo,
-      detalle: finalDetalle,
-      ...((motivo === 'Acto Administrativo' || motivo === 'SINTyS') && { tipoActo, numeroActo }),
+      tipoActo: (motivo === 'Acto Administrativo' || motivo === 'SINTyS') ? tipoActo : null,
+      numeroActo: (motivo === 'Acto Administrativo' || motivo === 'SINTyS') ? numeroActo : null,
+      mesBaja,
+      anioBaja,
+      detalle,
+      fecha: new Date().toISOString().split('T')[0],
     };
     onConfirm(bajaData);
   };
 
-  const meses = [
-    { value: '1', label: 'Enero' }, { value: '2', label: 'Febrero' }, { value: '3', label: 'Marzo' },
-    { value: '4', label: 'Abril' }, { value: '5', label: 'Mayo' }, { value: '6', label: 'Junio' },
-    { value: '7', label: 'Julio' }, { value: '8', label: 'Agosto' }, { value: '9', label: 'Septiembre' },
-    { value: '10', label: 'Octubre' }, { value: '11', label: 'Noviembre' }, { value: '12', label: 'Diciembre' },
-  ];
-
-  const motivosBaja = ['Acto Administrativo', 'RRHH Vinculados', 'SINTyS'].sort();
-  const tiposActoAdmin = ['Decreto', 'Resolución'].sort();
-  const detallesBaja = ['Horas Docentes', 'Otras', 'Renuncia', 'Trabajo Registrado'].sort();
+  const isActoAdministrativo = motivo === 'Acto Administrativo' || motivo === 'SINTyS';
 
   return (
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>Registrar Baja de Participante</AlertDialogTitle>
-        <AlertDialogDescription>
-          Complete los siguientes datos para registrar la baja de{' '}
-          <strong>{participantName}</strong>.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <div className="space-y-4 py-4">
-        <div className="flex items-center gap-4">
-          <label className="w-1/4 text-sm font-medium">Año de Baja</label>
-          <Input value={anioBaja} onChange={(e) => setAnioBaja(e.target.value)} className="w-3/4" />
-        </div>
-        <div className="flex items-center gap-4">
-          <label className="w-1/4 text-sm font-medium">Mes de Baja</label>
-          <Select value={mesBaja} onValueChange={setMesBaja}>
-            <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un mes" /></SelectTrigger>
-            <SelectContent>
-              {meses.map((mes) => <SelectItem key={mes.value} value={mes.value}>{mes.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-4">
-          <label className="w-1/4 text-sm font-medium">Motivo</label>
-          <Select value={motivo} onValueChange={setMotivo}>
-            <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un motivo" /></SelectTrigger>
-            <SelectContent>
-              {motivosBaja.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {(motivo === 'Acto Administrativo' || motivo === 'SINTyS') && (
-          <>
-            <div className="flex items-center gap-4">
-              <label className="w-1/4 text-sm font-medium">Tipo de Acto</label>
-              <Select value={tipoActo} onValueChange={setTipoActo}>
-                <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
-                <SelectContent>
-                  {tiposActoAdmin.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-4">
-              <label className="w-1/4 text-sm font-medium">Número</label>
-              <Input value={numeroActo} onChange={(e) => setNumeroActo(e.target.value)} className="w-3/4" placeholder="Ingrese el número" />
-            </div>
-          </>
-        )}
-
-        <div className="flex items-center gap-4">
-          <label className="w-1/4 text-sm font-medium">Detalle</label>
-          <Select value={detalle} onValueChange={setDetalle}>
-            <SelectTrigger className="w-3/4"><SelectValue placeholder="Seleccione un detalle" /></SelectTrigger>
-            <SelectContent>
-              {detallesBaja.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {detalle === 'Otras' && (
-          <div className="flex items-center gap-4">
-            <label className="w-1/4 text-sm font-medium">Especifique</label>
-            <Input value={otrasDetalle} onChange={(e) => setOtrasDetalle(e.target.value)} className="w-3/4" placeholder="Ingrese el detalle" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg relative max-h-full overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Registrar Baja de Participante</h2>
+            <Button variant="ghost" size="icon" onClick={onCancel}><X className="h-5 w-5"/></Button>
           </div>
-        )}
+          <p className="text-sm text-gray-600 mb-6">Estás por dar de baja a <strong>{participantName}</strong>.</p>
 
+          <div className="space-y-4">
+            <div>
+                <label className="block text-sm font-bold mb-1">Motivo de la Baja</label>
+                <Select value={motivo} onValueChange={setMotivo}>
+                    <SelectTrigger><SelectValue placeholder="Seleccione un motivo..." /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Renuncia">Renuncia</SelectItem>
+                        <SelectItem value="Acto Administrativo">Acto Administrativo</SelectItem>
+                        <SelectItem value="Fallecimiento">Fallecimiento</SelectItem>
+                        <SelectItem value="SINTyS">Cruce SINTyS</SelectItem>
+                        <SelectItem value="Otros">Otros</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {isActoAdministrativo && (
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-gray-50">
+                <div>
+                  <label className="block text-sm font-bold mb-1">Tipo de Acto</label>
+                  <Select value={tipoActo} onValueChange={setTipoActo}>
+                      <SelectTrigger><SelectValue placeholder="Tipo..." /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="Decreto">Decreto</SelectItem>
+                          <SelectItem value="Resolución">Resolución</SelectItem>
+                      </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1">Número</label>
+                  <Input value={numeroActo} onChange={(e) => setNumeroActo(e.target.value)} placeholder="Ej: 1234/24" />
+                </div>
+              </div>
+            )}
+            
+            <div className="p-4 border rounded-md bg-blue-50 border-blue-200">
+                <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-blue-800"><Calendar /> Período del Evento</h4>
+                <p className="text-xs text-blue-700 mb-3">Indica el mes y año en que se hizo efectiva la baja.</p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-bold mb-1">Mes de Baja</label>
+                        <Select value={mesBaja} onValueChange={setMesBaja}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold mb-1">Año de Baja</label>
+                        <Select value={anioBaja} onValueChange={setAnioBaja}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-sm font-bold mb-1 flex items-center gap-2"><FileText size={16}/>Detalles Adicionales</label>
+                <Textarea value={detalle} onChange={(e) => setDetalle(e.target.value)} placeholder="Añada cualquier información relevante..." />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-2 border-t">
+          <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={!motivo || (isActoAdministrativo && (!tipoActo || !numeroActo))}>Confirmar Baja</Button>
+        </div>
       </div>
-      <AlertDialogFooter>
-        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-        <AlertDialogAction onClick={handleConfirm}>Confirmar</AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
+    </div>
   );
 };
 

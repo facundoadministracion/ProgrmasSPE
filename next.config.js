@@ -1,14 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Este ajuste es CRÍTICO para solucionar el error "Turbopack build failed"
-  // y "Next.js inferred your workspace root" en entornos virtuales.
-  experimental: {
-    turbopack: {
-      // Al establecer 'root' a null, forzamos a Turbopack a reconocer 
-      // la raíz del proyecto como el directorio donde se encuentra este archivo.
-      root: null, 
-    },
-  },
+  // La configuración 'experimental.turbopack' fue eliminada.
+  // Estaba causando una advertencia en la versión actual de Next.js.
+  // Si se presentan problemas con Turbopack en entornos virtuales,
+  // será necesario investigar la configuración equivalente para Next.js 15+.
   
   // Si tienes otras configuraciones en tu next.config.js, puedes añadirlas aquí.
   // Ejemplo:
