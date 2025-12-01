@@ -4,13 +4,37 @@ import { Participant } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, FileText, Edit, Ban, Bell, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, User, Edit, Ban, Bell, CheckCircle, XCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ParticipantForm from './EditParticipantForm';
 import BajaForm from './BajaForm';
 import { getAlertStatus } from '@/lib/logic';
 import { MONTHS as meses } from '@/lib/constants';
+
+const formatDate = (dateString: string | undefined) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+    if (isNaN(date.getTime())) return 'Fecha inválida';
+    return date.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  } catch (error) {
+    return '-';
+  }
+};
+
+const formatDateToMonthYear = (dateString: string | undefined) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+    if (isNaN(date.getTime())) return 'Fecha inválida';
+    const month = date.toLocaleDateString('es-AR', { month: 'long' });
+    const year = date.getFullYear();
+    return `${month.charAt(0).toUpperCase() + month.slice(1)} de ${year}`;
+  } catch (error) {
+    return '-';
+  }
+};
 
 const ParticipantDetail = ({ participant: initialParticipant, onBack }: { participant: Participant; onBack: () => void; }) => {
   const [participant, setParticipant] = useState(initialParticipant);
@@ -19,14 +43,17 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const { firestore } = useFirebase();
   const { user } = useUser();
 
-  const handleUpdate = (updatedParticipant: Participant) => {
+  const handleSave = async (updatedData: Partial<Participant>) => {
+    if (!firestore) return;
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, updatedData);
+    const updatedParticipant = { ...participant, ...updatedData };
     setParticipant(updatedParticipant);
     setIsEditing(false);
   };
 
   const handleBajaConfirm = async (bajaData: any) => {
     if (!firestore || !user) return;
-
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: false, estado: 'Baja' });
     setParticipant(prev => ({...prev, activo: false, estado: 'Baja'}));
@@ -50,7 +77,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       fechaRealCarga: serverTimestamp(),
       ownerId: user.uid
     });
-
     setIsBajaDialogOpen(false);
   };
   
@@ -59,7 +85,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: true, estado: 'Activo' });
     setParticipant(prev => ({...prev, activo: true, estado: 'Activo'}));
-    // Maybe add a novelty?
   }
 
   const alert = getAlertStatus(participant);
@@ -79,7 +104,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   );
 
   if (isEditing) {
-    return <ParticipantForm participant={participant} onUpdate={handleUpdate} onCancel={() => setIsEditing(false)} />;
+    return <ParticipantForm participant={participant} onSave={handleSave} onCancel={() => setIsEditing(false)} />;
   }
 
   return (
@@ -127,16 +152,16 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
               <User className="h-10 w-10 text-gray-500" />
               <div>
                 <CardTitle className="text-2xl">{participant.nombre}</CardTitle>
-                <CardDescription>DNI: {participant.dni} - Legajo: {participant.legajo}</CardDescription>
+                <CardDescription>DNI: {participant.dni} - Legajo: {participant.legajo || '-'}</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-6">
               {renderField('Programa', participant.programa)}
-              {renderField('Fecha de Nacimiento', participant.fechaNacimiento)}
+              {renderField('Fecha de Nacimiento', formatDate(participant.fechaNacimiento))}
               {renderField('Teléfono', participant.telefono)}
               {renderField('Domicilio', participant.domicilio)}
               {renderField('Localidad', participant.localidad)}
-              {renderField('Fecha de Alta', participant.fechaAlta ? new Date(participant.fechaAlta).toLocaleDateString() : '-')}
+              {renderField('Fecha de Alta', formatDateToMonthYear(participant.fechaIngreso))}
             </CardContent>
           </Card>
         </div>
@@ -160,7 +185,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
           ownerId={user?.uid || ''} 
           onConfirm={handleBajaConfirm}
           onCancel={() => setIsBajaDialogOpen(false)}
-          mesAusencia={participant.mesAusencia} // <-- Prop added here
+          mesAusencia={participant.mesAusencia}
         />
       )}
     </div>
