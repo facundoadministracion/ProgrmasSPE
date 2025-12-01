@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy, increment } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, serverTimestamp, query, onSnapshot, setDoc, where, getCountFromServer, orderBy, increment, limit } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight, XCircle, Pencil } from 'lucide-react';
@@ -237,6 +237,9 @@ export default function App() {
       setForceUpdateKey(prev => prev + 1); 
   }, []);
 
+  const [programCounts, setProgramCounts] = useState<{ [key: string]: number }>({});
+  const [latestPaymentInfo, setLatestPaymentInfo] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
@@ -277,6 +280,48 @@ export default function App() {
   const participantsRef = useMemoFirebase(() => (firestore) ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
+  useEffect(() => {
+    if (!firestore || !participants) return;
+
+    const historyRef = collection(firestore, 'paymentHistory');
+    const q = query(historyRef, orderBy('uploadedAt', 'desc'), limit(1));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) {
+            setLatestPaymentInfo(null);
+            setProgramCounts({});
+            return;
+        }
+
+        const latestDoc = snapshot.docs[0].data();
+        const paidDnis = new Set(latestDoc.dnisProcesados || []);
+        const paymentMonth = `${latestDoc.mesLiquidacion}/${latestDoc.anoLiquidacion}`;
+        setLatestPaymentInfo(paymentMonth);
+
+        const counts: { [key: string]: number } = {};
+        Object.values(PROGRAMAS).forEach(prog => {
+            counts[prog] = 0;
+        });
+        
+        const paidParticipants = participants.filter(p => paidDnis.has(String(p.dni)));
+
+        paidParticipants.forEach(p => {
+            if (p.programa && counts.hasOwnProperty(p.programa)) {
+                counts[p.programa]++;
+            }
+        });
+        
+        setProgramCounts(counts);
+
+    }, (error) => {
+        console.error("Error fetching payment history:", error);
+        setLatestPaymentInfo(null);
+        setProgramCounts({});
+    });
+
+    return () => unsubscribe();
+  }, [firestore, participants]);
+
   const usersRef = useMemoFirebase(() => (firestore && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
@@ -354,7 +399,7 @@ export default function App() {
   
   const renderDashboard = () => {
     if (selectedProgramDetail) {
-        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} onSelectParticipant={setSelectedParticipant}/>;
+        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} onSelectParticipant={setSelectedParticipant}/>
     }
     
     const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
@@ -374,11 +419,11 @@ export default function App() {
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => handleSetFilter('ageAlert')} actionText="Ver Lista" />
         </div>
         <div className="border-t pt-6">
-            <h2 className="text-xl font-bold text-gray-700 mb-6">Detalle por Programas</h2>
+            <h2 className="text-xl font-bold text-gray-700 mb-4">Liquidación Mensual</h2>
+             {latestPaymentInfo && <p className="text-sm text-gray-500 mb-6">Mostrando datos del mes {latestPaymentInfo}</p>}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {Object.values(PROGRAMAS).map(prog => {
-                    const count = (participants || []).filter(p => p.programa === prog && (p.estado === 'Activo' || p.estado === 'Requiere Atención')).length;
-                    return <DashboardCard key={prog} title={prog} value={count} icon={Briefcase} subtitle="Participantes activos" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo" isLoading={participantsLoading}/>;
+                    return <DashboardCard key={prog} title={prog} value={programCounts[prog] || 0} icon={Briefcase} subtitle="Participantes liquidados" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo" isLoading={participantsLoading}/>;
                 })}
             </div>
         </div>

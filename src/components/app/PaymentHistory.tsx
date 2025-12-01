@@ -4,10 +4,10 @@ import { useFirebase } from '@/firebase';
 import { collection, getDocs, writeBatch, query, where, doc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, Loader, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, Loader, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 
-// (Interfaces no modificadas)
+// Interfaces
 interface Payment {
   id: string;
   mes: string;
@@ -34,6 +34,7 @@ const PaymentHistory = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [cleaning, setCleaning] = useState(false);
 
   const fetchHistory = async () => {
     if (!firestore) return;
@@ -80,45 +81,126 @@ const PaymentHistory = () => {
     return { paginatedHistory: paginated, totalPages };
   }, [history, currentPage]);
 
+  const handleCleanOrphanedBajas = async () => {
+    if (!firestore || !window.confirm('Esto eliminará las bajas residuales de Febrero 2025. ¿Continuar?')) return;
+    setCleaning(true);
+    try {
+        const batch = writeBatch(firestore);
 
+        const qNovedades = query(
+            collection(firestore, 'novedades'),
+            where('type', '==', 'POSIBLE_BAJA'),
+            where('mesEvento', '==', '2'),
+            where('anoEvento', '==', '2025')
+        );
+
+        const novedadesSnapshot = await getDocs(qNovedades);
+        if (novedadesSnapshot.empty) {
+            alert('No se encontraron bajas residuales para limpiar.');
+            setCleaning(false);
+            return;
+        }
+        
+        const participantIdsToRevert = novedadesSnapshot.docs.map(doc => doc.data().participantId);
+        
+        novedadesSnapshot.forEach(doc => batch.delete(doc.ref));
+
+        if (participantIdsToRevert.length > 0) {
+            const CHUNK_SIZE = 30;
+            for (let i = 0; i < participantIdsToRevert.length; i += CHUNK_SIZE) {
+                const chunk = participantIdsToRevert.slice(i, i + CHUNK_SIZE);
+                const qParticipants = query(
+                    collection(firestore, 'participants'),
+                    where('__name__', 'in', chunk),
+                    where('programa', '==', PROGRAMAS.TUTORIAS)
+                );
+                const participantsSnapshot = await getDocs(qParticipants);
+                participantsSnapshot.forEach(pDoc => {
+                    if (pDoc.data().estado === 'Requiere Atención') {
+                        batch.update(pDoc.ref, { estado: 'Activo', mesAusencia: null });
+                    }
+                });
+            }
+        }
+
+        await batch.commit();
+        alert('Limpieza completada. Las bajas residuales han sido eliminadas.');
+        fetchHistory();
+    } catch (error) {
+        console.error("Error during cleanup:", error);
+        alert("Ocurrió un error durante la limpieza. Revisa la consola.");
+    } finally {
+        setCleaning(false);
+    }
+  };
+  
   const handleDeleteBatch = async (batchData: GroupedPayment) => {
-    if (!firestore || !window.confirm(`¿Estás seguro de que quieres eliminar ${batchData.count} pagos de ${MONTHS[parseInt(batchData.mes) - 1]} ${batchData.anio} para el programa ${batchData.programa}? Esta acción no se puede deshacer.`)) {
-      return;
+    if (!firestore || !window.confirm(`¿Estás seguro de que quieres eliminar ${batchData.count} pagos de ${MONTHS[parseInt(batchData.mes) - 1]} ${batchData.anio} para el programa ${batchData.programa}? Esta acción limpiará también las bajas asociadas.`)) {
+        return;
     }
 
     const key = `${batchData.mes}-${batchData.anio}-${batchData.programa}`;
     setDeleting(key);
 
     try {
-      const batch = writeBatch(firestore);
+        const batch = writeBatch(firestore);
+        const absenceMonthCheck = `${parseInt(batchData.mes)}/${batchData.anio}`;
 
-      const uniqueParticipantIds = [...new Set(batchData.participantsToUpdate)];
-      uniqueParticipantIds.forEach(participantId => {
-        if (participantId) {
-            const participantRef = doc(firestore, 'participants', participantId);
-            batch.update(participantRef, { pagosAcumulados: increment(-1) });
+        if (batchData.participantsToUpdate.length > 0) {
+            const chunks: string[][] = [];
+            for (let i = 0; i < batchData.participantsToUpdate.length; i += 30) { chunks.push(batchData.participantsToUpdate.slice(i, i + 30)); }
+            for (const chunk of chunks) {
+                const q = query(collection(firestore, 'participants'), where('__name__', 'in', chunk));
+                const snapshot = await getDocs(q);
+                snapshot.forEach(doc => { batch.update(doc.ref, { pagosAcumulados: increment(-1) }); });
+            }
         }
-      });
+        batchData.paymentIds.forEach(paymentId => {
+            const paymentRef = doc(firestore, 'pagosRegistrados', paymentId);
+            batch.delete(paymentRef);
+        });
 
-      batchData.paymentIds.forEach(paymentId => {
-        const paymentRef = doc(firestore, 'pagosRegistrados', paymentId);
-        batch.delete(paymentRef);
-      });
+        const novedadesQuery = query(
+            collection(firestore, 'novedades'),
+            where('type', '==', 'POSIBLE_BAJA'),
+            where('mesEvento', '==', batchData.mes),
+            where('anoEvento', '==', batchData.anio),
+            where('programa', '==', batchData.programa)
+        );
+        
+        const novedadesSnapshot = await getDocs(novedadesQuery);
+        const pIdsFromNovedades = novedadesSnapshot.docs.map(d => d.data().participantId);
 
-      await batch.commit();
-      
-      alert('Lote de pagos eliminado exitosamente.');
-      await fetchHistory(); 
-      
-      if ((currentPage - 1) * ITEMS_PER_PAGE >= history.length - batchData.paymentIds.length && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
-      }
+        if (pIdsFromNovedades.length > 0) {
+            const chunks: string[][] = [];
+            for (let i = 0; i < pIdsFromNovedades.length; i += 30) { chunks.push(pIdsFromNovedades.slice(i, i + 30)); }
+            for (const chunk of chunks) {
+                const pQuery = query(collection(firestore, 'participants'), where('__name__', 'in', chunk), where('programa', '==', batchData.programa));
+                const pSnapshot = await getDocs(pQuery);
+                pSnapshot.forEach(pDoc => {
+                    if (pDoc.data().estado === 'Requiere Atención' && pDoc.data().mesAusencia === absenceMonthCheck) {
+                        batch.update(pDoc.ref, { estado: 'Activo', mesAusencia: null });
+                    }
+                });
+            }
+        }
+        
+        novedadesSnapshot.forEach(novedadDoc => { batch.delete(novedadDoc.ref); });
+
+        await batch.commit();
+
+        alert('Lote de pagos, novedades y estados revertidos exitosamente.');
+        await fetchHistory();
+
+        if ((currentPage - 1) * ITEMS_PER_PAGE >= history.length - batchData.count && currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
 
     } catch (error) {
-      console.error("Error eliminando el lote de pagos: ", error);
-      alert('Ocurrió un error al eliminar el lote de pagos.');
+        console.error("Error eliminando el lote de pagos: ", error);
+        alert('Ocurrió un error al eliminar el lote de pagos. Revise la consola.');
     } finally {
-      setDeleting(null);
+        setDeleting(null);
     }
   };
 
@@ -132,7 +214,21 @@ const PaymentHistory = () => {
         <CardTitle>Historial de Cargas de Pago</CardTitle>
       </CardHeader>
       <CardContent>
-        {history.length === 0 ? (
+        <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-md mb-6">
+          <div className="flex">
+              <div className="flex-shrink-0"><AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" /></div>
+              <div className="ml-3">
+                  <p className="text-sm text-red-700">Acción Requerida: Se detectaron bajas residuales de Febrero.</p>
+                  <div className="mt-2 text-sm text-red-700">
+                      <Button variant="destructive" size="sm" onClick={handleCleanOrphanedBajas} disabled={cleaning}>
+                          {cleaning ? <><Loader size={16} className="animate-spin mr-2" />Limpiando...</> : 'Limpiar Bajas de Febrero'}
+                      </Button>
+                  </div>
+              </div>
+          </div>
+        </div>
+
+        {history.length === 0 && !loading ? (
           <p className="text-sm text-gray-500">No se encontraron cargas de pago masivas.</p>
         ) : (
           <div className="space-y-4">
@@ -142,19 +238,10 @@ const PaymentHistory = () => {
               return (
                 <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                   <div>
-                    <p className="font-bold">
-                        {MONTHS[parseInt(batch.mes) - 1]} {batch.anio}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                        <span className="font-semibold">{batch.programa}</span> - {batch.count} pagos registrados
-                    </p>
+                    <p className="font-bold">{MONTHS[parseInt(batch.mes) - 1]} {batch.anio}</p>
+                    <p className="text-sm text-gray-600"><span className="font-semibold">{batch.programa}</span> - {batch.count} pagos registrados</p>
                   </div>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => handleDeleteBatch(batch)}
-                    disabled={isDeleting}
-                  >
+                  <Button variant="destructive" size="sm" onClick={() => handleDeleteBatch(batch)} disabled={isDeleting}>
                     {isDeleting ? <Loader size={16} className="animate-spin" /> : <Trash2 size={16} />}<span className="ml-2">Eliminar</span>
                   </Button>
                 </div>

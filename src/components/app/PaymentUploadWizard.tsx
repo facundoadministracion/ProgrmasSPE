@@ -182,9 +182,26 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
           fecha: new Date().toISOString().split('T')[0], 
           mesEvento: String(config.mes + 1),
           anoEvento: String(config.anio),
+          programa: config.programa,
           fechaRealCarga: serverTimestamp(), 
           ownerId: user.uid
         });
+      });
+
+      // Registrar en el historial de carga
+      const paymentHistoryRef = doc(collection(firestore, 'paymentHistory'));
+      batch.set(paymentHistoryRef, {
+        uploadedAt: serverTimestamp(),
+        uploadedBy: user.uid,
+        mesLiquidacion: String(config.mes + 1),
+        anoLiquidacion: String(config.anio),
+        programa: config.programa,
+        dnisProcesados: allPayments.map(p => p.dni),
+        cantidadPagos: allPayments.length,
+        cantidadAusentes: analysis.absent.length,
+        cantidadRegulares: analysis.regulars.length,
+        cantidadAltas: analysis.newlyPaid.length,
+        cantidadDesconocidos: analysis.unknown.length,
       });
 
       await batch.commit();
