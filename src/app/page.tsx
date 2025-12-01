@@ -490,8 +490,14 @@ export default function App() {
       </Dialog>
       
       <Dialog open={!!(selectedParticipant && selectedParticipant !== 'new')} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
-        <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Legajo Personal</DialogTitle><DialogDescription>Información del participante, pagos y novedades.</DialogDescription></DialogHeader>
-          {selectedParticipant && selectedParticipant !== 'new' && <ParticipantDetail participant={selectedParticipant}/>}
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Legajo Personal</DialogTitle>
+            <DialogDescription>Información del participante, pagos y novedades.</DialogDescription>
+          </DialogHeader>
+          {selectedParticipant && selectedParticipant !== 'new' && (
+            <ParticipantDetail participant={selectedParticipant} onBack={() => setSelectedParticipant(null)} />
+          )}
         </DialogContent>
       </Dialog>
       
