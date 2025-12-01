@@ -2,9 +2,8 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Novedad, Participant } from '@/lib/types';
-import { MONTHS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
-import { formatDateToDDMMYYYY } from '@/lib/utils';
-import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Wrench, Loader2, Coins } from 'lucide-react';
+import { MONTHS, PROGRAMAS } from '@/lib/constants';
+import { ArrowLeft, BarChart3, FileText, UserMinus, UserPlus, Wrench, Loader2, Coins, Users } from 'lucide-react';
 import { Card as UICard, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useConfiguracion } from '@/hooks/useConfiguracion';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
     <UICard>
@@ -43,6 +42,45 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   const [paymentData, setPaymentData] = useState<ProcessedPaymentData | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  const [latestLiquidationStats, setLatestLiquidationStats] = useState<{ count: number; month: string; year: string } | null>(null);
+  const [loadingLatest, setLoadingLatest] = useState(true);
+
+  useEffect(() => {
+    const fetchLatestLiquidation = async () => {
+        if (!firestore) return;
+        setLoadingLatest(true);
+        try {
+            const historyRef = collection(firestore, 'paymentHistory');
+            const q = query(
+                historyRef,
+                where('programa', '==', programName),
+                orderBy('anoLiquidacion', 'desc'),
+                orderBy('mesLiquidacion', 'desc'),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+
+            if (!snapshot.empty) {
+                const latest = snapshot.docs[0].data();
+                setLatestLiquidationStats({
+                    count: latest.cantidadPagos,
+                    month: MONTHS[parseInt(latest.mesLiquidacion) - 1],
+                    year: latest.anoLiquidacion,
+                });
+            } else {
+                setLatestLiquidationStats(null);
+            }
+        } catch (error) {
+            console.error("Error fetching latest liquidation:", error);
+            setLatestLiquidationStats(null);
+        } finally {
+            setLoadingLatest(false);
+        }
+    };
+
+    fetchLatestLiquidation();
+  }, [firestore, programName]);
 
   useEffect(() => {
     const fetchPaymentData = async () => {
@@ -170,15 +208,19 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card 
-                  title="Total Liquidado"
+                  title="Activos (Última Liquidación)"
+                  value={latestLiquidationStats ? latestLiquidationStats.count : 0}
+                  icon={Users}
+                  subtitle={latestLiquidationStats ? `Liquidación de ${latestLiquidationStats.month} ${latestLiquidationStats.year}` : 'Sin liquidaciones'}
+                  isLoading={loadingLatest}
+              />
+              <Card 
+                  title="Liquidado en Mes Seleccionado"
                   value={(paymentData?.totalMonto || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
                   icon={Coins} 
                   subtitle={paymentData ? `${paymentData.count} participantes` : 'Sin pago en este mes'}
                   isLoading={paymentLoading}
               />
-              {programName !== PROGRAMAS.TUTORIAS &&
-                  <Card title="Equipo Técnico" value={analytics.equipoTecnico} icon={Wrench} subtitle="Personal de Staff" />
-              }
               <Card title="Altas del Mes" value={analytics.altas.length} icon={UserPlus} subtitle={`En ${selectedMonthName}`} />
               <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" isLoading={novedadesLoading}/>
           </div>
