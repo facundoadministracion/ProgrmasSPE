@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useFirestore, useMemoFirebase } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Users, DollarSign, AlertTriangle, Briefcase, UserCheck } from 'lucide-react';
 
@@ -18,6 +18,11 @@ interface ProgramData {
     count: number;
     date: string;
 }
+
+const MESES = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+];
 
 const Dashboard = ({ 
     participants, 
@@ -60,7 +65,15 @@ const Dashboard = ({
                 const latestRecord = recordSnapshot.docs[0].data();
                 const latestMes = latestRecord.mes;
                 const latestAnio = latestRecord.anio;
-                const dateString = `${String(latestMes).padStart(2, '0')}/${latestAnio}`;
+                
+                const monthIndex = typeof latestMes === 'string' ? parseInt(latestMes, 10) - 1 : latestMes - 1;
+                let dateString;
+                if (monthIndex >= 0 && monthIndex < 12) {
+                    const monthName = MESES[monthIndex];
+                    dateString = `${monthName} de ${latestAnio}`;
+                } else {
+                    dateString = `${String(latestMes).padStart(2, '0')}/${latestAnio}`;
+                }
 
                 const paymentsQuery = query(
                     collection(firestore, 'pagosRegistrados'),
