@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,6 +32,7 @@ import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial, { type Configuracion } from '@/components/app/ConfiguracionHistorial';
+import ParticipantsTab from '@/components/app/ParticipantsTab';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
@@ -76,146 +76,6 @@ const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEve
         </form>
     )
 };
-
-const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled, activeFilter, onClearFilter } : {
-    participants: Participant[],
-    isLoading: boolean,
-    onSelect: (p: Participant | 'new') => void,
-    onOpenParticipantWizard: () => void,
-    initialSearchTerm?: string,
-    onSearchHandled?: () => void,
-    activeFilter: ParticipantFilter,
-    onClearFilter: () => void,
-}) => {
-    const [inputValue, setInputValue] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
-
-    useEffect(() => {
-      if (initialSearchTerm) {
-        setInputValue(initialSearchTerm);
-        if (onSearchHandled) onSearchHandled();
-      }
-    }, [initialSearchTerm, onSearchHandled]);
-
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setSearchTerm(inputValue);
-            setCurrentPage(1);
-        }, 300);
-        return () => clearTimeout(handler);
-    }, [inputValue]);
-
-    const paginatedParticipants = useMemo(() => {
-        if (!participants) return { paginated: [], totalPages: 0 };
-
-        let filtered = participants.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
-
-        if (activeFilter === 'requiresAttention') {
-            filtered = filtered.filter(p => p.estado === 'Requiere Atención');
-        } else if (activeFilter === 'paymentAlert') {
-            filtered = filtered.filter(p => {
-                const status = getAlertStatus(p);
-                return p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12) 
-            });
-        } else if (activeFilter === 'ageAlert') {
-             filtered = filtered.filter(p => {
-                const edad = getAlertStatus(p);
-                return p.activo && p.programa === PROGRAMAS.JOVEN && edad.msg.includes('Límite de Edad');
-            });
-        }
-
-        filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-        const totalPages = Math.ceil(filtered.length / itemsPerPage);
-        const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-        
-        return { paginated, totalPages, filteredCount: filtered.length };
-    }, [participants, searchTerm, currentPage, activeFilter]);
-
-    const { paginated, totalPages, filteredCount } = paginatedParticipants;
-
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center flex-wrap gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">Padrón de Participantes</h2>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-96">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <Input 
-                            type="text" 
-                            placeholder="Buscar DNI/Nombre..." 
-                            className="pl-10" 
-                            value={inputValue} 
-                            onChange={(e) => setInputValue(e.target.value)} 
-                        />
-                    </div>
-                    <Button onClick={onOpenParticipantWizard} variant="outline"><Upload className="mr-2 h-4 w-4" /> Carga Masiva</Button>
-                    <Button onClick={() => onSelect('new')}><PlusCircle className="mr-2 h-4 w-4" /> Nuevo</Button>
-                </div>
-            </div>
-
-            {activeFilter && (
-                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md flex justify-between items-center">
-                    <div className="flex items-center">
-                        <AlertTriangle className="h-5 w-5 mr-3" />
-                        <div>
-                            <p className="font-bold">Filtro Activo</p>
-                            <p>Mostrando {filteredCount} participantes que requieren atención.</p>
-                        </div>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={onClearFilter} className="text-yellow-800 hover:bg-yellow-200"><XCircle className="mr-2 h-4 w-4"/> Limpiar</Button>
-                </div>
-            )}
-
-            <Card>
-                {isLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/> Cargando participantes...</div> : (
-                    <>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead>Programa</TableHead>
-                                <TableHead>Estado</TableHead><TableHead>Mes Ausencia</TableHead><TableHead>Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginated.map(p => {
-                                const alert = getAlertStatus(p);
-                                return (
-                                    <TableRow key={p.id}>
-                                        <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
-                                        <TableCell>
-                                            <span className="block text-sm">{p.programa}</span>
-                                            {p.esEquipoTecnico ? (
-                                                <Badge variant="indigo">Equipo Técnico</Badge>
-                                            ) : p.programa === PROGRAMAS.TUTORIAS ? (
-                                                <span className="text-xs text-gray-400">{p.categoria}</span>
-                                            ) : null}
-                                        </TableCell>
-                                        <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
-                                        <TableCell className="text-sm">{p.estado === 'Requiere Atención' ? p.mesAusencia || 'N/A' : '-'}</TableCell>
-                                        <TableCell><Button variant="link" size="sm" onClick={() => onSelect(p)}>Ver Legajo</Button></TableCell>
-                                    </TableRow>
-                                )
-                            })}
-                            {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados.</TableCell></TableRow>}
-                        </TableBody>
-                    </Table>
-                    {totalPages > 1 && (
-                        <div className="flex items-center justify-end space-x-2 p-4 border-t">
-                            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /> Anterior</Button>
-                            <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</div>
-                            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente <ChevronRight className="h-4 w-4" /></Button>
-                        </div>
-                    )}
-                    </>
-                )}
-            </Card>
-        </div>
-    );
-};
-
 
 export default function App() {
   const { auth } = useFirebase();
@@ -281,46 +141,57 @@ export default function App() {
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
   useEffect(() => {
-    if (!firestore || !participants) return;
+    if (!firestore) return;
 
-    const historyRef = collection(firestore, 'paymentHistory');
-    const q = query(historyRef, orderBy('uploadedAt', 'desc'), limit(1));
+    const recordsRef = collection(firestore, 'paymentRecords');
+    const latestRecordQuery = query(recordsRef, orderBy('fechaCarga', 'desc'), limit(1));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        if (snapshot.empty) {
-            setLatestPaymentInfo(null);
-            setProgramCounts({});
-            return;
-        }
+    const unsubscribeRecords = onSnapshot(latestRecordQuery, (recordSnapshot) => {
+      if (recordSnapshot.empty) {
+        setLatestPaymentInfo(null);
+        setProgramCounts({});
+        return;
+      }
 
-        const latestDoc = snapshot.docs[0].data();
-        const paidDnis = new Set(latestDoc.dnisProcesados || []);
-        const paymentMonth = `${latestDoc.mesLiquidacion}/${latestDoc.anoLiquidacion}`;
-        setLatestPaymentInfo(paymentMonth);
+      const latestRecord = recordSnapshot.docs[0].data();
+      const latestMes = latestRecord.mes;
+      const latestAnio = latestRecord.anio;
 
+      setLatestPaymentInfo(`${latestMes}/${latestAnio}`);
+      
+      const paymentsRef = collection(firestore, 'pagosRegistrados');
+      const paymentsQuery = query(paymentsRef, where('mes', '==', latestMes), where('anio', '==', latestAnio));
+      
+      const unsubscribePayments = onSnapshot(paymentsQuery, (paymentsSnapshot) => {
         const counts: { [key: string]: number } = {};
         Object.values(PROGRAMAS).forEach(prog => {
             counts[prog] = 0;
         });
-        
-        const paidParticipants = participants.filter(p => paidDnis.has(String(p.dni)));
 
-        paidParticipants.forEach(p => {
-            if (p.programa && counts.hasOwnProperty(p.programa)) {
-                counts[p.programa]++;
+        paymentsSnapshot.forEach(doc => {
+            const payment = doc.data();
+            if (payment.programa && counts.hasOwnProperty(payment.programa)) {
+                counts[payment.programa]++;
             }
         });
         
         setProgramCounts(counts);
 
-    }, (error) => {
-        console.error("Error fetching payment history:", error);
-        setLatestPaymentInfo(null);
+      }, (error) => {
+        console.error(`Error fetching payments for ${latestMes}/${latestAnio}:`, error);
         setProgramCounts({});
+      });
+
+      return () => unsubscribePayments();
+
+    }, (error) => {
+      console.error("Error fetching latest payment record:", error);
+      setLatestPaymentInfo(null);
+      setProgramCounts({});
     });
 
-    return () => unsubscribe();
-  }, [firestore, participants]);
+    return () => unsubscribeRecords();
+  }, [firestore]);
 
   const usersRef = useMemoFirebase(() => (firestore && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
