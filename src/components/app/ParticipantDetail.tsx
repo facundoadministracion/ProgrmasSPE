@@ -11,6 +11,7 @@ import ParticipantForm from './EditParticipantForm';
 import BajaForm from './BajaForm';
 import { getAlertStatus } from '@/lib/logic';
 import { MONTHS as meses } from '@/lib/constants';
+import { calculateSeniority } from '@/lib/utils'; // Importar la nueva función
 
 const formatDate = (dateString: string | undefined) => {
   if (!dateString) return '-';
@@ -59,7 +60,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     setParticipant(prev => ({...prev, activo: false, estado: 'Baja'}));
 
     let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}.`;
-    if (bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'SINTyS') {
+    if (bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS') {
       descripcion += ` ${bajaData.tipoActo} N° ${bajaData.numeroActo}.`;
     }
     
@@ -166,6 +167,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
               {renderField('Teléfono', participant.telefono)}
               {renderField('Domicilio', participant.domicilio)}
               {renderField('Localidad', participant.localidad)}
+              {renderField('Departamento', participant.departamento)}
               {renderField('Fecha de Alta', formatDateToMonthYear(participant.fechaIngreso))}
             </CardContent>
           </Card>
@@ -174,6 +176,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             <Card>
                 <CardHeader><CardTitle>Información Adicional</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
+                    {renderField('Antigüedad', calculateSeniority(participant.fechaIngreso))}
                     {renderField('Pagos Acumulados', participant.pagosAcumulados)}
                     {renderField('Último Pago', participant.ultimoPago)}
                     {renderField('Acto Administrativo', participant.actoAdministrativo)}

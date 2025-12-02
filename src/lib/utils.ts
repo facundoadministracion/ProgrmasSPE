@@ -86,13 +86,8 @@ export const calculateAgeAtEndOfMonth = (birthDateString: string | null | undefi
 
 export const formatDateToDDMMYYYY = (dateString: string | undefined | null): string => {
     if (!dateString) return '-';
-    // El input de tipo "date" devuelve YYYY-MM-DD.
-    // Firestore puede devolver un string ISO o un objeto Timestamp.
-    // Esta función intenta manejar ambos casos.
     try {
         const date = new Date(dateString);
-        // Si el string de entrada no tiene info de timezone, se tratará como UTC.
-        // Sumamos el offset para mostrar la fecha local correcta.
         const userTimezoneOffset = date.getTimezoneOffset() * 60000;
         const localDate = new Date(date.getTime() + userTimezoneOffset);
 
@@ -102,7 +97,7 @@ export const formatDateToDDMMYYYY = (dateString: string | undefined | null): str
             year: 'numeric'
         });
     } catch(e) {
-        return dateString; // Si falla, devuelve el string original
+        return dateString; 
     }
 }
 
@@ -139,4 +134,38 @@ export const formatCurrency = (value: number | null | undefined): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+};
+
+export const calculateSeniority = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'No especificada';
+
+  // Asegurarse de que la fecha se interpreta correctamente como UTC
+  const startDate = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+  if (isNaN(startDate.getTime())) return 'Fecha inválida';
+
+  const today = new Date();
+  if (startDate > today) return 'Ingreso futuro';
+
+  let years = today.getFullYear() - startDate.getFullYear();
+  let months = today.getMonth() - startDate.getMonth();
+  
+  if (today.getDate() < startDate.getDate()) {
+    months--;
+  }
+
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  if (years === 0 && months === 0) return 'Menos de un mes';
+
+  const yearText = years > 0 ? `${years} ${years === 1 ? 'año' : 'años'}` : '';
+  const monthText = months > 0 ? `${months} ${months === 1 ? 'mes' : 'meses'}` : '';
+
+  if (yearText && monthText) {
+    return `${yearText} y ${monthText}`;
+  }
+  
+  return yearText || monthText;
 };
