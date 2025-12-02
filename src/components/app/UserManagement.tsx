@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import type { UserRole } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -31,7 +31,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { PlusCircle, Loader2, Edit } from 'lucide-react';
+import { PlusCircle, Loader2, Edit, Wrench } from 'lucide-react';
 import { ROLES } from '@/lib/constants';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +47,8 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
   const { toast } = useToast();
   const [editingUser, setEditingUser] = useState<UserRole | null>(null);
   const [updatedData, setUpdatedData] = useState<{ name: string; role: UserRole['role'] }>({ name: '', role: ROLES.DATA_ENTRY });
+
+  const currentUserRole = users.find(u => u.uid === currentUser?.uid)?.role;
 
   useEffect(() => {
     if (editingUser) {
@@ -77,13 +79,90 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
     }
   };
 
+  const handleFixPagosAcumulados = async () => {
+    if (!firestore) return;
+
+    toast({
+      title: 'Iniciando corrección (v2)',
+      description: 'Recalculando los pagos acumulados desde el historial de cargas. Esto puede tardar unos segundos...',
+    });
+
+    try {
+      const participantsCollection = collection(firestore, 'participants');
+      const paymentRecordsCollection = collection(firestore, 'paymentRecords'); // <-- Use paymentRecords
+
+      const participantsSnapshot = await getDocs(participantsCollection);
+      const paymentRecordsSnapshot = await getDocs(paymentRecordsCollection);
+
+      const paymentCounts: { [key: string]: number } = {}; // Map of participantId -> count
+
+      // 1. Calculate correct counts from paymentRecords
+      paymentRecordsSnapshot.docs.forEach(recordDoc => {
+        const record = recordDoc.data();
+        if (record.participantes && Array.isArray(record.participantes)) {
+          record.participantes.forEach((p: { id: string; }) => {
+            if (p.id) { // Ensure participant ID exists
+              paymentCounts[p.id] = (paymentCounts[p.id] || 0) + 1;
+            }
+          });
+        }
+      });
+      
+      // 2. Batch update participants
+      const batch = writeBatch(firestore);
+      let updatedCount = 0;
+
+      participantsSnapshot.docs.forEach(participantDoc => {
+        const participantId = participantDoc.id;
+        const participantData = participantDoc.data();
+        
+        const correctPaymentCount = paymentCounts[participantId] || 0;
+
+        if (participantData.pagosAcumulados !== correctPaymentCount) {
+          console.log(`Fixing participant ${participantId}: from ${participantData.pagosAcumulados} to ${correctPaymentCount}`);
+          const participantRef = participantDoc.ref;
+          batch.update(participantRef, { pagosAcumulados: correctPaymentCount });
+          updatedCount++;
+        }
+      });
+      
+      if (updatedCount > 0) {
+          await batch.commit();
+          toast({
+            title: '¡Corrección completada!',
+            description: `Se ha actualizado el contador de pagos para ${updatedCount} participante(s).`,
+          });
+      } else {
+          toast({
+            title: 'No se necesitaron cambios',
+            description: 'Los contadores de pagos acumulados ya estaban correctos.',
+          });
+      }
+
+    } catch (error) {
+      console.error('Error al corregir los pagos acumulados:', error);
+      toast({
+        variant: "destructive",
+        title: 'Error en la corrección',
+        description: 'No se pudo completar el proceso. Revisa la consola para más detalles.',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Gestión de Usuarios del Sistema</h2>
-        <Button asChild>
-          <Link href="/signup"><PlusCircle className="mr-2 h-4 w-4"/> Nuevo Usuario</Link>
-        </Button>
+        <div className="flex gap-2">
+          {currentUserRole === ROLES.ADMIN && (
+            <Button variant="outline" onClick={handleFixPagosAcumulados}>
+              <Wrench className="mr-2 h-4 w-4" /> Corregir Pagos Acumulados
+            </Button>
+          )}
+          <Button asChild>
+            <Link href="/signup"><PlusCircle className="mr-2 h-4 w-4"/> Nuevo Usuario</Link>
+          </Button>
+        </div>
       </div>
       
       <Card>
