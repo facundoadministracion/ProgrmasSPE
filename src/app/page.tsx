@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation';
 import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight, XCircle, Pencil } from 'lucide-react';
 
 import type { Participant, UserRole } from '@/lib/types';
-import { getAlertStatus } from '@/lib/logic';
 import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
@@ -23,16 +22,15 @@ import { useToast } from '@/hooks/use-toast';
 
 // Componentes de la App
 import ParticipantDetail from '@/components/app/ParticipantDetail';
-import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import ParticipantUploadWizard from '@/components/app/ParticipantUploadWizard';
 import PaymentHistory from '@/components/app/PaymentHistory';
-import { DashboardCard } from '@/components/app/DashboardCard';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial, { type Configuracion } from '@/components/app/ConfiguracionHistorial';
 import ParticipantsTab from '@/components/app/ParticipantsTab';
+import Dashboard from '@/components/app/Dashboard'; // Importamos el nuevo componente
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
@@ -41,38 +39,38 @@ const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEve
     return (
         <form onSubmit={onFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
              <div className="flex flex-wrap gap-4">
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Nombre</label><Input name="nombre" required /></div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">DNI</label><Input name="dni" required /></div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Fecha Nacimiento</label><Input name="fechaNacimiento" type="date" required /></div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Acto Adm. Alta</label><Input name="actoAdministrativo" placeholder="Res. Nº..." /></div>
-        <div className="flex-grow md:basis-1/3">
-            <label className="text-sm">Programa</label>
-            <Select name="programa" value={selectedProgram} onValueChange={(value) => setSelectedProgram(value)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-            </Select>
-        </div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
-        
-        {selectedProgram === PROGRAMAS.TUTORIAS && (
-            <div className="flex-grow md:basis-1/3">
-                <label className="text-sm">Categoría (Tutorías)</label>
-                <Select name="categoria">
-                    <SelectTrigger><SelectValue placeholder="-"/></SelectTrigger>
-                    <SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Nombre</label><Input name="nombre" required /></div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">DNI</label><Input name="dni" required /></div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Fecha Nacimiento</label><Input name="fechaNacimiento" type="date" required /></div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Acto Adm. Alta</label><Input name="actoAdministrativo" placeholder="Res. Nº..." /></div>
+                <div className="flex-grow md:basis-1/3">
+                    <label className="text-sm">Programa</label>
+                    <Select name="programa" value={selectedProgram} onValueChange={(value) => setSelectedProgram(value)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Object.values(PROGRAMAS).map(p=><SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Fecha Ingreso</label><Input name="fechaIngreso" type="date" required /></div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Depto</label><Select name="departamento" defaultValue={DEPARTAMENTOS[0]}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{DEPARTAMENTOS.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
+                
+                {selectedProgram === PROGRAMAS.TUTORIAS && (
+                    <div className="flex-grow md:basis-1/3">
+                        <label className="text-sm">Categoría (Tutorías)</label>
+                        <Select name="categoria">
+                            <SelectTrigger><SelectValue placeholder="-"/></SelectTrigger>
+                            <SelectContent>{CATEGORIAS_TUTORIAS.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                )}
+                
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Email</label><Input name="email" type="email" /></div>
+                <div className="flex-grow md:basis-1/3"><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
             </div>
-        )}
-        
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Lugar de Trabajo</label><Input name="lugarTrabajo" placeholder="Ej: Escuela N° 5" /></div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Email</label><Input name="email" type="email" /></div>
-        <div className="flex-grow md:basis-1/3"><label className="text-sm">Teléfono</label><Input name="telefono" /></div>
-    </div>
-    <div className="flex items-center gap-2 mt-4 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
-    <div className="flex justify-end mt-6">
-        <Button type="submit">Guardar</Button>
-    </div>
+            <div className="flex items-center gap-2 mt-4 bg-indigo-50 p-3 rounded border border-indigo-100"><Checkbox id="esEquipoTecnico" name="esEquipoTecnico" /><label htmlFor="esEquipoTecnico" className="text-sm font-bold text-indigo-800 select-none">Es Equipo Técnico</label></div>
+            <div className="flex justify-end mt-6">
+                <Button type="submit">Guardar</Button>
+            </div>
         </form>
     )
 };
@@ -86,7 +84,6 @@ export default function App() {
   
   const [userProfile, setUserProfile] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
   const [initialSearch, setInitialSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ParticipantFilter>(null);
   
@@ -96,9 +93,6 @@ export default function App() {
   const handleConfigSave = useCallback(() => {
       setForceUpdateKey(prev => prev + 1); 
   }, []);
-
-  const [programCounts, setProgramCounts] = useState<{ [key: string]: number }>({});
-  const [latestPaymentInfo, setLatestPaymentInfo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -140,59 +134,6 @@ export default function App() {
   const participantsRef = useMemoFirebase(() => (firestore) ? query(collection(firestore, 'participants')) : null, [firestore]);
   const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsRef);
   
-  useEffect(() => {
-    if (!firestore) return;
-
-    const recordsRef = collection(firestore, 'paymentRecords');
-    const latestRecordQuery = query(recordsRef, orderBy('fechaCarga', 'desc'), limit(1));
-
-    const unsubscribeRecords = onSnapshot(latestRecordQuery, (recordSnapshot) => {
-      if (recordSnapshot.empty) {
-        setLatestPaymentInfo(null);
-        setProgramCounts({});
-        return;
-      }
-
-      const latestRecord = recordSnapshot.docs[0].data();
-      const latestMes = latestRecord.mes;
-      const latestAnio = latestRecord.anio;
-
-      setLatestPaymentInfo(`${latestMes}/${latestAnio}`);
-      
-      const paymentsRef = collection(firestore, 'pagosRegistrados');
-      const paymentsQuery = query(paymentsRef, where('mes', '==', latestMes), where('anio', '==', latestAnio));
-      
-      const unsubscribePayments = onSnapshot(paymentsQuery, (paymentsSnapshot) => {
-        const counts: { [key: string]: number } = {};
-        Object.values(PROGRAMAS).forEach(prog => {
-            counts[prog] = 0;
-        });
-
-        paymentsSnapshot.forEach(doc => {
-            const payment = doc.data();
-            if (payment.programa && counts.hasOwnProperty(payment.programa)) {
-                counts[payment.programa]++;
-            }
-        });
-        
-        setProgramCounts(counts);
-
-      }, (error) => {
-        console.error(`Error fetching payments for ${latestMes}/${latestAnio}:`, error);
-        setProgramCounts({});
-      });
-
-      return () => unsubscribePayments();
-
-    }, (error) => {
-      console.error("Error fetching latest payment record:", error);
-      setLatestPaymentInfo(null);
-      setProgramCounts({});
-    });
-
-    return () => unsubscribeRecords();
-  }, [firestore]);
-
   const usersRef = useMemoFirebase(() => (firestore && userProfile?.role === ROLES.ADMIN) ? query(collection(firestore, 'users')) : null, [firestore, userProfile]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserRole>(usersRef);
 
@@ -268,40 +209,6 @@ export default function App() {
     return <div className="flex flex-col items-center justify-center h-screen text-gray-500 gap-4"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p>Cargando perfil...</p></div>;
   }
   
-  const renderDashboard = () => {
-    if (selectedProgramDetail) {
-        return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} onSelectParticipant={setSelectedParticipant}/>
-    }
-    
-    const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
-
-    const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
-    
-    const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
-
-    const activeParticipants = (participants || []).filter(p => p.estado === 'Activo' || p.estado === 'Requiere Atención').length;
-
-    return (
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón liquidado" isLoading={participantsLoading} />
-            <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => handleSetFilter('requiresAttention')} actionText="Ver Lista" />
-            <DashboardCard title="Alerta de Pagos" value={paymentAlertCount} icon={DollarSign} color="yellow" subtitle="Próximos a vencer/vencidos" isLoading={participantsLoading} onClick={() => handleSetFilter('paymentAlert')} actionText="Ver Lista" />
-            <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => handleSetFilter('ageAlert')} actionText="Ver Lista" />
-        </div>
-        <div className="border-t pt-6">
-            <h2 className="text-xl font-bold text-gray-700 mb-4">Liquidación Mensual</h2>
-             {latestPaymentInfo && <p className="text-sm text-gray-500 mb-6">Mostrando datos del mes {latestPaymentInfo}</p>}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {Object.values(PROGRAMAS).map(prog => {
-                    return <DashboardCard key={prog} title={prog} value={programCounts[prog] || 0} icon={Briefcase} subtitle="Participantes liquidados" onClick={() => setSelectedProgramDetail(prog)} actionText="Ver Análisis Mensual" color="indigo" isLoading={participantsLoading}/>;
-                })}
-            </div>
-        </div>
-      </div>
-    );
-  };
-  
   const renderConfig = () => {
     return (
         <div className="space-y-8">
@@ -341,18 +248,41 @@ export default function App() {
 
   const ActiveTabContent = () => {
     switch (activeTab) {
-      case 'dashboard': return isAdmin ? renderDashboard() : null;
-      case 'participants': return isAdmin ? <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={setSelectedParticipant} onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} initialSearchTerm={initialSearch} onSearchHandled={() => setInitialSearch('')} activeFilter={activeFilter} onClearFilter={handleClearFilter} /> : null;
-      case 'attendance': return (isAdmin || isDataEntry) ? <AttendanceSection participants={participants || []} /> : null;
-      case 'users': return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
-      case 'config': return isAdmin ? renderConfig() : null;
-      default: return null;
+        case 'dashboard': 
+            return isAdmin 
+                ? <Dashboard 
+                    participants={participants || []} 
+                    participantsLoading={participantsLoading} 
+                    onSetFilter={handleSetFilter}
+                    onSelectParticipant={(p) => setSelectedParticipant(p)}
+                  /> 
+                : null;
+        case 'participants': 
+            return isAdmin 
+                ? <ParticipantsTab 
+                    participants={participants || []} 
+                    isLoading={participantsLoading} 
+                    onSelect={setSelectedParticipant} 
+                    onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} 
+                    initialSearchTerm={initialSearch} 
+                    onSearchHandled={() => setInitialSearch('')} 
+                    activeFilter={activeFilter} 
+                    onClearFilter={handleClearFilter} 
+                  /> 
+                : null;
+        case 'attendance': 
+            return (isAdmin || isDataEntry) ? <AttendanceSection participants={participants || []} /> : null;
+        case 'users': 
+            return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
+        case 'config': 
+            return isAdmin ? renderConfig() : null;
+        default: 
+            return null;
     }
   };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setSelectedProgramDetail(null);
     if (tab !== 'participants') {
       setActiveFilter(null); 
     }
