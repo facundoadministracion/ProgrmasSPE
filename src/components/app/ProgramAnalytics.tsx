@@ -206,14 +206,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
           </div>
           <h2 className="text-2xl font-bold text-gray-800">Análisis: {programName}</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card 
-                  title="Activos (Última Liquidación)"
-                  value={latestLiquidationStats ? latestLiquidationStats.count : 0}
-                  icon={Users}
-                  subtitle={latestLiquidationStats ? `Liquidación de ${latestLiquidationStats.month} ${latestLiquidationStats.year}` : 'Sin liquidaciones'}
-                  isLoading={loadingLatest}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card 
                   title="Liquidado en Mes Seleccionado"
                   value={(paymentData?.totalMonto || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}

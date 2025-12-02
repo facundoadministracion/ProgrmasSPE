@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { MONTHS } from '@/lib/constants';
+import { MONTHS, CAUSALES_GENERALES, CAUSALES_SINTYS } from '@/lib/constants';
 
 const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel, mesAusencia }: 
   { participantId: string; participantName: string; ownerId: string; onConfirm: (data: any) => void; onCancel: () => void; mesAusencia?: string | null; }) => {
@@ -25,9 +25,14 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
   const [motivo, setMotivo] = useState('');
   const [tipoActo, setTipoActo] = useState('');
   const [numeroActo, setNumeroActo] = useState('');
+  const [causalInforme, setCausalInforme] = useState('');
   const [mesBaja, setMesBaja] = useState<string>(String(initialBajaState.mes));
   const [anioBaja, setAnioBaja] = useState<string>(String(initialBajaState.anio));
   const [detalle, setDetalle] = useState('');
+
+  useEffect(() => {
+    setCausalInforme(''); // Reset causal on motivo change
+  }, [motivo]);
 
   const handleSubmit = () => {
     const bajaData = {
@@ -35,8 +40,9 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
       participantName,
       ownerId,
       motivo,
-      tipoActo: (motivo === 'Acto Administrativo' || motivo === 'SINTyS') ? tipoActo : null,
-      numeroActo: (motivo === 'Acto Administrativo' || motivo === 'SINTyS') ? numeroActo : null,
+      tipoActo: isActoAdministrativo ? tipoActo : null,
+      numeroActo: isActoAdministrativo ? numeroActo : null,
+      causalInforme: isCausalRequired ? causalInforme : null,
       mesBaja,
       anioBaja,
       detalle,
@@ -45,7 +51,14 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
     onConfirm(bajaData);
   };
 
-  const isActoAdministrativo = motivo === 'Acto Administrativo' || motivo === 'SINTyS';
+  const isActoAdministrativo = motivo === 'Acto Administrativo' || motivo === 'Cruce SINTyS';
+  const isCausalRequired = motivo === 'Acto Administrativo' || motivo === 'Cruce SINTyS' || motivo === 'Informe Vinculados';
+
+  const getCausalOptions = () => {
+    if (motivo === 'Cruce SINTyS') return CAUSALES_SINTYS;
+    if (motivo === 'Acto Administrativo' || motivo === 'Informe Vinculados') return CAUSALES_GENERALES;
+    return [];
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
@@ -63,11 +76,9 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
                 <Select value={motivo} onValueChange={setMotivo}>
                     <SelectTrigger><SelectValue placeholder="Seleccione un motivo..." /></SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="Renuncia">Renuncia</SelectItem>
                         <SelectItem value="Acto Administrativo">Acto Administrativo</SelectItem>
-                        <SelectItem value="Fallecimiento">Fallecimiento</SelectItem>
-                        <SelectItem value="SINTyS">Cruce SINTyS</SelectItem>
-                        <SelectItem value="Otros">Otros</SelectItem>
+                        <SelectItem value="Cruce SINTyS">Cruce SINTyS</SelectItem>
+                        <SelectItem value="Informe Vinculados">Informe Vinculados</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -88,6 +99,18 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
                   <label className="block text-sm font-bold mb-1">Número</label>
                   <Input value={numeroActo} onChange={(e) => setNumeroActo(e.target.value)} placeholder="Ej: 1234/24" />
                 </div>
+              </div>
+            )}
+
+            {isCausalRequired && (
+              <div className="p-4 border rounded-md bg-gray-50">
+                <label className="block text-sm font-bold mb-1">Causal</label>
+                <Select value={causalInforme} onValueChange={setCausalInforme}>
+                    <SelectTrigger><SelectValue placeholder="Seleccione una causal..." /></SelectTrigger>
+                    <SelectContent>
+                        {getCausalOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                </Select>
               </div>
             )}
             
@@ -121,7 +144,7 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
 
         <div className="bg-gray-50 px-6 py-4 flex justify-end gap-2 border-t">
           <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!motivo || (isActoAdministrativo && (!tipoActo || !numeroActo))}>Confirmar Baja</Button>
+          <Button onClick={handleSubmit} disabled={!motivo || (isActoAdministrativo && (!tipoActo || !numeroActo)) || (isCausalRequired && !causalInforme)}>Confirmar Baja</Button>
         </div>
       </div>
     </div>

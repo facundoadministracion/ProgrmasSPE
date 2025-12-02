@@ -39,3 +39,7 @@ export const ROLES = {
   DATA_ENTRY: 'data_entry',
   TECNICO: 'tecnico'
 } as const;
+
+export const CAUSALES_GENERALES = ['Renuncia', 'Horas Docente', 'Trabajo Registrado', 'Solicitadas'];
+
+export const CAUSALES_SINTYS = ['Trabajo Registrado', 'Jubilación', 'Monotributo', 'Régimen General', 'Fallecimiento'];

@@ -62,6 +62,11 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if (bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'SINTyS') {
       descripcion += ` ${bajaData.tipoActo} N° ${bajaData.numeroActo}.`;
     }
+    
+    if (bajaData.causalInforme) {
+      descripcion += ` Causal: ${bajaData.causalInforme}.`;
+    }
+
     if (bajaData.detalle) {
       descripcion += ` Detalle: ${bajaData.detalle}.`;
     }
