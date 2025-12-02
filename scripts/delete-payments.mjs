@@ -2,16 +2,25 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 
-// Copia la configuración de tu proyecto de Firebase aquí
+// ADVERTENCIA DE SEGURIDAD:
+// No almacenes la configuración de Firebase directamente en este fichero.
+// Si necesitas ejecutar este script, completa la configuración de forma temporal
+// y asegúrate de no subirla al repositorio de código.
 const firebaseConfig = {
-  apiKey: "AIzaSyAIAoyr8-zy0_TpU3jvXZ52e3Rfza_ViCc",
-  authDomain: "programas-de-empleo-lr.firebaseapp.com",
-  projectId: "programas-de-empleo-lr",
-  storageBucket: "programas-de-empleo-lr.firebasestorage.app",
-  messagingSenderId: "193300807292",
-  appId: "1:193300807292:web:a7e93290204796e65cd3f9",
-  measurementId: "G-9381S3P20H"
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_AUTH_DOMAIN",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_STORAGE_BUCKET",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID",
+  measurementId: "TU_MEASUREMENT_ID"
 };
+
+// Antes de ejecutar, asegúrate de que firebaseConfig esté correctamente completado.
+if (firebaseConfig.apiKey === "TU_API_KEY") {
+  console.error('Error: Debes completar la configuración de Firebase en scripts/delete-payments.mjs antes de ejecutarlo.');
+  process.exit(1);
+}
 
 // Inicializa Firebase
 const app = initializeApp(firebaseConfig);
