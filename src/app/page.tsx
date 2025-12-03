@@ -140,7 +140,24 @@ export default function App() {
   const isAdmin = userProfile?.role === ROLES.ADMIN;
   const isDataEntry = userProfile?.role === ROLES.DATA_ENTRY;
   
-  const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+
+  const selectedParticipant = useMemo(() => {
+      if (!selectedParticipantId) return null;
+      return participants?.find(p => p.id === selectedParticipantId) ?? null;
+  }, [selectedParticipantId, participants]);
+
+  const handleSelectParticipant = (participant: Participant | null) => {
+    setSelectedParticipantId(participant ? participant.id : null);
+    setIsCreatingNew(false);
+  };
+
+  const handleOpenNewForm = () => {
+      setSelectedParticipantId(null);
+      setIsCreatingNew(true);
+  };
+
   const [isPaymentUploadOpen, setIsPaymentUploadOpen] = useState(false);
   const [isParticipantUploadOpen, setIsParticipantUploadOpen] = useState(false);
 
@@ -175,7 +192,7 @@ export default function App() {
       ownerId: user.uid
     });
     toast({ title: "Participante Agregado", description: "El nuevo participante ha sido registrado." });
-    setSelectedParticipant(null);
+    setIsCreatingNew(false);
   };
 
   const handleFindDni = (dni: string) => {
@@ -254,7 +271,7 @@ export default function App() {
                     participants={participants || []} 
                     participantsLoading={participantsLoading} 
                     onSetFilter={handleSetFilter}
-                    onSelectParticipant={(p) => setSelectedParticipant(p)}
+                    onSelectParticipant={handleSelectParticipant}
                   /> 
                 : null;
         case 'participants': 
@@ -262,7 +279,7 @@ export default function App() {
                 ? <ParticipantsTab 
                     participants={participants || []} 
                     isLoading={participantsLoading} 
-                    onSelect={setSelectedParticipant} 
+                    onSelect={handleSelectParticipant} 
                     onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} 
                     initialSearchTerm={initialSearch} 
                     onSearchHandled={() => setInitialSearch('')} 
@@ -329,20 +346,20 @@ export default function App() {
         </main>
       </SidebarInset>
 
-      <Dialog open={selectedParticipant === 'new'} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
+      <Dialog open={isCreatingNew} onOpenChange={setIsCreatingNew}>
         <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Nuevo Participante</DialogTitle><DialogDescription>Complete el formulario para agregar un nuevo participante.</DialogDescription></DialogHeader>
           <NewParticipantForm onFormSubmit={handleAddParticipant} />
         </DialogContent>
       </Dialog>
       
-      <Dialog open={!!(selectedParticipant && selectedParticipant !== 'new')} onOpenChange={(isOpen) => !isOpen && setSelectedParticipant(null)}>
+      <Dialog open={!!selectedParticipant} onOpenChange={(isOpen) => !isOpen && handleSelectParticipant(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Legajo Personal</DialogTitle>
             <DialogDescription>Información del participante, pagos y novedades.</DialogDescription>
           </DialogHeader>
-          {selectedParticipant && selectedParticipant !== 'new' && (
-            <ParticipantDetail participant={selectedParticipant} onBack={() => setSelectedParticipant(null)} />
+          {selectedParticipant && (
+            <ParticipantDetail participant={selectedParticipant} onBack={() => handleSelectParticipant(null)} />
           )}
         </DialogContent>
       </Dialog>

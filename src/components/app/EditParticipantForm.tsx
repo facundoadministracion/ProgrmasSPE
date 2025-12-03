@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useId } from 'react';
 import type { Participant } from '@/lib/types';
 import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE, DEPARTAMENTOS } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
@@ -24,10 +24,6 @@ interface EditParticipantFormProps {
 const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, onSave, onCancel }) => {
   const formId = useId();
   const [formData, setFormData] = useState(participant);
-
-  useEffect(() => {
-    setFormData(participant);
-  }, [participant]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;

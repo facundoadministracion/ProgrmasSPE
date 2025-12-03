@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Participant } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Edit, Ban, Bell, CheckCircle, XCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import ParticipantForm from './EditParticipantForm';
+import EditParticipantForm from './EditParticipantForm';
 import BajaForm from './BajaForm';
 import { getAlertStatus } from '@/lib/logic';
 import { MONTHS as meses } from '@/lib/constants';
-import { calculateSeniority } from '@/lib/utils'; // Importar la nueva función
+import { calculateSeniority } from '@/lib/utils';
 
 const formatDate = (dateString: string | undefined) => {
   if (!dateString) return '-';
@@ -37,8 +37,7 @@ const formatDateToMonthYear = (dateString: string | undefined) => {
   }
 };
 
-const ParticipantDetail = ({ participant: initialParticipant, onBack }: { participant: Participant; onBack: () => void; }) => {
-  const [participant, setParticipant] = useState(initialParticipant);
+const ParticipantDetail = ({ participant, onBack }: { participant: Participant; onBack: () => void; }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   const { firestore } = useFirebase();
@@ -48,8 +47,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if (!firestore) return;
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedData);
-    const updatedParticipant = { ...participant, ...updatedData };
-    setParticipant(updatedParticipant);
     setIsEditing(false);
   };
 
@@ -57,7 +54,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if (!firestore || !user) return;
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: false, estado: 'Baja' });
-    setParticipant(prev => ({...prev, activo: false, estado: 'Baja'}));
 
     let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}.`;
     if (bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS') {
@@ -90,7 +86,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if (!firestore) return;
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, { activo: true, estado: 'Activo' });
-    setParticipant(prev => ({...prev, activo: true, estado: 'Activo'}));
   }
 
   const alert = getAlertStatus(participant);
@@ -100,6 +95,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     yellow: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     blue: 'bg-blue-50 border-blue-200 text-blue-800',
     indigo: 'bg-indigo-50 border-indigo-200 text-indigo-800',
+    purple: 'bg-purple-50 border-purple-200 text-purple-800',
+    green: 'bg-green-50 border-green-200 text-green-800'
   };
 
   const renderField = (label: string, value: any) => (
@@ -110,7 +107,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   );
 
   if (isEditing) {
-    return <ParticipantForm participant={participant} onSave={handleSave} onCancel={() => setIsEditing(false)} />;
+    return <EditParticipantForm participant={participant} onSave={handleSave} onCancel={() => setIsEditing(false)} />;
   }
 
   return (
@@ -142,7 +139,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       </div>
       
       {alert && (
-          <div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alertClassNames[alert.type]}`}>
+          <div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alertClassNames[alert.type] || 'bg-gray-50 border-gray-200'}`}>
               {alert.type === 'red' ? <XCircle/> : (alert.type === 'yellow' ? <Bell /> : <CheckCircle />)}
               <div className='flex-1'>
                 <h3 className="font-bold text-sm leading-tight">{alert.msg}</h3>
@@ -169,6 +166,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
               {renderField('Localidad', participant.localidad)}
               {renderField('Departamento', participant.departamento)}
               {renderField('Fecha de Alta', formatDateToMonthYear(participant.fechaIngreso))}
+              {renderField('Lugar de Trabajo', participant.lugarTrabajo)}
             </CardContent>
           </Card>
         </div>
