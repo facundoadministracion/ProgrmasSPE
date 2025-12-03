@@ -153,12 +153,14 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
                 <h3 className="font-semibold text-lg">Valores para Programas</h3>
                  <div className="space-y-4 p-4 border rounded-md">
                     <Label className="font-medium">Tutorías (Por Categoría)</Label>
-                    {CATEGORIAS_TUTORIAS.map(cat => (
-                        <div key={cat} className="space-y-1">
-                            <Label htmlFor={cat}>{cat}</Label>
-                            <Input id={cat} type="text" value={formatNumber(montos[cat])} onChange={e => handleMontoChange(cat, e.target.value)} placeholder="0" />
-                        </div>
-                    ))}
+                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                        {CATEGORIAS_TUTORIAS.map(cat => (
+                            <div key={cat} className="space-y-1">
+                                <Label htmlFor={cat}>{cat}</Label>
+                                <Input id={cat} type="text" value={formatNumber(montos[cat])} onChange={e => handleMontoChange(cat, e.target.value)} placeholder="0" />
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <div className="space-y-4 p-4 border rounded-md">
                      <Label className="font-medium">Otros Programas (Fijo)</Label>

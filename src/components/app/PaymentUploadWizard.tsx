@@ -4,13 +4,15 @@ import type { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS, CATEGORIAS_TUTORIAS } from '@/lib/constants';
 import { useFirebase, useUser } from '@/firebase';
 import { useConfiguracion } from '@/hooks/useConfiguracion';
-import { writeBatch, collection, doc, serverTimestamp, increment, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { writeBatch, collection, doc, serverTimestamp, increment, getDocs, query, where } from 'firebase/firestore';
 import { ArrowRight, AlertTriangle, Upload, XCircle, FileSignature, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useToast } from '@/hooks/use-toast';
 
 const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participants: Participant[]; onClose: () => void; onFindDni: (dni: string) => void; }) => {
@@ -168,7 +170,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         });
       });
 
-      analysis.absent.forEach(p => {
+      analysis.absent.forEach((p: Participant) => {
         const partRef = doc(firestore, 'participants', p.id);
         batch.update(partRef, { estado: 'Requiere Atención', mesAusencia: paymentMonthStr });
 
@@ -188,7 +190,6 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         });
       });
 
-      // Registrar en el historial de carga
       const paymentHistoryRef = doc(collection(firestore, 'paymentHistory'));
       batch.set(paymentHistoryRef, {
         uploadedAt: serverTimestamp(),
@@ -233,19 +234,19 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         <div className="space-y-4 pt-4">
           <p className="text-sm text-gray-600">Seleccione el programa y el período para el cual desea registrar los pagos.</p>
           <div>
-            <label className="block text-sm font-bold mb-1">Programa</label>
+            <Label className="block text-sm font-bold mb-1">Programa</Label>
             <Select value={config.programa} onValueChange={(v) => setConfig({ ...config, programa: v as any })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.values(PROGRAMAS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div> <label className="block text-sm font-bold mb-1">Mes de Pago</label> <Select value={String(config.mes)} onValueChange={(v) => setConfig({ ...config, mes: parseInt(v) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent></Select> </div>
-            <div> <label className="block text-sm font-bold mb-1">Año</label> <Select value={String(config.anio)} onValueChange={(v) => setConfig({ ...config, anio: parseInt(v) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select> </div>
+            <div> <Label className="block text-sm font-bold mb-1">Mes de Pago</Label> <Select value={String(config.mes)} onValueChange={(v) => setConfig({ ...config, mes: parseInt(v) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent></Select> </div>
+            <div> <Label className="block text-sm font-bold mb-1">Año</Label> <Select value={String(config.anio)} onValueChange={(v) => setConfig({ ...config, anio: parseInt(v) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select> </div>
           </div>
           {config.programa === PROGRAMAS.TUTORIAS && (
               <div className={`p-3 rounded-md text-sm ${configLoading ? 'bg-gray-100 text-gray-500' : (configReady ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800')}`}>
                   {configLoading ? <span className='flex items-center'><Loader2 className="animate-spin mr-2"/>Buscando configuración...</span> : (configReady ? 'Configuración de montos encontrada.' : 'Configuración de montos NO encontrada.')}
               </div>
           )}
-          <div className="flex justify-end pt-4"><Button onClick={() => setStep(2)}>Siguiente</Button></div>
+          <div className="flex justify-end pt-4"><Button onClick={() => setStep(2)} disabled={!configReady || configLoading}>{configLoading ? 'Cargando...' : 'Siguiente'}</Button></div>
         </div>
       )}
 
@@ -268,19 +269,69 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
              <Card className={`p-4 ${analysis.unknown.length > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-100'}`}><CardContent className="p-2"><h3 className={`text-2xl font-bold ${analysis.unknown.length > 0 ? 'text-red-700' : 'text-gray-500'}`}>{analysis.unknown.length}</h3><p className={`text-xs uppercase font-bold ${analysis.unknown.length > 0 ? 'text-red-600' : 'text-gray-500'}`}>Desconocidos</p></CardContent></Card>
            </div>
 
-          <div className="grid grid-cols-1 gap-6 items-start">
-            {analysis.unknown.length > 0 && <Card className="border-red-500"><CardHeader className="bg-red-50"><CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>DNIs Desconocidos (Bloqueo)</CardTitle></CardHeader><CardContent className="p-4 text-sm text-red-700"><p className='mb-4'>Hay {analysis.unknown.length} DNI que no se encontraron. Debe cargarlos primero.</p><div className="max-h-40 overflow-y-auto border bg-white p-2 rounded"><Table><TableHeader><TableRow><TableHead>DNI</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader><TableBody>{analysis.unknown.map((u:any) => <TableRow key={u.dni}><TableCell className="font-mono">{u.dni}</TableCell><TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => onFindDni(u.dni)}><Search className="h-4 w-4 mr-2"/>Buscar</Button></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>}
-            {analysis.absent.length > 0 && <Card className="border-yellow-200"><CardHeader className="bg-yellow-50"><CardTitle className="text-yellow-800 flex items-center gap-2 text-base"><AlertTriangle />Ausentes (Posible Baja)</CardTitle></CardHeader><CardContent className="p-4 text-sm text-yellow-800"><p>Se registrará una novedad para los <strong>{analysis.absent.length} participantes</strong> que cobraron el mes pasado pero no figuran en este archivo.</p></CardContent></Card>}
+          {analysis.unknown.length > 0 && <Card className="border-red-500"><CardHeader className="bg-red-50"><CardTitle className="text-red-800 flex items-center gap-2 text-base"><XCircle/>DNIs Desconocidos (Bloqueo)</CardTitle></CardHeader><CardContent className="p-4 text-sm text-red-700"><p className='mb-4'>Hay {analysis.unknown.length} DNI que no se encontraron. Debe cargarlos primero.</p><div className="max-h-40 overflow-y-auto border bg-white p-2 rounded"><Table><TableHeader><TableRow><TableHead>DNI</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader><TableBody>{analysis.unknown.map((u:any) => <TableRow key={u.dni}><TableCell className="font-mono">{u.dni}</TableCell><TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => onFindDni(u.dni)}><Search className="h-4 w-4 mr-2"/>Buscar</Button></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>}
+          
+          <div className="space-y-4 items-start">
             {analysis.newlyPaid.length > 0 && (
-              <Card className="border-indigo-200"><CardHeader className="bg-indigo-50"><CardTitle className="text-indigo-800 flex items-center gap-2 text-base"><FileSignature />Altas para este Período ({analysis.newlyPaid.length})</CardTitle></CardHeader><CardContent className="p-4"><p className="text-sm text-indigo-700 mb-2">Para las nuevas altas, ingrese el Decreto/Resolución de respaldo.</p><Input type="text" placeholder="Ej: Dec. N° 123/24" value={altaResolution} onChange={(e) => setAltaResolution(e.target.value)} />
-              {config.programa === PROGRAMAS.TUTORIAS && <div className='mt-4'><p className="text-sm font-bold mb-2">Categorías Calculadas para Altas:</p><div className="max-h-32 overflow-y-auto"><Table><TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Categoría</TableHead></TableRow></TableHeader><TableBody>{analysis.newlyPaid.map((p:any)=><TableRow key={p.dni}><TableCell>{p.participant.nombre}</TableCell><TableCell className={p.categoriaCalculada.includes('NO') ? 'text-red-600 font-bold' : ''}>{p.categoriaCalculada}</TableCell></TableRow>)}</TableBody></Table></div></div>}
-              </CardContent></Card>
+                <Accordion type="single" collapsible className="w-full border border-indigo-200 rounded-md">
+                    <AccordionItem value="altas">
+                        <AccordionTrigger className="p-4 bg-indigo-50 text-indigo-800 font-semibold text-base rounded-t-md hover:no-underline">
+                            <div className="flex items-center gap-2"><FileSignature />Altas para este Período ({analysis.newlyPaid.length})</div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 space-y-4 bg-white rounded-b-md">
+                            <div>
+                                <Label htmlFor='alta-resolution' className='text-sm text-indigo-700 mb-2 block'>Decreto/Resolución de respaldo para las nuevas altas:</Label>
+                                <Input id='alta-resolution' type="text" placeholder="Ej: Dec. N° 123/24" value={altaResolution} onChange={(e) => setAltaResolution(e.target.value)} />
+                            </div>
+                            <div className='mt-4'>
+                                <p className="text-sm font-bold mb-2">Lista de Altas:</p>
+                                <div className="max-h-60 overflow-y-auto border rounded bg-white text-gray-800">
+                                    <Table><TableHeader><TableRow>
+                                        <TableHead>Nombre</TableHead>
+                                        {config.programa === PROGRAMAS.TUTORIAS ? <TableHead>Categoría Calculada</TableHead> : <TableHead>DNI</TableHead>}
+                                    </TableRow></TableHeader>
+                                    <TableBody>{analysis.newlyPaid.map((p: any) => (
+                                        <TableRow key={p.dni}>
+                                            <TableCell>{p.participant.nombre}</TableCell>
+                                            {config.programa === PROGRAMAS.TUTORIAS ? (
+                                                <TableCell className={p.categoriaCalculada.includes('NO') ? 'text-red-600 font-bold' : ''}>{p.categoriaCalculada}</TableCell>
+                                            ) : (
+                                                <TableCell className="font-mono">{p.dni}</TableCell>
+                                            )}
+                                        </TableRow>
+                                    ))}</TableBody></Table>
+                                </div>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             )}
+            {analysis.absent.length > 0 && 
+                <Accordion type="single" collapsible className="w-full border border-yellow-200 rounded-md">
+                    <AccordionItem value="ausentes">
+                        <AccordionTrigger className="p-4 bg-yellow-50 text-yellow-800 font-semibold text-base rounded-t-md hover:no-underline">
+                            <div className="flex items-center gap-2"><AlertTriangle />Ausentes (Posible Baja) ({analysis.absent.length})</div>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 text-sm text-yellow-800 bg-white rounded-b-md">
+                            <p className="mb-2">Se registrará una novedad para estos <strong>{analysis.absent.length} participantes</strong>.</p>
+                            <div className="max-h-60 overflow-y-auto border rounded bg-white">
+                                <Table><TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>DNI</TableHead></TableRow></TableHeader>
+                                    <TableBody>{analysis.absent.map((p: Participant) => (
+                                        <TableRow key={p.id}><TableCell className='text-gray-800'>{p.nombre}</TableCell><TableCell className="font-mono text-gray-800">{p.dni}</TableCell></TableRow>
+                                    ))}</TableBody>
+                                </Table>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            }
           </div>
           
           <div className="flex justify-between pt-6 border-t">
             <Button variant="ghost" onClick={() => { setAnalysis(null); setStep(2); }}>Atrás</Button>
-            <Button onClick={handleExecute} disabled={processing || analyzing || analysis.unknown.length > 0 || (config.programa === PROGRAMAS.TUTORIAS && !configReady)} className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"> {processing ? 'Procesando...' : (analysis.unknown.length > 0 ? 'Corrija los Errores' : 'Confirmar y Ejecutar')} </Button>
+            <Button onClick={handleExecute} disabled={processing || analyzing || analysis.unknown.length > 0 || (analysis.newlyPaid.length > 0 && !altaResolution) || (config.programa === PROGRAMAS.TUTORIAS && !configReady)} className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400">
+              {processing ? 'Procesando...' : (analysis.unknown.length > 0 ? 'Corrija los Errores' : 'Confirmar y Ejecutar')}
+            </Button>
           </div>
         </div>
       )}
