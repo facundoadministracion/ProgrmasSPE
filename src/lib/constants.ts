@@ -36,7 +36,7 @@ export const MONTHS = [
 
 export const ROLES = {
   ADMIN: 'admin',
-  DATA_ENTRY: 'data_entry',
+  DATA_ENTRY: 'data-entry',
   TECNICO: 'tecnico'
 } as const;
 

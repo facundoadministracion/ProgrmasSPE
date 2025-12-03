@@ -3,47 +3,53 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to get the role of the requesting user.
     function getUserRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+      // Devuelve el rol del usuario en minúsculas para comparaciones insensibles a mayúsculas/minúsculas.
+      return get(/databases/$(database)/documents/users/$(userId)).data.role.lower();
     }
 
-    // Users can read/update their own profile. Admins can manage all users.
     match /users/{userId} {
-      allow read, write: if request.auth != null && 
-                          (request.auth.uid == userId || getUserRole(request.auth.uid) == 'Admin');
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                   (request.auth.uid == userId || getUserRole(request.auth.uid) == 'admin');
     }
 
-    // Participants can be read by any authenticated user.
-    // Only Admins and Data Entry can create, update, or delete.
     match /participants/{participantId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && getUserRole(request.auth.uid) in ['Admin', 'Data Entry'];
+      allow create, update, delete: if request.auth != null && getUserRole(request.auth.uid) in ['admin', 'data-entry'];
 
-      // Attendance can be managed by Admins and Data Entry roles.
       match /attendance/{attendanceId} {
-        allow read, write: if request.auth != null && getUserRole(request.auth.uid) in ['Admin', 'Data Entry'];
+        allow read, write: if request.auth != null && getUserRole(request.auth.uid) in ['admin', 'data-entry'];
       }
     }
     
-    // Novedades can be read by any authenticated user.
-    // Only Admins and Data Entry can create them.
     match /novedades/{novedadId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && getUserRole(request.auth.uid) in ['Admin', 'Data Entry'];
+      allow create: if request.auth != null && getUserRole(request.auth.uid) in ['admin', 'data-entry'];
     }
 
-    // Payment records can be read or created by Admins (for analytics and uploads).
     match /paymentRecords/{recordId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'Admin';
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
 
-    // Config history and global stats are restricted to Admins.
     match /configHistory/{configId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'Admin';
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
     match /stats/{statId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'Admin';
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    // REGLAS AÑADIDAS PARA CORREGIR PERMISOS
+    match /configuracionMontos/{docId} {
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    match /pagosRegistrados/{docId} {
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    match /paymentHistory/{docId} {
+      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
   }
 }

@@ -1,3 +1,4 @@
+
 export type UserRole = {
   uid: string;
   name: string;
@@ -10,12 +11,15 @@ export type Participant = {
   id: string;
   nombre: string;
   dni: string;
+  legajo?: string;
   fechaNacimiento: string;
   actoAdministrativo?: string;
   programa: string;
   fechaIngreso: string;
   departamento: string;
   lugarTrabajo?: string;
+  domicilio?: string;
+  localidad?: string;
   categoria?: string;
   email?: string;
   telefono?: string;

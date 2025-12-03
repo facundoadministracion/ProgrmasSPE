@@ -147,7 +147,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
           estado: 'Activo',
           mesAusencia: null,
         };
-        if (analysis.newlyPaid.some(np => np.participant.id === item.participant.id) && altaResolution) {
+        if (analysis.newlyPaid.some((np: any) => np.participant.id === item.participant.id) && altaResolution) {
           updates.actoAdministrativo = altaResolution;
         }
         if (item.categoriaCalculada && item.categoriaCalculada !== 'MONTO NO COINCIDE') {

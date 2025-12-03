@@ -1,15 +1,45 @@
-# Settings to manage and configure a Firebase App Hosting backend.
-# https://firebase.google.com/docs/app-hosting/configure
 
+# Settings for the App Hosting Backend
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
-backend:
-  # The command that starts your application.
-  # This is the same command you'd run to start your app locally.
-  run: npm run start
-  # Specifies the command to build your application. App Hosting
-  # runs this command to produce a production-ready version of your
-  # code, which it then deploys.
-  build: npm run build
+  # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+  # Injects Firebase project config as environment variables
+  firebase: {}
+
+# Environment variables and secrets
+env:
+  # Map the injected Firebase config to the variables your app expects
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: ${FIREBASE_API_KEY}
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: ${FIREBASE_AUTH_DOMAIN}
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: ${FIREBASE_PROJECT_ID}
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: ${FIREBASE_STORAGE_BUCKET}
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: ${FIREBASE_MESSAGING_SENDER_ID}
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: ${FIREBASE_APP_ID}
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: ${FIREBASE_MEASUREMENT_ID}
+    availability:
+      - BUILD
+      - RUNTIME

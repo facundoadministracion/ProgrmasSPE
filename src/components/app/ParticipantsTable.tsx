@@ -56,7 +56,7 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
                 <TableCell className="hidden md:table-cell">{p.programa}</TableCell>
                 <TableCell className="hidden lg:table-cell">
                     <div>{p.telefono}</div>
-                    <div className="text-sm text-gray-500">{p.correo}</div>
+                    <div className="text-sm text-gray-500">{p.email}</div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={alert.type === 'green' ? 'default' : 'destructive'}>{alert.msg}</Badge>

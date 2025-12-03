@@ -56,8 +56,8 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
             const formMontos: MontosState = { ...getInitialMontos() };
             for(const key in configToEdit.montos) {
                 // Mapeo de nombres de programa a nombres de campo de formulario
-                if (key === PROGRAMAS.EMPLEO_JOVEN) formMontos['Empleo Joven'] = configToEdit.montos[key];
-                else if (key === PROGRAMAS.TECNOEMPLEO) formMontos.Tecnoempleo = configToEdit.montos[key];
+                if (key === PROGRAMAS.JOVEN) formMontos['Empleo Joven'] = configToEdit.montos[key];
+                else if (key === PROGRAMAS.TECNO) formMontos.Tecnoempleo = configToEdit.montos[key];
                 else if (CATEGORIAS_TUTORIAS.includes(key)) formMontos[key] = configToEdit.montos[key];
             }
 
@@ -97,8 +97,8 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
         const newConfigData = {
             montos: {
                 ...CATEGORIAS_TUTORIAS.reduce((acc, cat) => ({...acc, [cat]: Number(montos[cat]) }), {}),
-                [PROGRAMAS.EMPLEO_JOVEN]: Number(montos['Empleo Joven']),
-                [PROGRAMAS.TECNOEMPLEO]: Number(montos['Tecnoempleo']),
+                [PROGRAMAS.JOVEN]: Number(montos['Empleo Joven']),
+                [PROGRAMAS.TECNO]: Number(montos['Tecnoempleo']),
             },
             mesVigencia: Number(mesVigencia),
             anoVigencia: Number(anoVigencia),

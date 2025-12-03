@@ -1,0 +1,127 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "configuracionMontos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anoVigencia",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "mesVigencia",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "liquidaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "programa",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaLiquidacion",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "paymentHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "programa",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "anoLiquidacion",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "mesLiquidacion",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "paymentHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "programa",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "paymentRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "programa",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "anio",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mes",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "paymentRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "programa",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaCarga",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    }
+  ],
+  "fieldOverrides": []
+}

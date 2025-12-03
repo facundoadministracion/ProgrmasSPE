@@ -35,7 +35,7 @@ import Dashboard from '@/components/app/Dashboard'; // Importamos el nuevo compo
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
 const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void }) => {
-    const [selectedProgram, setSelectedProgram] = useState(PROGRAMAS.TUTORIAS);
+    const [selectedProgram, setSelectedProgram] = useState<string>(PROGRAMAS.TUTORIAS);
     return (
         <form onSubmit={onFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
              <div className="flex flex-wrap gap-4">
@@ -254,7 +254,7 @@ export default function App() {
                     <CardTitle className="flex items-center gap-2"><History/> Historial de Configuraciones</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ConfiguracionHistorial key={forceUpdateKey} onEditConfig={handleEditConfig} />
+                    <ConfiguracionHistorial forceUpdateKey={forceUpdateKey} onEditConfig={handleEditConfig} />
                 </CardContent>
             </Card>
             
@@ -279,7 +279,13 @@ export default function App() {
                 ? <ParticipantsTab 
                     participants={participants || []} 
                     isLoading={participantsLoading} 
-                    onSelect={handleSelectParticipant} 
+                    onSelect={(p) => {
+                        if (p === 'new') {
+                            handleOpenNewForm();
+                        } else {
+                            handleSelectParticipant(p);
+                        }
+                    }} 
                     onOpenParticipantWizard={() => setIsParticipantUploadOpen(true)} 
                     initialSearchTerm={initialSearch} 
                     onSearchHandled={() => setInitialSearch('')} 
