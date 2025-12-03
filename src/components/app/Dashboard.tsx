@@ -100,12 +100,13 @@ const Dashboard = ({
     const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
     const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
     const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
-    const activeParticipants = (participants || []).filter(p => p.estado === 'Activo' || p.estado === 'Requiere Atención').length;
+    
+    const totalLiquidado = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
 
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <DashboardCard title="Total Activos" value={activeParticipants} icon={Users} color="blue" subtitle="Padrón liquidado" isLoading={participantsLoading} />
+            <DashboardCard title="Total Activos" value={totalLiquidado} icon={Users} color="blue" subtitle="Padrón liquidado" isLoading={isProgramDataLoading} />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Pagos" value={paymentAlertCount} icon={DollarSign} color="yellow" subtitle="Próximos a vencer/vencidos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentAlert')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
