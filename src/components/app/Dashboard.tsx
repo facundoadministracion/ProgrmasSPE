@@ -49,9 +49,9 @@ const Dashboard = ({
 
             for (const prog of Object.values(PROGRAMAS)) {
                 const recordsQuery = query(
-                    collection(firestore, 'paymentRecords'),
+                    collection(firestore, 'paymentHistory'),
                     where('programa', '==', prog),
-                    orderBy('fechaCarga', 'desc'),
+                    orderBy('uploadedAt', 'desc'),
                     limit(1)
                 );
 
@@ -63,8 +63,8 @@ const Dashboard = ({
                 }
 
                 const latestRecord = recordSnapshot.docs[0].data();
-                const latestMes = latestRecord.mes;
-                const latestAnio = latestRecord.anio;
+                const latestMes = latestRecord.mesLiquidacion;
+                const latestAnio = latestRecord.anoLiquidacion;
                 
                 const monthIndex = typeof latestMes === 'string' ? parseInt(latestMes, 10) - 1 : latestMes - 1;
                 let dateString;
@@ -75,15 +75,7 @@ const Dashboard = ({
                     dateString = `${String(latestMes).padStart(2, '0')}/${latestAnio}`;
                 }
 
-                const paymentsQuery = query(
-                    collection(firestore, 'pagosRegistrados'),
-                    where('mes', '==', latestMes),
-                    where('anio', '==', latestAnio),
-                    where('programa', '==', prog)
-                );
-                const paymentsSnapshot = await getDocs(paymentsQuery);
-                
-                data[prog] = { count: paymentsSnapshot.size, date: dateString };
+                data[prog] = { count: latestRecord.cantidadPagos, date: dateString };
             }
             setProgramData(data);
             setIsProgramDataLoading(false);
