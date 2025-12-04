@@ -38,8 +38,8 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
     const getInitialMontos = () => {
         const initialState: MontosState = {};
         CATEGORIAS_TUTORIAS.forEach(cat => initialState[cat] = '');
-        initialState['Empleo Joven'] = '';
-        initialState['Tecnoempleo'] = '';
+        initialState[PROGRAMAS.JOVEN] = '';
+        initialState[PROGRAMAS.TECNO] = '';
         return initialState;
     }
 
@@ -55,10 +55,9 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
         if (configToEdit) {
             const formMontos: MontosState = { ...getInitialMontos() };
             for(const key in configToEdit.montos) {
-                // Mapeo de nombres de programa a nombres de campo de formulario
-                if (key === PROGRAMAS.JOVEN) formMontos['Empleo Joven'] = configToEdit.montos[key];
-                else if (key === PROGRAMAS.TECNO) formMontos.Tecnoempleo = configToEdit.montos[key];
-                else if (CATEGORIAS_TUTORIAS.includes(key)) formMontos[key] = configToEdit.montos[key];
+                if (Object.values(PROGRAMAS).includes(key as any) || CATEGORIAS_TUTORIAS.includes(key)) {
+                    formMontos[key] = configToEdit.montos[key];
+                }
             }
 
             setMontos(formMontos);
@@ -97,8 +96,8 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
         const newConfigData = {
             montos: {
                 ...CATEGORIAS_TUTORIAS.reduce((acc, cat) => ({...acc, [cat]: Number(montos[cat]) }), {}),
-                [PROGRAMAS.JOVEN]: Number(montos['Empleo Joven']),
-                [PROGRAMAS.TECNO]: Number(montos['Tecnoempleo']),
+                [PROGRAMAS.JOVEN]: Number(montos[PROGRAMAS.JOVEN]),
+                [PROGRAMAS.TECNO]: Number(montos[PROGRAMAS.TECNO]),
             },
             mesVigencia: Number(mesVigencia),
             anoVigencia: Number(anoVigencia),
@@ -165,12 +164,12 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
                 <div className="space-y-4 p-4 border rounded-md">
                      <Label className="font-medium">Otros Programas (Fijo)</Label>
                      <div className="space-y-1">
-                        <Label htmlFor="empleo-joven">Empleo Joven</Label>
-                        <Input id="empleo-joven" type="text" value={formatNumber(montos['Empleo Joven'])} onChange={e => handleMontoChange('Empleo Joven', e.target.value)} placeholder="0" />
+                        <Label htmlFor={PROGRAMAS.JOVEN}>Empleo Joven</Label>
+                        <Input id={PROGRAMAS.JOVEN} type="text" value={formatNumber(montos[PROGRAMAS.JOVEN])} onChange={e => handleMontoChange(PROGRAMAS.JOVEN, e.target.value)} placeholder="0" />
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="tecnoempleo">Tecnoempleo</Label>
-                        <Input id="tecnoempleo" type="text" value={formatNumber(montos['Tecnoempleo'])} onChange={e => handleMontoChange('Tecnoempleo', e.target.value)} placeholder="0" />
+                        <Label htmlFor={PROGRAMAS.TECNO}>Tecnoempleo</Label>
+                        <Input id={PROGRAMAS.TECNO} type="text" value={formatNumber(montos[PROGRAMAS.TECNO])} onChange={e => handleMontoChange(PROGRAMAS.TECNO, e.target.value)} placeholder="0" />
                     </div>
                 </div>
             </div>
