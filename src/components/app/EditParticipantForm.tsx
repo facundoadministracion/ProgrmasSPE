@@ -55,20 +55,20 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
             <h3 className="text-xl font-bold mb-4">Editar Legajo</h3>
             <form id={formId} onSubmit={handleSubmit} className="max-h-[75vh] overflow-y-auto -m-2 p-2">
                 <div className="flex flex-wrap">
-                    <MemoizedTextField id="nombre" label="Nombre Completo" value={formData.nombre} onUpdate={handleUpdate} />
-                    <MemoizedTextField id="dni" label="DNI" value={participant.dni} onUpdate={() => {}} disabled />
-                    <MemoizedTextField id="fechaNacimiento" label="Fecha de Nacimiento" type="date" value={formData.fechaNacimiento} onUpdate={handleUpdate} />
-                    <MemoizedTextField id="fechaIngreso" label="Fecha de Ingreso" type="date" value={formData.fechaIngreso} onUpdate={handleUpdate} />
-                    <MemoizedTextField id="domicilio" label="Domicilio" value={formData.domicilio} onUpdate={handleUpdate} />
-                    <MemoizedSelectField id="localidad" label="Localidad" value={formData.localidad} onUpdate={handleUpdate} options={DEPARTAMENTOS} />
-                    <MemoizedSelectField id="programa" label="Programa" value={formData.programa} onUpdate={handleUpdate} options={Object.values(PROGRAMAS)} />
-                    <MemoizedSelectField id="estado" label="Estado" value={formData.estado} onUpdate={handleUpdate} options={ESTADOS_PARTICIPANTE} />
+                    <MemoizedTextField id="nombre" label="Nombre Completo" value={formData.nombre || ''} onUpdate={handleUpdate} />
+                    <MemoizedTextField id="dni" label="DNI" value={participant.dni || ''} onUpdate={() => {}} disabled />
+                    <MemoizedTextField id="fechaNacimiento" label="Fecha de Nacimiento" type="date" value={formData.fechaNacimiento || ''} onUpdate={handleUpdate} />
+                    <MemoizedTextField id="fechaIngreso" label="Fecha de Ingreso" type="date" value={formData.fechaIngreso || ''} onUpdate={handleUpdate} />
+                    <MemoizedTextField id="domicilio" label="Domicilio" value={formData.domicilio || ''} onUpdate={handleUpdate} />
+                    <MemoizedSelectField id="localidad" label="Localidad" value={formData.localidad || ''} onUpdate={handleUpdate} options={DEPARTAMENTOS} />
+                    <MemoizedSelectField id="programa" label="Programa" value={formData.programa || ''} onUpdate={handleUpdate} options={Object.values(PROGRAMAS)} />
+                    <MemoizedSelectField id="estado" label="Estado" value={formData.estado || ''} onUpdate={handleUpdate} options={ESTADOS_PARTICIPANTE} />
                     {formData.programa === PROGRAMAS.TUTORIAS && (
-                        <MemoizedSelectField id="categoria" label="Categoría (Tutorías)" value={formData.categoria} onUpdate={handleUpdate} options={CATEGORIAS_TUTORIAS} />
+                        <MemoizedSelectField id="categoria" label="Categoría (Tutorías)" value={formData.categoria || ''} onUpdate={handleUpdate} options={CATEGORIAS_TUTORIAS} />
                     )}
-                    <MemoizedTextField id="lugarTrabajo" label="Lugar de Trabajo" value={formData.lugarTrabajo} onUpdate={handleUpdate} />
-                    <MemoizedTextField id="email" label="Email" type="email" value={formData.email} onUpdate={handleUpdate} />
-                    <MemoizedTextField id="telefono" label="Teléfono" value={formData.telefono} onUpdate={handleUpdate} />
+                    <MemoizedTextField id="lugarTrabajo" label="Lugar de Trabajo" value={formData.lugarTrabajo || ''} onUpdate={handleUpdate} />
+                    <MemoizedTextField id="email" label="Email" type="email" value={formData.email || ''} onUpdate={handleUpdate} />
+                    <MemoizedTextField id="telefono" label="Teléfono" value={formData.telefono || ''} onUpdate={handleUpdate} />
                     <MemoizedSwitchField id="esEquipoTecnico" label="Es Equipo Técnico" checked={formData.esEquipoTecnico} onUpdate={handleUpdate} />
                 </div>
             </form>

@@ -1,11 +1,11 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { getPaymentStatus } from '@/lib/logic';
 import { useFirebase, useUser } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { Search, ArrowRight, Save, MapPin, DollarSign, Info, AlertTriangle } from 'lucide-react';
+import { Search, ArrowRight, Save, MapPin, DollarSign, Info, AlertTriangle, Calendar, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,17 +13,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 const AttendanceSection = ({ participants }: { participants: Participant[] }) => {
   const { firestore } = useFirebase();
   const { user } = useUser();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPerson, setSelectedPerson] = useState<Participant | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   const [formData, setFormData] = useState({
-      mes: new Date().getMonth(),
-      anio: new Date().getFullYear(),
+      mes: selectedMonth,
+      anio: selectedYear,
       lugarTrabajo: '',
       responsable: '',
       metodo: 'Papel (Ministerio)',
@@ -37,79 +43,94 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
   const filteredPeople = useMemo(() => {
       if(searchTerm.length < 3) return [];
       const lower = searchTerm.toLowerCase();
-      // Filtra solo por el programa de tutorías
       return participants.filter(p => 
           p.programa === PROGRAMAS.TUTORIAS && 
           (p.nombre.toLowerCase().includes(lower) || p.dni.includes(lower))
       );
   }, [searchTerm, participants]);
 
-  const handleSelectPerson = async (p: Participant) => {
+  useEffect(() => {
+    if (selectedPerson) {
+        handleSelectPerson(selectedPerson, true);
+    }
+  }, [selectedMonth, selectedYear]);
+
+  const handleSelectPerson = async (p: Participant, isRecheck = false) => {
       if (!firestore) return;
-      setSelectedPerson(p);
-      setSearchTerm(''); 
+      
+      if (!isRecheck) {
+        setSelectedPerson(p);
+        setSearchTerm(''); 
+        setFormData({
+            mes: selectedMonth,
+            anio: selectedYear,
+            lugarTrabajo: p.lugarTrabajo || '', 
+            responsable: '',
+            metodo: 'Papel (Ministerio)',
+            emailPresentacion: '',
+            tardanza: false,
+            certificado: false,
+            observaciones: '',
+            actualizarArea: false
+        });
+      }
+
       setDuplicateWarning(null);
-
-      setFormData({
-          mes: new Date().getMonth(),
-          anio: new Date().getFullYear(),
-          lugarTrabajo: p.lugarTrabajo || '', 
-          responsable: '',
-          metodo: 'Papel (Ministerio)',
-          emailPresentacion: '',
-          tardanza: false,
-          certificado: false,
-          observaciones: '',
-          actualizarArea: false
-      });
-
       const q = query(
           collection(firestore, 'asistencias'),
           where('participantId', '==', p.id),
-          where('mes', '==', new Date().getMonth()),
-          where('anio', '==', new Date().getFullYear())
+          where('mes', '==', selectedMonth),
+          where('anio', '==', selectedYear)
       );
       const snapshot = await getDocs(q);
       if(!snapshot.empty) {
           const rec = snapshot.docs[0].data();
-          setDuplicateWarning(`¡Atención! Ya existe una planilla cargada para este mes (${MONTHS[rec.mes]}) por método: ${rec.metodo}.`);
+          setDuplicateWarning(`¡Atención! Ya existe una planilla cargada para ${p.nombre} en ${MONTHS[selectedMonth]} ${selectedYear} por método: ${rec.metodo}.`);
       }
   };
 
   const handleSave = async () => {
       if(!selectedPerson || !firestore) return;
       if(!formData.lugarTrabajo || !formData.responsable) {
-          alert("Falta completar Lugar de Trabajo o Responsable.");
+          toast({ variant: "destructive", title: "Datos Incompletos", description: "Falta completar el Lugar de Trabajo o el Responsable de la firma." });
           return;
       }
-      const batch = writeBatch(firestore);
-      const asisRef = doc(collection(firestore, 'asistencias'));
-      batch.set(asisRef, {
-          participantId: selectedPerson.id,
-          participantName: selectedPerson.nombre,
-          dni: selectedPerson.dni,
-          ...formData,
-          fechaCarga: serverTimestamp(),
-          ownerId: user?.uid,
-      });
+      setIsSaving(true);
+      try {
+        const batch = writeBatch(firestore);
+        const asisRef = doc(collection(firestore, 'asistencias'));
+        batch.set(asisRef, {
+            participantId: selectedPerson.id,
+            participantName: selectedPerson.nombre,
+            dni: selectedPerson.dni,
+            ...formData,
+            fechaCarga: serverTimestamp(),
+            ownerId: user?.uid,
+        });
 
-      if(formData.actualizarArea && formData.lugarTrabajo !== selectedPerson.lugarTrabajo) {
-          const partRef = doc(firestore, 'participants', selectedPerson.id);
-          batch.update(partRef, { lugarTrabajo: formData.lugarTrabajo });
-          const novRef = doc(collection(firestore, 'novedades'));
-          batch.set(novRef, {
-              participantId: selectedPerson.id,
-              participantName: selectedPerson.nombre,
-              descripcion: `Cambio de Área por Planilla: ${selectedPerson.lugarTrabajo || 'S/D'} -> ${formData.lugarTrabajo}`,
-              fecha: new Date().toISOString().split('T')[0],
-              fechaRealCarga: serverTimestamp(),
-              ownerId: user?.uid,
-          });
+        if(formData.actualizarArea && formData.lugarTrabajo !== selectedPerson.lugarTrabajo) {
+            const partRef = doc(firestore, 'participants', selectedPerson.id);
+            batch.update(partRef, { lugarTrabajo: formData.lugarTrabajo });
+            const novRef = doc(collection(firestore, 'novedades'));
+            batch.set(novRef, {
+                participantId: selectedPerson.id,
+                participantName: selectedPerson.nombre,
+                descripcion: `Cambio de Área por Planilla: ${selectedPerson.lugarTrabajo || 'S/D'} -> ${formData.lugarTrabajo}`,
+                fecha: new Date().toISOString().split('T')[0],
+                fechaRealCarga: serverTimestamp(),
+                ownerId: user?.uid,
+            });
+        }
+
+        await batch.commit();
+        toast({ title: "Asistencia Guardada", description: `La planilla de ${selectedPerson.nombre} para ${MONTHS[formData.mes]} ha sido registrada.` });
+        setSelectedPerson(null); 
+      } catch (error) {
+        console.error("Error saving attendance:", error);
+        toast({ variant: "destructive", title: "Error al Guardar", description: "No se pudo guardar la planilla. Intente de nuevo." });
+      } finally {
+        setIsSaving(false);
       }
-
-      await batch.commit();
-      alert("Asistencia guardada correctamente.");
-      setSelectedPerson(null); 
   };
 
   const isAreaChanged = selectedPerson && formData.lugarTrabajo.trim().toLowerCase() !== (selectedPerson.lugarTrabajo || '').trim().toLowerCase();
@@ -121,8 +142,25 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
           <Card className="p-8 text-center max-w-2xl mx-auto">
             <CardContent>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Carga de Asistencia de Tutorías</h2>
-              <p className="text-gray-500 mb-6">Busque al tutor para ingresar los datos de su planilla mensual.</p>
+              <p className="text-gray-500 mb-6">Seleccione el período y luego busque al tutor para ingresar su planilla.</p>
               
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto mb-6">
+                <div>
+                    <label className="text-sm font-medium text-gray-600 block mb-1 text-left">Mes de la Planilla</label>
+                    <Select value={String(selectedMonth)} onValueChange={v => setSelectedMonth(parseInt(v))}>
+                      <SelectTrigger><SelectValue/></SelectTrigger>
+                      <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <label className="text-sm font-medium text-gray-600 block mb-1 text-left">Año</label>
+                    <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(parseInt(v))}>
+                      <SelectTrigger><SelectValue/></SelectTrigger>
+                      <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+              </div>
+
               <div className="relative max-w-md mx-auto">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                   <Input 
@@ -165,20 +203,28 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
           </Card>
       ) : (
           <Card className="overflow-hidden max-w-4xl mx-auto">
-              <div className="bg-slate-800 text-white p-6 flex justify-between items-start">
-                  <div className="flex gap-4">
-                      <div className="h-16 w-16 bg-slate-600 rounded-full flex items-center justify-center text-2xl font-bold">
-                          {selectedPerson.nombre.charAt(0)}
+               <div className="bg-slate-800 text-white p-6 flex justify-between items-start">
+                  <div>
+                      <div className="mb-3">
+                        <Badge variant="default" className="bg-blue-500 hover:bg-blue-500">
+                           <Calendar size={14} className="mr-2"/> 
+                           Planilla para: {MONTHS[formData.mes]} {formData.anio}
+                        </Badge>
                       </div>
-                      <div>
-                          <h2 className="text-xl font-bold flex items-center gap-2">
-                              {selectedPerson.nombre}
-                              {selectedPersonStatus?.type === 'red' && <Badge variant="destructive">INACTIVO</Badge>}
-                          </h2>
-                          <p className="text-slate-300">{selectedPerson.dni} • {selectedPerson.programa}</p>
-                          <div className="flex gap-2 mt-2 text-xs">
-                              <Badge variant="secondary"><MapPin size={12} className="mr-1"/> {selectedPerson.departamento}</Badge>
-                              <Badge variant="secondary"><DollarSign size={12} className="mr-1"/> Ult. Pago: {selectedPerson.ultimoPago || 'N/A'}</Badge>
+                      <div className="flex gap-4">
+                          <div className="h-16 w-16 bg-slate-600 rounded-full flex items-center justify-center text-2xl font-bold">
+                              {selectedPerson.nombre.charAt(0)}
+                          </div>
+                          <div>
+                              <h2 className="text-xl font-bold flex items-center gap-2">
+                                  {selectedPerson.nombre}
+                                  {selectedPersonStatus?.type === 'red' && <Badge variant="destructive">INACTIVO</Badge>}
+                              </h2>
+                              <p className="text-slate-300">{selectedPerson.dni} • {selectedPerson.programa}</p>
+                              <div className="flex gap-2 mt-2 text-xs">
+                                  <Badge variant="secondary"><MapPin size={12} className="mr-1"/> {selectedPerson.departamento}</Badge>
+                                  <Badge variant="secondary"><DollarSign size={12} className="mr-1"/> Ult. Pago: {selectedPerson.ultimoPago || 'N/A'}</Badge>
+                              </div>
                           </div>
                       </div>
                   </div>
@@ -211,14 +257,14 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="text-sm font-medium text-gray-600 block mb-1">Mes</label>
-                              <Select value={String(formData.mes)} onValueChange={v => setFormData({...formData, mes: parseInt(v)})}>
+                              <Select value={String(formData.mes)} onValueChange={v => setFormData({...formData, mes: parseInt(v)})} disabled={true}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}</SelectContent>
                               </Select>
                           </div>
                           <div>
                               <label className="text-sm font-medium text-gray-600 block mb-1">Año</label>
-                              <Select value={String(formData.anio)} onValueChange={v => setFormData({...formData, anio: parseInt(v)})}>
+                              <Select value={String(formData.anio)} onValueChange={v => setFormData({...formData, anio: parseInt(v)})} disabled={true}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                               </Select>
@@ -285,8 +331,11 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
               </CardContent>
 
               <div className="bg-gray-50 p-6 border-t flex justify-end gap-3">
-                  <Button variant="ghost" onClick={() => setSelectedPerson(null)}>Cancelar</Button>
-                  <Button onClick={handleSave}><Save size={18} className="mr-2"/> Guardar Asistencia</Button>
+                  <Button variant="ghost" onClick={() => setSelectedPerson(null)} disabled={isSaving}>Cancelar</Button>
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? <Loader2 size={18} className="mr-2 animate-spin"/> : <Save size={18} className="mr-2"/>} 
+                    Guardar Asistencia
+                  </Button>
               </div>
           </Card>
       )}

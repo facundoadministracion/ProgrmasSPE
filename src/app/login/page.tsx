@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Briefcase } from 'lucide-react';
-import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -126,12 +125,6 @@ export default function LoginPage() {
             <Button type="submit" className="w-full">
               Ingresar
             </Button>
-            <div className="text-center text-sm text-gray-500 pt-2">
-                ¿No tienes cuenta?{' '}
-                <Link href="/signup" className="font-medium text-blue-600 hover:underline">
-                    Regístrate
-                </Link>
-            </div>
           </form>
         </CardContent>
       </Card>
