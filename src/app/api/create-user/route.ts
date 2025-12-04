@@ -1,15 +1,19 @@
+
 import { NextResponse } from 'next/server';
 import { initializeAdminApp } from '@/firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// Initialize Firebase Admin SDK
-const adminApp = initializeAdminApp();
-const adminAuth = getAuth(adminApp);
-const firestore = getFirestore(adminApp);
+async function getAdminServices() {
+  const adminApp = initializeAdminApp();
+  const adminAuth = getAuth(adminApp);
+  const firestore = getFirestore(adminApp);
+  return { adminAuth, firestore };
+}
 
 export async function POST(request: Request) {
   try {
+    const { adminAuth, firestore } = await getAdminServices();
     const { name, email, password, role } = await request.json();
 
     // 1. Create user in Firebase Authentication

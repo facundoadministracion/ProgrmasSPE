@@ -60,7 +60,7 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
   const [editingUser, setEditingUser] = useState<UserRole | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserRole | null>(null);
   
-  const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '', role: ROLES.DATA_ENTRY });
+  const [newUserData, setNewUserData] = useState<{ name: string; email: string; password: string; role: 'admin' | 'data-entry' }>({ name: '', email: '', password: '', role: ROLES.DATA_ENTRY });
   const [updatedData, setUpdatedData] = useState<{ name: string; role: UserRole['role'] }>({ name: '', role: ROLES.DATA_ENTRY });
 
   const currentUserRole = users.find(u => u.uid === currentUser?.uid)?.role;
