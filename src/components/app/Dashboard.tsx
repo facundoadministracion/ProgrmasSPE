@@ -75,7 +75,6 @@ const Dashboard = ({
                 }
 
                 const latestRecord = recordSnapshot.docs[0].data();
-                // Assumption: the settlement amount is stored in a field called 'montoLiquidado'
                 const settlementAmount = latestRecord.montoLiquidado || 0; 
                 const latestMes = latestRecord.mesLiquidacion;
                 const latestAnio = latestRecord.anoLiquidacion;
@@ -107,21 +106,18 @@ const Dashboard = ({
     const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
     const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
     
-    // Calculate total participants and total settled amount
     const totalParticipants = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
     const totalSettledAmount = Object.values(programData).reduce((sum, data) => sum + (data?.amount ?? 0), 0);
 
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Updated DashboardCard with the new structure */}
             <DashboardCard 
               title="Total Padrón Liquidado" 
               value={totalParticipants} 
               secondaryValue={formatCurrency(totalSettledAmount)}
               icon={Users} 
               color="blue" 
-              subtitle="Suma de últimas liquidaciones" 
               isLoading={isProgramDataLoading} 
             />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />

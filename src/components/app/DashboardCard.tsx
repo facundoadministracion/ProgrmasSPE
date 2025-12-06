@@ -4,13 +4,14 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 
 type DashboardCardProps = {
   title: string;
   value: string | number;
-  secondaryValue?: string; // New optional prop
+  secondaryValue?: string;
   icon: React.ElementType;
-  subtitle: string;
+  subtitle?: string; // Make subtitle optional
   onClick?: () => void;
   actionText?: string;
   color?: string;
@@ -28,16 +29,6 @@ export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtit
 
   const selectedColor = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
 
-  // Helper to format the monetary value
-  const formatCurrency = (num: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(num);
-  };
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -53,13 +44,23 @@ export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtit
         ) : (
           <>
             <div className="text-2xl font-bold">{value}</div>
-            {/* Safely render the secondary value only if it exists */}
-            {secondaryValue && (
-              <div className="text-l font-semibold text-gray-600">{secondaryValue}</div>
+            {title === 'Total Padrón Liquidado' && secondaryValue ? (
+                <>
+                    <Separator className="my-2" />
+                    <div className="text-xs text-muted-foreground">Total Monto Invertido</div>
+                    <div className="text-l font-semibold text-gray-600">{secondaryValue}</div>
+                </>
+            ) : (
+                <>
+                    {secondaryValue && (
+                        <div className="text-l font-semibold text-gray-600">{secondaryValue}</div>
+                    )}
+                </>
             )}
           </>
         )}
-        <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        {/* Only render subtitle if it exists */}
+        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
       </CardContent>
       {onClick && (
         <CardFooter className="pt-0">
