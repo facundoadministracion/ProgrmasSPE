@@ -1,28 +1,14 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
   "hosting": {
-    "rewrites": [
-      {
-        "source": "**",
-        "run": {
-          "serviceId": "my-web-app",
-          "region": "us-central1"
-        }
-      }
-    ]
-  },
-  "apphosting": {
-    "backendId": "my-web-app",
-    "rootDir": "/",
+    "source": ".",
     "ignore": [
-      "node_modules",
-      ".git",
-      "firebase-debug.log",
-      "firebase-debug.*.log",
-      "functions"
-    ]
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "id": "my-web-app",
+      "region": "us-central1"
+    }
   }
 }

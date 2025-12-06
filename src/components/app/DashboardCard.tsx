@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 type DashboardCardProps = {
   title: string;
   value: string | number;
+  secondaryValue?: string; // New optional prop
   icon: React.ElementType;
   subtitle: string;
   onClick?: () => void;
@@ -16,23 +17,26 @@ type DashboardCardProps = {
   isLoading?: boolean;
 };
 
-export const DashboardCard = ({ title, value, icon: Icon, subtitle, onClick, actionText, color = 'blue', isLoading = false }: DashboardCardProps) => {
+export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtitle, onClick, actionText, color = 'blue', isLoading = false }: DashboardCardProps) => {
   const colorClasses = {
-    blue: {
-      icon: 'text-blue-500',
-    },
-    red: {
-      icon: 'text-red-500',
-    },
-    green: {
-      icon: 'text-green-500',
-    },
-    indigo: {
-        icon: 'text-indigo-500',
-    }
+    blue: { icon: 'text-blue-500' },
+    red: { icon: 'text-red-500' },
+    green: { icon: 'text-green-500' },
+    indigo: { icon: 'text-indigo-500' },
+    orange: { icon: 'text-orange-500' }
   };
 
   const selectedColor = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
+
+  // Helper to format the monetary value
+  const formatCurrency = (num: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(num);
+  };
 
   return (
     <Card>
@@ -42,17 +46,26 @@ export const DashboardCard = ({ title, value, icon: Icon, subtitle, onClick, act
       </CardHeader>
       <CardContent>
         {isLoading ? (
-            <Skeleton className="h-7 w-1/2" />
+          <>
+            <Skeleton className="h-7 w-1/2 mb-2" />
+            <Skeleton className="h-4 w-3/4" />
+          </>
         ) : (
+          <>
             <div className="text-2xl font-bold">{value}</div>
+            {/* Safely render the secondary value only if it exists */}
+            {secondaryValue && (
+              <div className="text-l font-semibold text-gray-600">{secondaryValue}</div>
+            )}
+          </>
         )}
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
+        <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
       </CardContent>
-       {onClick && (
-            <CardFooter>
-                 <Button onClick={onClick} variant="outline" className="w-full" disabled={isLoading}>{actionText || "Ver Detalles"}</Button>
-            </CardFooter>
-       )}
+      {onClick && (
+        <CardFooter className="pt-0">
+          <Button onClick={onClick} variant="outline" className="w-full" disabled={isLoading}>{actionText || "Ver Detalles"}</Button>
+        </CardFooter>
+      )}
     </Card>
   );
 };
