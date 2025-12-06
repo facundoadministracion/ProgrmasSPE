@@ -14,7 +14,6 @@ import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
-// Updated interface to include the monetary amount
 interface ProgramData {
     count: number;
     amount: number; 
@@ -26,7 +25,6 @@ const MESES = [
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
 ];
 
-// Helper to format currency
 const formatCurrency = (num: number) => {
     return new Intl.NumberFormat('es-AR', {
         style: 'currency',
@@ -75,7 +73,7 @@ const Dashboard = ({
                 }
 
                 const latestRecord = recordSnapshot.docs[0].data();
-                const settlementAmount = latestRecord.montoLiquidado || 0; 
+                const settlementAmount = latestRecord.montoTotalLiquidado || 0; // <-- Correct field name
                 const latestMes = latestRecord.mesLiquidacion;
                 const latestAnio = latestRecord.anoLiquidacion;
                 

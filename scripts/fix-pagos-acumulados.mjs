@@ -1,73 +1,65 @@
+'use client';
 
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-// ADVERTENCIA DE SEGURIDAD:
-// No almacenes la configuración de Firebase directamente en este fichero.
-// Si necesitas ejecutar este script, completa la configuración de forma temporal
-// y asegúrate de no subirla al repositorio de código.
-const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_AUTH_DOMAIN",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_STORAGE_BUCKET",
-  messagingSenderId: "TU_MESSAGING_SENDER_ID",
-  appId: "TU_APP_ID",
-  measurementId: "TU_MEASUREMENT_ID"
-};
+// Esta función ahora corrige los montos faltantes en el historial de pagos.
+async function fixMissingPaymentAmounts() {
+  // Asegúrate de que la app de Firebase no se inicialice varias veces
+  if (getApps().length === 0) {
+    initializeApp(); // Asume que la configuración de Admin se carga de variables de entorno
+  }
 
-// Antes de ejecutar, asegúrate de que firebaseConfig esté correctamente completado.
-if (firebaseConfig.apiKey === "TU_API_KEY") {
-  console.error('Error: Debes completar la configuración de Firebase en scripts/fix-pagos-acumulados.mjs antes de ejecutarlo.');
-  process.exit(1);
-}
+  const db = getFirestore();
+  console.log('Iniciando la búsqueda de historiales de pago sin monto total...');
 
-// Inicializa Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+  const historyRef = db.collection('paymentHistory');
+  // Busca documentos donde el campo montoTotalLiquidado NO exista
+  const snapshot = await historyRef.where('montoTotalLiquidado', '==', null).get();
 
-async function fixPagosAcumulados() {
-  const participantsCollection = collection(db, 'participants');
-  const paymentsCollection = collection(db, 'payments');
+  if (snapshot.empty) {
+    console.log('¡Excelente! No hay historiales de pago que necesiten ser corregidos.');
+    return;
+  }
 
-  const participantsSnapshot = await getDocs(participantsCollection);
-  const paymentsSnapshot = await getDocs(paymentsCollection);
+  const batch = db.batch();
+  console.log(`Se encontraron ${snapshot.docs.length} historiales de pago para actualizar.`);
 
-  const paymentsByParticipant = {};
+  for (const doc of snapshot.docs) {
+    const historyData = doc.data();
+    const { mesLiquidacion, anoLiquidacion, programa } = historyData;
 
-  paymentsSnapshot.docs.forEach(doc => {
-    const payment = doc.data();
-    if (!paymentsByParticipant[payment.participantId]) {
-      paymentsByParticipant[payment.participantId] = [];
+    if (!mesLiquidacion || !anoLiquidacion || !programa) {
+      console.log(`- Saltando historial con ID ${doc.id} por falta de datos (mes, año o programa).`);
+      continue;
     }
-    paymentsByParticipant[payment.participantId].push(payment);
-  });
 
-  const batch = writeBatch(db);
+    console.log(`- Procesando: ${programa} de ${mesLiquidacion}/${anoLiquidacion}...`);
 
-  participantsSnapshot.docs.forEach(doc => {
-    const participant = doc.data();
-    const participantId = doc.id;
-    const paymentCount = paymentsByParticipant[participantId] ? paymentsByParticipant[participantId].length : 0;
+    const paymentsRef = db.collection('pagosRegistrados');
+    const paymentsSnapshot = await paymentsRef
+      .where('mes', '==', mesLiquidacion)
+      .where('anio', '==', anoLiquidacion)
+      .where('programa', '==', programa)
+      .get();
 
-    if (participant.pagosAcumulados !== paymentCount) {
-      console.log(`Fixing participant ${participantId}: from ${participant.pagosAcumulados} to ${paymentCount}`);
-      const participantRef = doc.ref;
-      batch.update(participantRef, { pagosAcumulados: paymentCount });
-    }
-  });
+    const totalAmount = paymentsSnapshot.docs.reduce((acc, curr) => {
+      return acc + (curr.data().montoPagado || 0);
+    }, 0);
+
+    console.log(`  -> Monto total calculado: ${totalAmount}. Actualizando...`);
+    batch.update(doc.ref, { montoTotalLiquidado: totalAmount });
+  }
 
   try {
     await batch.commit();
-    console.log('¡El contador de pagos acumulados ha sido corregido con éxito!');
+    console.log('¡Éxito! Todos los historiales de pago han sido actualizados con su monto total.');
   } catch (error) {
-    console.error('Error al corregir el contador de pagos acumulados:', error);
+    console.error('Error al intentar actualizar los historiales de pago:', error);
   }
 }
 
-fixPagosAcumulados().then(() => {
-  // Cierra la conexión o el proceso si es necesario.
-  // En un script simple, el proceso terminará automáticamente.
-}).catch(e => {
-    console.error(e)
+// Ejecuta la función de corrección
+fixMissingPaymentAmounts().catch(e => {
+    console.error("Se produjo un error inesperado durante la ejecución del script:", e);
 });

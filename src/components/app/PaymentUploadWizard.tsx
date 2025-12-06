@@ -138,6 +138,8 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
       const batch = writeBatch(firestore);
       const allPayments = [...analysis.regulars, ...analysis.newlyPaid];
 
+      const totalAmount = allPayments.reduce((sum, item) => sum + item.monto, 0);
+
       allPayments.forEach((item) => {
         const partRef = doc(firestore, 'participants', item.participant.id);
         const updates: any = {
@@ -199,6 +201,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         programa: config.programa,
         dnisProcesados: allPayments.map(p => p.dni),
         cantidadPagos: allPayments.length,
+        montoTotalLiquidado: totalAmount, // <-- This is the new field
         cantidadAusentes: analysis.absent.length,
         cantidadRegulares: analysis.regulars.length,
         cantidadAltas: analysis.newlyPaid.length,
