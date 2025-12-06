@@ -14,8 +14,10 @@ import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
+// Updated interface to include the monetary amount
 interface ProgramData {
     count: number;
+    amount: number; 
     date: string;
 }
 
@@ -23,6 +25,16 @@ const MESES = [
     'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
 ];
+
+// Helper to format currency
+const formatCurrency = (num: number) => {
+    return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(num);
+};
 
 const Dashboard = ({ 
     participants, 
@@ -58,11 +70,13 @@ const Dashboard = ({
                 const recordSnapshot = await getDocs(recordsQuery);
 
                 if (recordSnapshot.empty) {
-                    data[prog] = { count: 0, date: 'N/A' };
+                    data[prog] = { count: 0, amount: 0, date: 'N/A' };
                     continue;
                 }
 
                 const latestRecord = recordSnapshot.docs[0].data();
+                // Assumption: the settlement amount is stored in a field called 'montoLiquidado'
+                const settlementAmount = latestRecord.montoLiquidado || 0; 
                 const latestMes = latestRecord.mesLiquidacion;
                 const latestAnio = latestRecord.anoLiquidacion;
                 
@@ -75,7 +89,7 @@ const Dashboard = ({
                     dateString = `${String(latestMes).padStart(2, '0')}/${latestAnio}`;
                 }
 
-                data[prog] = { count: latestRecord.cantidadPagos, date: dateString };
+                data[prog] = { count: latestRecord.cantidadPagos, amount: settlementAmount, date: dateString };
             }
             setProgramData(data);
             setIsProgramDataLoading(false);
@@ -93,12 +107,23 @@ const Dashboard = ({
     const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
     const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
     
-    const totalLiquidado = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
+    // Calculate total participants and total settled amount
+    const totalParticipants = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
+    const totalSettledAmount = Object.values(programData).reduce((sum, data) => sum + (data?.amount ?? 0), 0);
 
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <DashboardCard title="Total Activos" value={totalLiquidado} icon={Users} color="blue" subtitle="Padrón liquidado" isLoading={isProgramDataLoading} />
+            {/* Updated DashboardCard with the new structure */}
+            <DashboardCard 
+              title="Total Padrón Liquidado" 
+              value={totalParticipants} 
+              secondaryValue={formatCurrency(totalSettledAmount)}
+              icon={Users} 
+              color="blue" 
+              subtitle="Suma de últimas liquidaciones" 
+              isLoading={isProgramDataLoading} 
+            />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Pagos" value={paymentAlertCount} icon={DollarSign} color="yellow" subtitle="Próximos a vencer/vencidos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentAlert')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
@@ -116,7 +141,7 @@ const Dashboard = ({
                             value={data?.count ?? 0} 
                             icon={Briefcase} 
                             subtitle={subtitle}
-                            onClick={() => setSelectedProgramDetail(prog)} 
+                            onClick={() => setSelectedProgramDetail(prog)}
                             actionText="Ver Análisis Mensual" 
                             color="indigo" 
                             isLoading={isProgramDataLoading}
