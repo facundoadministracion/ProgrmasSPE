@@ -129,42 +129,51 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
 
   const handleFixPagosAcumulados = async () => {
     if (!firestore) return;
-    toast({ title: 'Iniciando corrección...' });
+    toast({ title: 'Iniciando corrección...', description: 'Este proceso puede tardar unos segundos.' });
     try {
-      const participantsCollection = collection(firestore, 'participants');
-      const paymentRecordsCollection = collection(firestore, 'paymentRecords');
-      const participantsSnapshot = await getDocs(participantsCollection);
-      const paymentRecordsSnapshot = await getDocs(paymentRecordsCollection);
-      const paymentCounts: { [key: string]: number } = {};
-      paymentRecordsSnapshot.docs.forEach(recordDoc => {
-        const record = recordDoc.data();
-        if (record.participantes && Array.isArray(record.participantes)) {
-          record.participantes.forEach((p: { id: string; }) => {
-            if (p.id) { paymentCounts[p.id] = (paymentCounts[p.id] || 0) + 1; }
-          });
+      // 1. Leer todos los pagos de 'pagosRegistrados' y agruparlos por participante.
+      const pagosRef = collection(firestore, 'pagosRegistrados');
+      const pagosSnapshot = await getDocs(pagosRef);
+      
+      const paymentCounts = new Map<string, number>();
+      pagosSnapshot.forEach(doc => {
+        const payment = doc.data();
+        if (payment.participantId) {
+          paymentCounts.set(payment.participantId, (paymentCounts.get(payment.participantId) || 0) + 1);
         }
       });
+
+      // 2. Leer todos los participantes.
+      const participantsRef = collection(firestore, 'participants');
+      const participantsSnapshot = await getDocs(participantsRef);
+      
+      // 3. Crear un lote para actualizar solo los contadores incorrectos.
       const batch = writeBatch(firestore);
-      let updatedCount = 0;
-      participantsSnapshot.docs.forEach(participantDoc => {
-        const participantId = participantDoc.id;
-        const participantData = participantDoc.data();
-        const correctPaymentCount = paymentCounts[participantId] || 0;
-        if (participantData.pagosAcumulados !== correctPaymentCount) {
-          const participantRef = participantDoc.ref;
-          batch.update(participantRef, { pagosAcumulados: correctPaymentCount });
-          updatedCount++;
+      let updatesNeeded = 0;
+      
+      participantsSnapshot.forEach(doc => {
+        const participantId = doc.id;
+        const participant = doc.data();
+        const correctCount = paymentCounts.get(participantId) || 0;
+        
+        // Comprobar si el contador del perfil es diferente al recién calculado.
+        if ((participant.pagosAcumulados || 0) !== correctCount) {
+          batch.update(doc.ref, { pagosAcumulados: correctCount });
+          updatesNeeded++;
         }
       });
-      if (updatedCount > 0) {
-          await batch.commit();
-          toast({ title: '¡Corrección completada!', description: `Se actualizaron ${updatedCount} participante(s).` });
+
+      // 4. Ejecutar el lote solo si hay cambios.
+      if (updatesNeeded > 0) {
+        await batch.commit();
+        toast({ title: '¡Corrección Completada!', description: `Se han actualizado los contadores de ${updatesNeeded} participante(s).` });
       } else {
-          toast({ title: 'No se necesitaron cambios' });
+        toast({ title: 'Diagnóstico Finalizado', description: 'Todos los contadores ya estaban sincronizados. No se necesitaron cambios.' });
       }
+
     } catch (error) {
       console.error('Error al corregir los pagos acumulados:', error);
-      toast({ variant: "destructive", title: 'Error en la corrección' });
+      toast({ variant: "destructive", title: 'Error en la corrección', description: 'Ocurrió un error inesperado. Revisa la consola para más detalles.' });
     }
   };
 
