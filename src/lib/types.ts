@@ -31,6 +31,7 @@ export type Participant = {
   ultimoPago?: string; // Format "MM/YYYY"
   estado?: 'Activo' | 'Ingresado' | 'Baja' | 'Requiere Atención';
   mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
+  historialPagos?: string[]; // Array of "YYYY-MM"
 };
 
 export type Payment = {
