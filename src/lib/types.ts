@@ -61,13 +61,25 @@ export type PaymentRecord = {
 export type Novedad = {
     id: string;
     participantId: string;
-    participantName: string;
-    dni: string;
     descripcion: string;
-    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA';
-    fecha: string; // YYYY-MM-DD
     fechaRealCarga: any; // serverTimestamp
     ownerId: string;
+    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA' | 'REACTIVACION' | 'BAJA_DEFINITIVA';
+
+    // Optional fields that may or may not be present
+    participantName?: string;
+    dni?: string;
+    fecha?: string; // YYYY-MM-DD
+
+    // Fields from Baja/Reactivacion forms
+    mesEvento?: string;
+    anoEvento?: string;
+    actoAdministrativo?: string;
+    motivo?: string;
+    tipoActo?: string;
+    numeroActo?: string;
+    causalInforme?: string;
+    detalle?: string;
 }
 
 export type Asistencia = {

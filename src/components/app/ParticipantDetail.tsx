@@ -108,7 +108,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if (!firestore || !user) return;
     const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
     const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
-    const updatedParticipant = { activo: false, estado: 'Baja', actoAdministrativo: actoAdmin || participant.actoAdministrativo };
+    const updatedParticipant: Partial<Participant> = { activo: false, estado: 'Baja', actoAdministrativo: actoAdmin || participant.actoAdministrativo };
 
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
@@ -118,7 +118,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if(isActoAdmin && bajaData.causalInforme) descripcion += ` Causal: ${bajaData.causalInforme}.`;
     if(bajaData.detalle) descripcion += ` Detalles: ${bajaData.detalle}.`;
 
-    const newNovedad = {
+    const newNovedad: Omit<Novedad, 'id'> = {
       ...bajaData,
       participantId: participant.id, descripcion, type: 'BAJA_DEFINITIVA', fechaRealCarga: serverTimestamp(), ownerId: user.uid
     };
@@ -131,7 +131,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   
   const handleReactivate = async () => {
     if (!firestore || !user || !reactivationData.month || !reactivationData.year) return;
-    const updatedParticipant = { activo: true, estado: 'Activo', actoAdministrativo: reactivationData.decree || participant.actoAdministrativo };
+    const updatedParticipant: Partial<Participant> = { activo: true, estado: 'Activo', actoAdministrativo: reactivationData.decree || participant.actoAdministrativo };
     
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
@@ -140,7 +140,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     let descripcion = `Reactivación registrada para ${monthName} de ${reactivationData.year}.`;
     if(reactivationData.decree) descripcion += ` Decreto N°: ${reactivationData.decree}.`;
 
-    const newNovedad = {
+    const newNovedad: Omit<Novedad, 'id'> = {
         participantId: participant.id, descripcion, type: 'REACTIVACION', mesEvento: reactivationData.month, anoEvento: reactivationData.year, 
         actoAdministrativo: reactivationData.decree, fechaRealCarga: serverTimestamp(), ownerId: user.uid
     };
@@ -156,7 +156,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
     const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
     const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
-    const updatedParticipant = { actoAdministrativo: actoAdmin || participant.actoAdministrativo };
+    const updatedParticipant: Partial<Participant> = { actoAdministrativo: actoAdmin || participant.actoAdministrativo };
 
     const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
     let newDescription = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
@@ -185,7 +185,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const novedadRef = doc(firestore, 'novedades', reactivationToEdit.id);
     await updateDoc(novedadRef, { descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree });
 
-    const updatedParticipant = { actoAdministrativo: decree || participant.actoAdministrativo };
+    const updatedParticipant: Partial<Participant> = { actoAdministrativo: decree || participant.actoAdministrativo };
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
 
