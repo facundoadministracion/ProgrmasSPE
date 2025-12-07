@@ -359,7 +359,7 @@ export default function App() {
       </Dialog>
       
       <Dialog open={!!selectedParticipant} onOpenChange={(isOpen) => !isOpen && handleSelectParticipant(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Legajo Personal</DialogTitle>
             <DialogDescription>Información del participante, pagos y novedades.</DialogDescription>
