@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import type { UserRole } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, collection, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, writeBatch, deleteDoc, query, where } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -41,7 +41,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Loader2, Edit, Wrench, Trash2, PlusCircle } from 'lucide-react';
+import { Loader2, Edit, Wrench, Trash2, PlusCircle, Calendar } from 'lucide-react'; // Icono Corregido
 import { ROLES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 
@@ -123,7 +123,59 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
       setUserToDelete(null);
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar al usuario." });
+      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar el usuario." });
+    }
+  };
+
+  const handleCorrectDates = async () => {
+    if (!firestore) return;
+    toast({ title: 'Iniciando corrección de fechas...', description: 'Buscando participantes de Tecnoempleo.' });
+
+    const convertDate = (dateStr: string) => {
+        if (!dateStr || !dateStr.includes('/')) return null;
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return null;
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    };
+
+    try {
+        const q = query(collection(firestore, "participants"), where("programa", "==", "Tecnoempleo"));
+        const querySnapshot = await getDocs(q);
+        
+        const batch = writeBatch(firestore);
+        let updatesNeeded = 0;
+
+        querySnapshot.forEach(doc => {
+            const participant = doc.data();
+            const updates: { [key: string]: any } = {};
+
+            const newFechaNacimiento = convertDate(participant.fechaNacimiento);
+            if (newFechaNacimiento && newFechaNacimiento !== participant.fechaNacimiento) {
+                updates.fechaNacimiento = newFechaNacimiento;
+            }
+
+            const newFechaIngreso = convertDate(participant.fechaIngreso);
+            if (newFechaIngreso && newFechaIngreso !== participant.fechaIngreso) {
+                updates.fechaIngreso = newFechaIngreso;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                batch.update(doc.ref, updates);
+                updatesNeeded++;
+            }
+        });
+
+        if (updatesNeeded > 0) {
+            await batch.commit();
+            toast({ title: '¡Fechas Corregidas!', description: `Se han actualizado las fechas de ${updatesNeeded} participante(s).` });
+        } else {
+            toast({ title: 'Diagnóstico Finalizado', description: 'No se encontraron fechas con formato incorrecto en Tecnoempleo.' });
+        }
+
+    } catch (error) {
+        console.error('Error corrigiendo fechas:', error);
+        toast({ variant: "destructive", title: 'Error en la Corrección', description: 'Ocurrió un error inesperado.' });
     }
   };
 
@@ -131,7 +183,6 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
     if (!firestore) return;
     toast({ title: 'Iniciando corrección...', description: 'Este proceso puede tardar unos segundos.' });
     try {
-      // 1. Leer todos los pagos de 'pagosRegistrados' y agruparlos por participante.
       const pagosRef = collection(firestore, 'pagosRegistrados');
       const pagosSnapshot = await getDocs(pagosRef);
       
@@ -143,11 +194,9 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
         }
       });
 
-      // 2. Leer todos los participantes.
       const participantsRef = collection(firestore, 'participants');
       const participantsSnapshot = await getDocs(participantsRef);
       
-      // 3. Crear un lote para actualizar solo los contadores incorrectos.
       const batch = writeBatch(firestore);
       let updatesNeeded = 0;
       
@@ -156,14 +205,12 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
         const participant = doc.data();
         const correctCount = paymentCounts.get(participantId) || 0;
         
-        // Comprobar si el contador del perfil es diferente al recién calculado.
         if ((participant.pagosAcumulados || 0) !== correctCount) {
           batch.update(doc.ref, { pagosAcumulados: correctCount });
           updatesNeeded++;
         }
       });
 
-      // 4. Ejecutar el lote solo si hay cambios.
       if (updatesNeeded > 0) {
         await batch.commit();
         toast({ title: '¡Corrección Completada!', description: `Se han actualizado los contadores de ${updatesNeeded} participante(s).` });
@@ -180,11 +227,14 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Gestión de Usuarios del Sistema</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Gestión y Mantenimiento</h2>
         {currentUserRole === ROLES.ADMIN && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleCorrectDates}>
+              <Calendar className="mr-2 h-4 w-4" /> Corregir Fechas (Tecnoempleo)
+            </Button>
             <Button variant="outline" onClick={handleFixPagosAcumulados}>
-              <Wrench className="mr-2 h-4 w-4" /> Corregir Pagos
+              <Wrench className="mr-2 h-4 w-4" /> Corregir Contadores
             </Button>
             <Button onClick={() => setCreateDialogOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4"/> Nuevo Usuario
@@ -194,7 +244,7 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
       </div>
       
       <Card>
-        <CardHeader><CardTitle>Lista de Usuarios</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Lista de Usuarios del Sistema</CardTitle></CardHeader>
         <CardContent>
           {isLoading ? <div className="p-8 text-center text-gray-400 flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5"/>Cargando...</div> : (
             <Table>

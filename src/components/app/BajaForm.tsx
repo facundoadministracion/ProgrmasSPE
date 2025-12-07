@@ -62,7 +62,7 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg relative max-h-full overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative max-h-full overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Registrar Baja de Participante</h2>
@@ -70,75 +70,81 @@ const BajaForm = ({ participantId, participantName, ownerId, onConfirm, onCancel
           </div>
           <p className="text-sm text-gray-600 mb-6">Estás por dar de baja a <strong>{participantName}</strong>.</p>
 
-          <div className="space-y-4">
-            <div>
-                <label className="block text-sm font-bold mb-1">Motivo de la Baja</label>
-                <Select value={motivo} onValueChange={setMotivo}>
-                    <SelectTrigger><SelectValue placeholder="Seleccione un motivo..." /></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Acto Administrativo">Acto Administrativo</SelectItem>
-                        <SelectItem value="Cruce SINTyS">Cruce SINTyS</SelectItem>
-                        <SelectItem value="Informe Vinculados">Informe Vinculados</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {isActoAdministrativo && (
-              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-gray-50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            {/* Columna Izquierda */}
+            <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold mb-1">Tipo de Acto</label>
-                  <Select value={tipoActo} onValueChange={setTipoActo}>
-                      <SelectTrigger><SelectValue placeholder="Tipo..." /></SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="Decreto">Decreto</SelectItem>
-                          <SelectItem value="Resolución">Resolución</SelectItem>
-                      </SelectContent>
-                  </Select>
+                    <label className="block text-sm font-bold mb-1">1. Motivo de la Baja</label>
+                    <Select value={motivo} onValueChange={setMotivo}>
+                        <SelectTrigger><SelectValue placeholder="Seleccione un motivo..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Acto Administrativo">Acto Administrativo</SelectItem>
+                            <SelectItem value="Cruce SINTyS">Cruce SINTyS</SelectItem>
+                            <SelectItem value="Informe Vinculados">Informe Vinculados</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1">Número</label>
-                  <Input value={numeroActo} onChange={(e) => setNumeroActo(e.target.value)} placeholder="Ej: 1234/24" />
-                </div>
-              </div>
-            )}
 
-            {isCausalRequired && (
-              <div className="p-4 border rounded-md bg-gray-50">
-                <label className="block text-sm font-bold mb-1">Causal</label>
-                <Select value={causalInforme} onValueChange={setCausalInforme}>
-                    <SelectTrigger><SelectValue placeholder="Seleccione una causal..." /></SelectTrigger>
-                    <SelectContent>
-                        {getCausalOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            <div className="p-4 border rounded-md bg-blue-50 border-blue-200">
-                <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-blue-800"><Calendar /> Período del Evento</h4>
-                <p className="text-xs text-blue-700 mb-3">Indica el mes y año en que se hizo efectiva la baja.</p>
-                <div className="grid grid-cols-2 gap-4">
+                {isActoAdministrativo && (
+                  <div className="grid grid-cols-2 gap-4 p-3 border rounded-md bg-gray-50">
                     <div>
-                        <label className="block text-sm font-bold mb-1">Mes de Baja</label>
-                        <Select value={mesBaja} onValueChange={setMesBaja}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
-                        </Select>
+                      <label className="block text-sm font-bold mb-1">Tipo de Acto</label>
+                      <Select value={tipoActo} onValueChange={setTipoActo}>
+                          <SelectTrigger><SelectValue placeholder="Tipo..." /></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="Decreto">Decreto</SelectItem>
+                              <SelectItem value="Resolución">Resolución</SelectItem>
+                          </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                        <label className="block text-sm font-bold mb-1">Año de Baja</label>
-                        <Select value={anioBaja} onValueChange={setAnioBaja}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                        </Select>
+                      <label className="block text-sm font-bold mb-1">Número</label>
+                      <Input value={numeroActo} onChange={(e) => setNumeroActo(e.target.value)} placeholder="Ej: 1234/24" />
                     </div>
+                  </div>
+                )}
+
+                {isCausalRequired && (
+                  <div>
+                    <label className="block text-sm font-bold mb-1">2. Causal</label>
+                    <Select value={causalInforme} onValueChange={setCausalInforme}>
+                        <SelectTrigger><SelectValue placeholder="Seleccione una causal..." /></SelectTrigger>
+                        <SelectContent>
+                            {getCausalOptions().map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                  </div>
+                )}
+            </div>
+
+            {/* Columna Derecha */}
+            <div className="space-y-4">
+                <div className="p-3 border rounded-md bg-blue-50 border-blue-200">
+                    <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-blue-800"><Calendar /> 3. Período del Evento</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-bold mb-1">Mes</label>
+                            <Select value={mesBaja} onValueChange={setMesBaja}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold mb-1">Año</label>
+                            <Select value={anioBaja} onValueChange={setAnioBaja}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold mb-1 flex items-center gap-2"><FileText size={16}/>4. Detalles Adicionales</label>
+                    <Textarea value={detalle} onChange={(e) => setDetalle(e.target.value)} placeholder="Añada cualquier información relevante..." rows={isActoAdministrativo || isCausalRequired ? 3 : 6}/>
                 </div>
             </div>
 
-            <div>
-                <label className="block text-sm font-bold mb-1 flex items-center gap-2"><FileText size={16}/>Detalles Adicionales</label>
-                <Textarea value={detalle} onChange={(e) => setDetalle(e.target.value)} placeholder="Añada cualquier información relevante..." />
-            </div>
           </div>
         </div>
 
