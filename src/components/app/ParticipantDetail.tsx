@@ -22,7 +22,8 @@ const formatDate = (dateString: string | undefined | null) => {
   try {
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
     if (isNaN(date.getTime())) return 'Fecha inválida';
-    return date.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const monthName = meses[date.getUTCMonth()];
+    return `${monthName} ${date.getUTCFullYear()}`;
   } catch (error) {
     return '-';
   }
@@ -74,7 +75,11 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
 
   useEffect(() => {
     if (novedadToEdit) {
-      setNewDescription(novedadToEdit.descripcion);
+      let description = novedadToEdit.descripcion;
+      if (description.includes('Respaldo:')) {
+        description = description.replace('Respaldo:', 'Decreto N°:');
+      }
+      setNewDescription(description);
     } else {
       setNewDescription('');
     }
@@ -96,8 +101,8 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
     await updateDoc(partRef, { activo: false, estado: 'Baja', actoAdministrativo: actoAdmin || participant.actoAdministrativo });
 
     const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
-    let descripcion = `Baja por ${bajaData.motivo} (${monthName} ${bajaData.anioBaja}).`;
-    if(actoAdmin) descripcion += ` Respaldo: ${actoAdmin}.`;
+    let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}. Período de baja: ${monthName} - ${bajaData.anioBaja}.`;
+    if(actoAdmin) descripcion += ` Decreto N° a conseguir. Causal: ${bajaData.causal || 'No especificada'}.`;
 
     await addDoc(collection(firestore, 'novedades'), {
       ...bajaData,
@@ -123,8 +128,8 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
     await updateDoc(partRef, { activo: true, estado: 'Activo', actoAdministrativo: reactivationData.decree || participant.actoAdministrativo });
     
     const monthName = meses[parseInt(reactivationData.month, 10) - 1];
-    let descripcion = `Reactivación para ${monthName} de ${reactivationData.year}.`;
-    if(reactivationData.decree) descripcion += ` Respaldo: ${reactivationData.decree}.`;
+    let descripcion = `Reactivación registrada para el período ${monthName} de ${reactivationData.year}.`;
+    if(reactivationData.decree) descripcion += ` Decreto N°: ${reactivationData.decree}.`;
 
     await addDoc(collection(firestore, 'novedades'), {
         participantId: participant.id, 
@@ -234,7 +239,7 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
             </CardHeader>
             <CardContent className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-6">
               {renderField('Programa', participant.programa)}
-              {renderField('Fecha de Nacimiento', formatDate(participant.fechaNacimiento))}
+              {renderField('Fecha de Nacimiento', new Date(participant.fechaNacimiento + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }))}
               {renderField('Fecha de Alta', formatDate(participant.fechaIngreso))}
               {renderField('Departamento', participant.departamento)}
             </CardContent>
