@@ -4,7 +4,7 @@ import { createInterface } from 'readline';
 
 // --- CONFIGURACIÓN DEL SCRIPT ---
 const DNI_TO_DELETE = '39906437';
-const SERVICE_ACCOUNT_PATH = './serviceAccountKey.json'; // CAMBIA ESTO por la ruta a tu archivo de credenciales
+const SERVICE_ACCOUNT_PATH = '../serviceAccountKey.json'; // CAMBIA ESTO por la ruta a tu archivo de credenciales
 const PROJECT_ID = 'programas-de-empleo-lr'; // Asegúrate que este es tu ID de proyecto
 // --------------------------------
 

@@ -21,6 +21,7 @@ service cloud.firestore {
     match /novedades/{novedadId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && getUserRole(request.auth.uid) in ['admin', 'data-entry'];
+      allow update, delete: if request.auth != null && getUserRole(request.auth.uid) == 'admin'; // <-- REGLA AÑADIDA
     }
 
     // Regla corregida para la colección principal de asistencias

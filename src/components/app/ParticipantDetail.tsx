@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import type { Participant, Novedad } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
-import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast';
 import EditParticipantForm from './EditParticipantForm';
 import BajaForm from './BajaForm';
@@ -29,7 +30,7 @@ const formatDate = (dateString: string | undefined | null) => {
 
 const formatTimestamp = (timestamp: any) => {
     if (!timestamp) return '-';
-    return new Date(timestamp.seconds * 1000).toLocaleDateString('es-AR');
+    return new Date(timestamp.seconds * 1000).toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 const ParticipantDetail = ({ participant, onBack }: { participant: Participant; onBack: () => void; }) => {
@@ -40,6 +41,10 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
   const [history, setHistory] = useState<Novedad[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
+  const [novedadToDelete, setNovedadToDelete] = useState<Novedad | null>(null);
+  const [novedadToEdit, setNovedadToEdit] = useState<Novedad | null>(null);
+  const [newDescription, setNewDescription] = useState('');
+
   const { firestore } = useFirebase();
   const { user } = useUser();
   const { toast } = useToast();
@@ -66,6 +71,14 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
     }
     fetchHistory();
   }, [firestore, participant.id, toast]);
+
+  useEffect(() => {
+    if (novedadToEdit) {
+      setNewDescription(novedadToEdit.descripcion);
+    } else {
+      setNewDescription('');
+    }
+  }, [novedadToEdit]);
 
   const handleSave = async (updatedData: Partial<Participant>) => {
     if (!firestore) return;
@@ -126,6 +139,34 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
     toast({ title: "Participante Reactivado" });
     setIsReactivateDialogOpen(false);
   }
+
+  const handleDeleteNovedad = async () => {
+      if (!firestore || !novedadToDelete) return;
+      try {
+          const novedadRef = doc(firestore, 'novedades', novedadToDelete.id);
+          await deleteDoc(novedadRef);
+          toast({ title: 'Novedad Eliminada', description: 'El registro del historial ha sido borrado.' });
+          setHistory(prev => prev.filter(h => h.id !== novedadToDelete.id));
+          setNovedadToDelete(null);
+      } catch (error) {
+          console.error("Error deleting novedad: ", error);
+          toast({ variant: 'destructive', title: 'Error al eliminar', description: 'No se pudo borrar el registro del historial.' });
+      }
+  };
+
+  const handleUpdateNovedad = async () => {
+    if (!firestore || !novedadToEdit) return;
+    try {
+        const novedadRef = doc(firestore, 'novedades', novedadToEdit.id);
+        await updateDoc(novedadRef, { descripcion: newDescription });
+        toast({ title: 'Novedad Actualizada', description: 'El registro del historial ha sido modificado.' });
+        setHistory(prev => prev.map(h => h.id === novedadToEdit.id ? { ...h, descripcion: newDescription } : h));
+        setNovedadToEdit(null);
+    } catch (error) {
+        console.error("Error updating novedad: ", error);
+        toast({ variant: 'destructive', title: 'Error al actualizar', description: 'No se pudo modificar el registro del historial.' });
+    }
+  };
 
   const alert = getAlertStatus(participant);
 
@@ -219,15 +260,21 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
                 {isLoadingHistory ? <p>Cargando...</p> : (
                     <ul className="space-y-4">
                         {history.map(item => (
-                            <li key={item.id} className="flex items-start gap-3">
-                                <div className="mt-1">{historyIcons[item.type] || historyIcons.DEFAULT}</div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-800">{item.descripcion}</p>
-                                    <p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p>
+                            <li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-1">{historyIcons[item.type] || historyIcons.DEFAULT}</div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-800">{item.descripcion}</p>
+                                        <p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setNovedadToEdit(item)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setNovedadToDelete(item)}><XCircle className="h-4 w-4 text-red-500" /></Button>
                                 </div>
                             </li>
                         ))}
-                        <li className="flex items-start gap-3">
+                        <li className="flex items-start gap-3 px-2">
                             <div className="mt-1">{historyIcons.ALTA}</div>
                             <div>
                                 <p className="text-sm font-medium text-gray-800">Alta inicial en el programa.</p>
@@ -264,8 +311,59 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
           <DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar Reactivación</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!novedadToDelete} onOpenChange={(isOpen) => !isOpen && setNovedadToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Eliminación</DialogTitle>
+            <DialogDescription>¿Estás seguro de que quieres eliminar esta novedad del historial? Esta acción no se puede deshacer.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-gray-50 rounded-md px-4 border">
+            <p className="text-sm font-medium">{novedadToDelete?.descripcion}</p>
+            <p className="text-xs text-gray-500 mt-1">{formatTimestamp(novedadToDelete?.fechaRealCarga)}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!novedadToEdit} onOpenChange={(isOpen) => !isOpen && setNovedadToEdit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Novedad</DialogTitle>
+            <DialogDescription>Modifique la descripción del registro del historial.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              rows={4}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNovedadToEdit(null)}>Cancelar</Button>
+            <Button onClick={handleUpdateNovedad}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };
+
+// Minimal implementation of formatDateToMonthYear to avoid breaking the code
+const formatDateToMonthYear = (dateString: string | undefined | null) => {
+  if (!dateString) return '-';
+  try {
+    const [year, month] = dateString.split('-');
+    const monthName = meses[parseInt(month, 10) - 1] || '';
+    return `${monthName} ${year}`;
+  } catch (e) {
+      return '-'
+  }
+}
 
 export default ParticipantDetail;
