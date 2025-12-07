@@ -23,8 +23,7 @@ const formatDate = (dateString: string | undefined | null) => {
   try {
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
     if (isNaN(date.getTime())) return 'Fecha inválida';
-    const monthName = meses[date.getUTCMonth()];
-    return `${monthName} ${date.getUTCFullYear()}`;
+    return `${meses[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
   } catch (error) { return '-'; }
 };
 
@@ -37,14 +36,14 @@ const formatDateToMonthYear = (dateString: string | undefined | null) => {
   if (!dateString) return '-';
   try {
     const [year, month] = dateString.split('-');
-    const monthName = meses[parseInt(month, 10) - 1] || '';
-    return `${monthName} ${year}`;
+    return `${meses[parseInt(month, 10) - 1] || ''} ${year}`;
   } catch (e) { return '-'; }
 }
 
 // Main Component
-const ParticipantDetail = ({ participant, onBack }: { participant: Participant; onBack: () => void; }) => {
+const ParticipantDetail = ({ participant: initialParticipant, onBack }: { participant: Participant; onBack: () => void; }) => {
   // Component State
+  const [participant, setParticipant] = useState(initialParticipant);
   const [isEditing, setIsEditing] = useState(false);
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
@@ -52,17 +51,16 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
   const [history, setHistory] = useState<Novedad[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
-  // State for legacy text-based editing
   const [novedadToEditText, setNovedadToEditText] = useState<Novedad | null>(null);
   const [newDescription, setNewDescription] = useState('');
 
-  // State for new form-based reactivation editing
   const [reactivationToEdit, setReactivationToEdit] = useState<Novedad | null>(null);
   const [reactivationEditData, setReactivationEditData] = useState({ month: '', year: '', decree: '' });
 
+  const [bajaToEdit, setBajaToEdit] = useState<Novedad | null>(null);
+
   const [novedadToDelete, setNovedadToDelete] = useState<Novedad | null>(null);
 
-  // Hooks
   const { firestore } = useFirebase();
   const { user } = useUser();
   const { toast } = useToast();
@@ -75,40 +73,25 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
         try {
             const q = query(collection(firestore, 'novedades'), where('participantId', '==', participant.id), orderBy('fechaRealCarga', 'desc'));
             const querySnapshot = await getDocs(q);
-            const historyData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Novedad[];
-            setHistory(historyData);
+            setHistory(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Novedad[]);
         } catch (error) {
             console.error("Error fetching history: ", error);
             toast({ variant: 'destructive', title: 'Error al cargar historial' });
-        } finally {
-            setIsLoadingHistory(false);
-        }
+        } finally { setIsLoadingHistory(false); }
     }
     fetchHistory();
   }, [firestore, participant.id, toast]);
 
   useEffect(() => {
     if (novedadToEditText) {
-      let description = novedadToEditText.descripcion;
-      if (description.includes('Respaldo:')) {
-        description = description.replace('Respaldo:', 'Decreto N°:');
-      }
-      setNewDescription(description);
-    } else {
-      setNewDescription('');
-    }
+      setNewDescription(novedadToEditText.descripcion.replace('Respaldo:', 'Decreto N°:'));
+    } else { setNewDescription(''); }
   }, [novedadToEditText]);
 
   useEffect(() => {
     if (reactivationToEdit) {
-        setReactivationEditData({
-            month: reactivationToEdit.mesEvento || '',
-            year: reactivationToEdit.anoEvento || '',
-            decree: reactivationToEdit.actoAdministrativo || ''
-        });
-    } else {
-        setReactivationEditData({ month: '', year: '', decree: '' });
-    }
+        setReactivationEditData({ month: reactivationToEdit.mesEvento || '', year: reactivationToEdit.anoEvento || '', decree: reactivationToEdit.actoAdministrativo || '' });
+    } else { setReactivationEditData({ month: '', year: '', decree: '' }); }
   }, [reactivationToEdit]);
 
   // Data Handlers
@@ -116,271 +99,187 @@ const ParticipantDetail = ({ participant, onBack }: { participant: Participant; 
     if (!firestore) return;
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedData);
+    setParticipant(prev => ({...prev, ...updatedData}));
     toast({ title: "Legajo Actualizado" });
     setIsEditing(false);
   };
 
   const handleBajaConfirm = async (bajaData: any) => {
     if (!firestore || !user) return;
-    const actoAdmin = (bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS') ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
+    const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
+    const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
+    const updatedParticipant = { activo: false, estado: 'Baja', actoAdministrativo: actoAdmin || participant.actoAdministrativo };
+
     const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, { activo: false, estado: 'Baja', actoAdministrativo: actoAdmin || participant.actoAdministrativo });
+    await updateDoc(partRef, updatedParticipant);
 
     const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
-    let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}. Período de baja: ${monthName} - ${bajaData.anioBaja}.`;
-    if(actoAdmin) descripcion += ` Decreto N° a conseguir. Causal: ${bajaData.causal || 'No especificada'}.`;
+    let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
+    if(isActoAdmin && bajaData.causalInforme) descripcion += ` Causal: ${bajaData.causalInforme}.`;
+    if(bajaData.detalle) descripcion += ` Detalles: ${bajaData.detalle}.`;
 
-    await addDoc(collection(firestore, 'novedades'), {
+    const newNovedad = {
       ...bajaData,
-      participantId: participant.id,
-      descripcion, type: 'BAJA_DEFINITIVA',
-      mesEvento: bajaData.mesBaja, anoEvento: bajaData.anioBaja,
-      fechaRealCarga: serverTimestamp(), ownerId: user.uid
-    });
+      participantId: participant.id, descripcion, type: 'BAJA_DEFINITIVA', fechaRealCarga: serverTimestamp(), ownerId: user.uid
+    };
+    const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
+    setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}}, ...prev]);
+    setParticipant(prev => ({...prev, ...updatedParticipant}));
     toast({ title: "Participante Dado de Baja" });
     setIsBajaDialogOpen(false);
   };
   
   const handleReactivate = async () => {
-    if (!firestore || !user || !reactivationData.month || !reactivationData.year) {
-        toast({ variant: 'destructive', title: 'Datos incompletos' });
-        return;
-    }
+    if (!firestore || !user || !reactivationData.month || !reactivationData.year) return;
+    const updatedParticipant = { activo: true, estado: 'Activo', actoAdministrativo: reactivationData.decree || participant.actoAdministrativo };
+    
     const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, { activo: true, estado: 'Activo', actoAdministrativo: reactivationData.decree || participant.actoAdministrativo });
+    await updateDoc(partRef, updatedParticipant);
     
     const monthName = meses[parseInt(reactivationData.month, 10) - 1];
-    let descripcion = `Reactivación registrada para el período ${monthName} de ${reactivationData.year}.`;
+    let descripcion = `Reactivación registrada para ${monthName} de ${reactivationData.year}.`;
     if(reactivationData.decree) descripcion += ` Decreto N°: ${reactivationData.decree}.`;
 
-    await addDoc(collection(firestore, 'novedades'), {
-        participantId: participant.id, descripcion, type: 'REACTIVACION', 
-        mesEvento: reactivationData.month, anoEvento: reactivationData.year, 
-        actoAdministrativo: reactivationData.decree, 
-        fechaRealCarga: serverTimestamp(), ownerId: user.uid
-    });
+    const newNovedad = {
+        participantId: participant.id, descripcion, type: 'REACTIVACION', mesEvento: reactivationData.month, anoEvento: reactivationData.year, 
+        actoAdministrativo: reactivationData.decree, fechaRealCarga: serverTimestamp(), ownerId: user.uid
+    };
+    const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
+    setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}}, ...prev]);
+    setParticipant(prev => ({...prev, ...updatedParticipant}));
     toast({ title: "Participante Reactivado" });
     setIsReactivateDialogOpen(false);
   }
 
-  const handleUpdateReactivation = async () => {
-    if (!firestore || !reactivationToEdit || !user) return;
+  const handleUpdateBaja = async (bajaData: any) => {
+    if (!firestore || !bajaToEdit) return;
 
+    const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
+    const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
+    const updatedParticipant = { actoAdministrativo: actoAdmin || participant.actoAdministrativo };
+
+    const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
+    let newDescription = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
+    if(isActoAdmin && bajaData.causalInforme) newDescription += ` Causal: ${bajaData.causalInforme}.`;
+    if(bajaData.detalle) newDescription += ` Detalles: ${bajaData.detalle}.`;
+    
+    const novedadRef = doc(firestore, 'novedades', bajaToEdit.id);
+    await updateDoc(novedadRef, { ...bajaData, descripcion: newDescription });
+
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, updatedParticipant);
+
+    toast({ title: 'Baja Actualizada' });
+    setHistory(prev => prev.map(h => h.id === bajaToEdit.id ? { ...h, ...bajaData, descripcion: newDescription } : h));
+    setParticipant(prev => ({...prev, ...updatedParticipant}));
+    setBajaToEdit(null);
+  };
+
+  const handleUpdateReactivation = async () => {
+    if (!firestore || !reactivationToEdit) return;
     const { month, year, decree } = reactivationEditData;
     const monthName = meses[parseInt(month, 10) - 1];
-    let newDescription = `Reactivación registrada para el período ${monthName} de ${year}.`;
+    let newDescription = `Reactivación para ${monthName} de ${year}.`;
     if (decree) newDescription += ` Decreto N°: ${decree}.`;
 
-    // Update Novedad in Firestore
     const novedadRef = doc(firestore, 'novedades', reactivationToEdit.id);
-    await updateDoc(novedadRef, { 
-        descripcion: newDescription, 
-        mesEvento: month, 
-        anoEvento: year, 
-        actoAdministrativo: decree
-    });
+    await updateDoc(novedadRef, { descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree });
 
-    // Update participant's main actoAdministrativo field
+    const updatedParticipant = { actoAdministrativo: decree || participant.actoAdministrativo };
     const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, { actoAdministrativo: decree });
+    await updateDoc(partRef, updatedParticipant);
 
-    toast({ title: 'Reactivación Actualizada', description: 'El historial y la ficha del participante han sido actualizados.'});
-
-    // Update local state
+    toast({ title: 'Reactivación Actualizada'});
     setHistory(prev => prev.map(h => h.id === reactivationToEdit.id ? { ...h, descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree } : h));
+    setParticipant(prev => ({...prev, ...updatedParticipant}));
     setReactivationToEdit(null);
   }
 
   const handleDeleteNovedad = async () => {
       if (!firestore || !novedadToDelete) return;
       try {
-          const novedadRef = doc(firestore, 'novedades', novedadToDelete.id);
-          await deleteDoc(novedadRef);
+          await deleteDoc(doc(firestore, 'novedades', novedadToDelete.id));
           toast({ title: 'Novedad Eliminada' });
           setHistory(prev => prev.filter(h => h.id !== novedadToDelete.id));
           setNovedadToDelete(null);
-      } catch (error) {
-          console.error("Error deleting novedad: ", error);
-          toast({ variant: 'destructive', title: 'Error al eliminar' });
-      }
+      } catch (error) { toast({ variant: 'destructive', title: 'Error al eliminar' }); }
   };
 
   const handleUpdateNovedadText = async () => {
     if (!firestore || !novedadToEditText) return;
     try {
-        const novedadRef = doc(firestore, 'novedades', novedadToEditText.id);
-        await updateDoc(novedadRef, { descripcion: newDescription });
+        await updateDoc(doc(firestore, 'novedades', novedadToEditText.id), { descripcion: newDescription });
         toast({ title: 'Novedad Actualizada' });
         setHistory(prev => prev.map(h => h.id === novedadToEditText.id ? { ...h, descripcion: newDescription } : h));
         setNovedadToEditText(null);
-    } catch (error) {
-        console.error("Error updating novedad: ", error);
-        toast({ variant: 'destructive', title: 'Error al actualizar' });
-    }
+    } catch (error) { toast({ variant: 'destructive', title: 'Error al actualizar' }); }
   };
 
   const handleEditClick = (item: Novedad) => {
-      if (item.type === 'REACTIVACION') {
-          setReactivationToEdit(item);
-      } else {
-          setNovedadToEditText(item);
-      }
+      if (item.type === 'REACTIVACION') setReactivationToEdit(item);
+      else if (item.type === 'BAJA_DEFINITIVA') setBajaToEdit(item);
+      else setNovedadToEditText(item);
   }
 
   // Render Helpers
   const alert = getAlertStatus(participant);
-
-  const renderField = (label: string, value: any) => (
-    <div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>
-  );
-
+  const renderField = (label: string, value: any) => (<div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>);
   const renderMetric = () => {
       const program = participant.programa?.toLowerCase();
-      if(program?.includes('tecno') || program?.includes('joven')) return renderField('Cantidad de Pagos', participant.pagosAcumulados);
+      if(program?.includes('tecno') || program?.includes('joven')) return renderField('Pagos Acumulados', participant.pagosAcumulados);
       if (program?.includes('tutor')) return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
       return null;
   }
-  
-  const historyIcons: { [key: string]: React.ReactElement } = {
-    BAJA_DEFINITIVA: <Ban className="h-4 w-4 text-red-600" />,
-    REACTIVACION: <Check className="h-4 w-4 text-green-600" />,
-    ALTA: <FileText className="h-4 w-4 text-blue-600" />,
-    DEFAULT: <History className="h-4 w-4 text-gray-500" />
-  }
+  const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, DEFAULT: <History/> }
 
-  if (isEditing) {
-    return <EditParticipantForm participant={participant} onSave={handleSave} onCancel={() => setIsEditing(false)} />;
-  }
+  if (isEditing) return <EditParticipantForm participant={participant} onSave={handleSave} onCancel={() => setIsEditing(false)} />;
 
   return (
     <div className="pb-10">
-      {/* Header & Main Actions */}
       <div className="flex justify-between items-center mb-6">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-2 h-4 w-4"/>Volver</Button>
         <div className="flex items-center gap-2">
           {participant.activo ? (
             <Button variant="destructive" onClick={() => setIsBajaDialogOpen(true)}><Ban className="mr-2 h-4 w-4"/>Dar de Baja</Button>
            ) : (
-            <Button variant="outline" className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={() => setIsReactivateDialogOpen(true)}><CheckCircle className="mr-2 h-4 w-4"/>Reactivar</Button>
+            <Button variant="outline" className="border-green-500 text-green-600" onClick={() => setIsReactivateDialogOpen(true)}><CheckCircle className="mr-2 h-4 w-4"/>Reactivar</Button>
            )}
           <Button onClick={() => setIsEditing(true)}><Edit className="mr-2 h-4 w-4"/>Editar Legajo</Button>
         </div>
       </div>
       
-      {/* Alert Box */}
-      {alert && (
-          <div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alert.type === 'red' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
-              {alert.type === 'red' ? <XCircle/> : <AlertTriangle />}
-              <div><h3 className="font-bold text-sm leading-tight">{alert.msg}</h3>
-              {participant.estado === 'Requiere Atención' && participant.mesAusencia && <p className="text-xs mt-1">{`Ausente en la liquidación de ${participant.mesAusencia.replace('/', ' de ')}`}.</p>}</div>
-          </div>
-      )}
+      {alert && (<div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alert.type === 'red' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
+        {alert.type === 'red' ? <XCircle/> : <AlertTriangle/>}
+        <div><h3 className="font-bold text-sm">{alert.msg}</h3>
+        {participant.estado === 'Requiere Atención' && participant.mesAusencia && <p className="text-xs mt-1">{`Ausente en ${participant.mesAusencia.replace('/', ' de ')}`}.</p>}</div>
+      </div>)}
 
-      {/* Main Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
           <Card>
-            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
-              <User className="h-10 w-10 text-gray-500" />
-              <div><CardTitle className="text-2xl">{participant.nombre}</CardTitle><CardDescription>DNI: {participant.dni} - Legajo: {participant.legajo || '-'}</CardDescription></div>
-            </CardHeader>
-            <CardContent className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-6">
+            <CardHeader className="flex-row items-center gap-4 space-y-0"><User/><CardTitle>{participant.nombre}</CardTitle><CardDescription>DNI: {participant.dni} - Legajo: {participant.legajo || '-'}</CardDescription></CardHeader>
+            <CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-6">
               {renderField('Programa', participant.programa)}
-              {renderField('Fecha de Nacimiento', new Date(participant.fechaNacimiento + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }))}
-              {renderField('Fecha de Alta', formatDate(participant.fechaIngreso))}
+              {renderField('Nacimiento', new Date(participant.fechaNacimiento + 'T00:00:00').toLocaleDateString('es-AR'))}
+              {renderField('Alta', formatDate(participant.fechaIngreso))}
               {renderField('Departamento', participant.departamento)}
             </CardContent>
           </Card>
         </div>
-        <div>
-            <Card>
-                <CardHeader><CardTitle>Información Clave</CardTitle></CardHeader>
-                <CardContent className="divide-y">
-                    {renderMetric()}
-                    {renderField('Último Pago', participant.ultimoPago ? formatDateToMonthYear(participant.ultimoPago) : '-')}
-                    {renderField('Acto Administrativo', participant.actoAdministrativo)}
-                    {renderField('Estado', participant.estado)}
-                </CardContent>
-            </Card>
-        </div>
+        <Card><CardHeader><CardTitle>Información Clave</CardTitle></CardHeader><CardContent className="divide-y">{renderMetric()}{renderField('Último Pago', formatDateToMonthYear(participant.ultimoPago))}{renderField('Acto Administrativo', participant.actoAdministrativo)}{renderField('Estado', participant.estado)}</CardContent></Card>
       </div>
       
-      {/* History Card */}
-      <div className="mt-6">
-        <Card>
-            <CardHeader><CardTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Historial del Participante</CardTitle></CardHeader>
-            <CardContent>
-                {isLoadingHistory ? <p>Cargando...</p> : (
-                    <ul className="space-y-4">
-                        {history.map(item => (
-                            <li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-1">{historyIcons[item.type] || historyIcons.DEFAULT}</div>
-                                    <div><p className="text-sm font-medium text-gray-800">{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div>
-                                </div>
-                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(item)}><Pencil className="h-4 w-4 text-blue-500" /></Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setNovedadToDelete(item)}><XCircle className="h-4 w-4 text-red-500" /></Button>
-                                </div>
-                            </li>
-                        ))}
-                        <li className="flex items-start gap-3 px-2">
-                            <div className="mt-1">{historyIcons.ALTA}</div>
-                            <div><p className="text-sm font-medium text-gray-800">Alta inicial en el programa.</p><p className="text-xs text-gray-500">{formatDate(participant.fechaIngreso)}</p></div>
-                        </li>
-                    </ul>
-                )}
-            </CardContent>
-        </Card>
-      </div>
+      <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">
+        <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
+        <div className="flex opacity-0 group-hover:opacity-100"><Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}><Pencil/></Button><Button variant="ghost" size="icon" onClick={() => setNovedadToDelete(item)}><XCircle/></Button></div></li>))} <li className="flex items-start gap-3 px-2"><div className="mt-1 text-gray-500">{historyIcons.ALTA}</div><div><p>Alta inicial.</p><p className="text-xs text-gray-500">{formatDate(participant.fechaIngreso)}</p></div></li></ul>)}</CardContent></Card>
 
-      {/* Dialogs */}
-      {isBajaDialogOpen && <BajaForm participantId={participant.id} participantName={participant.nombre} ownerId={user?.uid || ''} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
+      {isBajaDialogOpen && <BajaForm participantName={participant.nombre} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
+      {bajaToEdit && <BajaForm participantName={participant.nombre} onConfirm={handleUpdateBaja} onCancel={() => setBajaToEdit(null)} initialData={bajaToEdit} isEditing={true} />}
 
-      <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className='grid grid-cols-2 gap-4'>
-                <div className="space-y-2"><label>Mes de Reactivación</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))} /></div>
-            </div>
-            <div className="space-y-2"><label>N° Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))} placeholder="Ej: Decreto 1234/23" /></div>
-          </div>
-          <DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar Reactivación</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-       <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className='grid grid-cols-2 gap-4'>
-                <div className="space-y-2"><label>Mes de Reactivación</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><label>Año</label><Input type="number" value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))} /></div>
-            </div>
-            <div className="space-y-2"><label>N° Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))} placeholder="Ej: Decreto 1234/23" /></div>
-          </div>
-          <DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar Cambios</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!novedadToDelete} onOpenChange={(isOpen) => !isOpen && setNovedadToDelete(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle><DialogDescription>Esta acción no se puede deshacer.</DialogDescription></DialogHeader>
-          <div className="py-4 bg-gray-50 rounded-md px-4 border"><p className="text-sm font-medium">{novedadToDelete?.descripcion}</p><p className="text-xs text-gray-500 mt-1">{formatTimestamp(novedadToDelete?.fechaRealCarga)}</p></div>
-          <DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!novedadToEditText} onOpenChange={(isOpen) => !isOpen && setNovedadToEditText(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar Novedad</DialogTitle><DialogDescription>Modifique la descripción del registro del historial.</DialogDescription></DialogHeader>
-          <div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4} className="w-full"/></div>
-          <DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar Cambios</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
+      {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
+      {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
+      {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
     </div>
   );
 };
