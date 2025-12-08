@@ -1,26 +1,37 @@
-# Firebase
-*.firebase.json
-*.firebaserc
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Node
-node_modules
-npm-debug.log
-yarn-error.log
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
 
-# Archivos de credenciales y secretos
-serviceAccountKey.json
-*.env
-.env.local
-.env.*
+# Build outputs
+/.next/
+/out/
+/build/
 
-# Logs
-logs
-*.log
+# Static exports
+/dist
 
-# Next.js
-.next/
-out/
-
-# Otros
+# Misc
 .DS_Store
-coverage/
+*.pem
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Firebase
+.firebase/
+*.firebase.*
+
+# Secrets
+serviceAccountKey.json

@@ -1,10 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
-  },
+  // La configuración 'eslint' fue eliminada porque ya no es compatible.
   
   // La configuración 'experimental.turbopack' fue eliminada.
   // Estaba causando una advertencia en la versión actual de Next.js.

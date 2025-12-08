@@ -31,6 +31,7 @@ import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial, { type Configuracion } from '@/components/app/ConfiguracionHistorial';
 import ParticipantsTab from '@/components/app/ParticipantsTab';
 import Dashboard from '@/components/app/Dashboard'; // Importamos el nuevo componente
+import ImportarPagosPage from './admin/importar-pagos/page';
 
 type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
@@ -299,6 +300,8 @@ export default function App() {
             return isAdmin ? <UserManagement users={allUsers || []} currentUser={user} isLoading={usersLoading} /> : null;
         case 'config': 
             return isAdmin ? renderConfig() : null;
+        case 'importar-pagos':
+            return isAdmin ? <ImportarPagosPage /> : null;
         default: 
             return null;
     }
@@ -325,6 +328,7 @@ export default function App() {
             {(isAdmin || isDataEntry) && <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('attendance')} isActive={activeTab === 'attendance'}><Calendar size={16} />Asistencia</SidebarMenuButton></SidebarMenuItem>}
             {isAdmin && <>
               <SidebarMenuItem><SidebarMenuButton onClick={() => setIsPaymentUploadOpen(true)}><DollarSign size={16} />Carga Pagos</SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('importar-pagos')} isActive={activeTab === 'importar-pagos'}><History size={16} />Importar Historial</SidebarMenuButton></SidebarMenuItem>
               <SidebarMenuItem><SidebarMenuButton onClick={() => handleTabChange('config')} isActive={activeTab === 'config'}><Settings size={16} />Configuración</SidebarMenuButton></SidebarMenuItem>
             </>}
           </SidebarMenu>
