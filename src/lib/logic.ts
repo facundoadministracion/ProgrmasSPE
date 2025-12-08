@@ -1,3 +1,4 @@
+
 import { PROGRAMAS } from './constants';
 import type { Participant } from './types';
 import { calculateAgeAtEndOfMonth } from './utils';
@@ -19,19 +20,11 @@ const ALERT_MESSAGES = {
   EQUIPO_TECNICO: 'Equipo Técnico',
   LIMITE_EDAD: (edad: number) => `Límite de Edad (${edad} años)`,
   PROXIMO_VENCIMIENTO: 'Próximo a Vencimiento',
-  REQUIERE_AUTORIZACION: 'Requiere Autorización (6 Pagos)',
-  FIN_DE_CICLO: 'Fin de Ciclo / Pase a Planta',
-  EXCEDIDO: 'Excedido (Revisar)',
+  REQUIERE_AUTORIZACION: 'Requiere Autorización',
   ACTIVO: 'Activo',
 };
 
 const AGE_LIMIT_JOVEN = 28;
-const PAYMENTS_THRESHOLD = {
-  NEAR_EXPIRY_1: 5,
-  AUTHORIZATION_REQUIRED: 6,
-  NEAR_EXPIRY_2: 11,
-  CYCLE_END: 12,
-};
 
 export const getAlertStatus = (participant: Participant) => {
   if (!participant.activo) {
@@ -58,17 +51,16 @@ export const getAlertStatus = (participant: Participant) => {
 
   if (participant.programa === PROGRAMAS.JOVEN || participant.programa === PROGRAMAS.TECNO) {
     const count = participant.pagosAcumulados || 0;
-    if (count === PAYMENTS_THRESHOLD.NEAR_EXPIRY_1 || count === PAYMENTS_THRESHOLD.NEAR_EXPIRY_2) {
-      return { type: ALERT_TYPES.YELLOW, msg: ALERT_MESSAGES.PROXIMO_VENCIMIENTO };
-    }
-    if (count === PAYMENTS_THRESHOLD.AUTHORIZATION_REQUIRED) {
+    const renewalsNeeded = Math.floor(count / 6);
+    const renewalsHeld = participant.renovaciones?.length || 0;
+
+    if (renewalsNeeded > renewalsHeld) {
       return { type: ALERT_TYPES.YELLOW, msg: ALERT_MESSAGES.REQUIERE_AUTORIZACION };
     }
-    if (count === PAYMENTS_THRESHOLD.CYCLE_END) {
-      return { type: ALERT_TYPES.YELLOW, msg: ALERT_MESSAGES.FIN_DE_CICLO };
-    }
-    if (count > PAYMENTS_THRESHOLD.CYCLE_END) {
-      return { type: ALERT_TYPES.PURPLE, msg: ALERT_MESSAGES.EXCEDIDO };
+
+    // Alerta para el pago previo a la necesidad de renovación (5, 11, 17, etc.)
+    if (count % 6 === 5) {
+      return { type: ALERT_TYPES.YELLOW, msg: ALERT_MESSAGES.PROXIMO_VENCIMIENTO };
     }
   }
 

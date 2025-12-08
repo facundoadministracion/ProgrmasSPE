@@ -7,6 +7,13 @@ export type UserRole = {
   createdAt: string;
 };
 
+export type Renovacion = {
+  tipoActo: 'decreto' | 'resolucion';
+  numeroActo: string;
+  fechaCarga: any; // Debería ser un Timestamp de servidor
+  ownerId: string;
+};
+
 export type Participant = {
   id: string;
   nombre: string;
@@ -32,6 +39,7 @@ export type Participant = {
   estado?: 'Activo' | 'Ingresado' | 'Baja' | 'Requiere Atención';
   mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
   historialPagos?: string[]; // Array of "YYYY-MM"
+  renovaciones?: Renovacion[]; // Array de actos de renovación
 };
 
 export type Payment = {

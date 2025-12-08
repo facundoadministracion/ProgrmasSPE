@@ -1,12 +1,12 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import type { Participant, Novedad } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,6 +64,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const { firestore } = useFirebase();
   const { user } = useUser();
   const { toast } = useToast();
+  const editFormId = useId();
+  const alert = getAlertStatus(participant);
 
   // Effects
   useEffect(() => {
@@ -95,12 +97,40 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   }, [reactivationToEdit]);
 
   // Data Handlers
-  const handleSave = async (updatedData: Partial<Participant>) => {
-    if (!firestore) return;
+  const handleSave = async (updatedData: any) => {
+    if (!firestore || !user) return;
+  
+    const { newRenovationActo, ...participantChanges } = updatedData;
+    let requiresUpdate = Object.keys(participantChanges).length > 0;
     const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, updatedData);
-    setParticipant(prev => ({...prev, ...updatedData}));
-    toast({ title: "Legajo Actualizado" });
+    let finalChanges = { ...participantChanges };
+
+    if (newRenovationActo) {
+        const novedadDescripcion = `Renovación registrada con Acto Administrativo: ${newRenovationActo}`;
+        const newNovedad = {
+            participantId: participant.id,
+            descripcion: novedadDescripcion,
+            type: 'RENOVACION',
+            fechaRealCarga: serverTimestamp(),
+            ownerId: user.uid,
+        };
+        const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
+        setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } }, ...prev]);
+
+        // The `renovaciones` array is part of participantChanges if it was modified in the form.
+        // We ensure we are using the most up-to-date array.
+        finalChanges.renovaciones = updatedData.renovaciones;
+        requiresUpdate = true;
+    }
+
+    if (requiresUpdate) {
+        await updateDoc(partRef, finalChanges);
+        setParticipant(prev => ({ ...prev, ...finalChanges }));
+        toast({ title: "Legajo Actualizado" });
+    } else {
+        toast({ title: "No se realizaron cambios." });
+    }
+    
     setIsEditing(false);
   };
 
@@ -222,7 +252,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   }
 
   // Render Helpers
-  const alert = getAlertStatus(participant);
   const renderField = (label: string, value: any) => (<div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>);
   const renderMetric = () => {
       const program = participant.programa?.toLowerCase();
@@ -230,9 +259,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       if (program?.includes('tutor')) return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
       return null;
   }
-  const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, DEFAULT: <History/> }
-
-  if (isEditing) return <EditParticipantForm participant={participant} onSave={handleSave} onCancel={() => setIsEditing(false)} />;
+  const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, DEFAULT: <History/> }
 
   return (
     <div className="pb-10">
@@ -275,6 +302,24 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
       {isBajaDialogOpen && <BajaForm participantName={participant.nombre} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
       {bajaToEdit && <BajaForm participantName={participant.nombre} onConfirm={handleUpdateBaja} onCancel={() => setBajaToEdit(null)} initialData={bajaToEdit} isEditing={true} />}
+      
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Editar Legajo</DialogTitle>
+          </DialogHeader>
+          <EditParticipantForm 
+            participant={participant} 
+            onSave={handleSave} 
+            formId={editFormId} 
+            requiresRenovation={alert.msg === 'Requiere Renovación por 6 meses o Baja'}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancelar</Button>
+            <Button type="submit" form={editFormId}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
       {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
