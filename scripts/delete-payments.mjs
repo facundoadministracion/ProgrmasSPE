@@ -1,72 +1,78 @@
 
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 
-// ADVERTENCIA DE SEGURIDAD:
-// No almacenes la configuración de Firebase directamente en este fichero.
-// Si necesitas ejecutar este script, completa la configuración de forma temporal
-// y asegúrate de no subirla al repositorio de código.
+// Configuración de Firebase
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_AUTH_DOMAIN",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_STORAGE_BUCKET",
-  messagingSenderId: "TU_MESSAGING_SENDER_ID",
-  appId: "TU_APP_ID",
-  measurementId: "TU_MEASUREMENT_ID"
+  apiKey: "AIzaSyAIAoyr8-zy0_TpU3jvXZ52e3Rfza_ViCc",
+  authDomain: "programas-de-empleo-lr.firebaseapp.com",
+  projectId: "programas-de-empleo-lr",
+  storageBucket: "programas-de-empleo-lr.appspot.com",
+  messagingSenderId: "193300807292",
+  appId: "1:193300807292:web:02fb904b08c8fe045cd3f9",
+  measurementId: "G-XFH1Y6MKEV"
 };
-
-// Antes de ejecutar, asegúrate de que firebaseConfig esté correctamente completado.
-if (firebaseConfig.apiKey === "TU_API_KEY") {
-  console.error('Error: Debes completar la configuración de Firebase en scripts/delete-payments.mjs antes de ejecutarlo.');
-  process.exit(1);
-}
 
 // Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-async function deleteAllPayments() {
-  const paymentsCollection = collection(db, 'payments');
-  const paymentsSnapshot = await getDocs(paymentsCollection);
+async function deletePaymentsByMonth(mes, anio) {
+  if (!mes || !anio) {
+    console.error('Error: Por favor, proporciona el mes y el año como argumentos.');
+    console.error('Uso: node scripts/delete-payments.mjs <mes> <anio>');
+    process.exit(1);
+  }
+
+  console.log(`Buscando pagos para eliminar del período: ${mes}/${anio}...`);
+
+  const paymentsCollectionRef = collection(db, 'pagosRegistrados');
+  // Las queries de Firestore necesitan que los valores coincidan en tipo.
+  // En `PaymentUploadWizard.tsx` se guardan como string.
+  const q = query(paymentsCollectionRef, where('mes', '==', String(mes)), where('anio', '==', String(anio)));
   
-  if (paymentsSnapshot.empty) {
-    console.log("No se encontraron pagos para eliminar.");
+  const querySnapshot = await getDocs(q);
+
+  if (querySnapshot.empty) {
+    console.log(`No se encontraron pagos registrados para ${mes}/${anio}.`);
     return;
   }
 
+  // Firestore limita los batches a 500 operaciones.
   const batchSize = 500;
   const batches = [];
   let currentBatch = writeBatch(db);
-  let currentBatchSize = 0;
+  let operationsInBatch = 0;
 
-  paymentsSnapshot.docs.forEach((doc, index) => {
+  querySnapshot.docs.forEach((doc) => {
     currentBatch.delete(doc.ref);
-    currentBatchSize++;
-    if (currentBatchSize === batchSize) {
+    operationsInBatch++;
+    if (operationsInBatch >= batchSize) {
       batches.push(currentBatch);
       currentBatch = writeBatch(db);
-      currentBatchSize = 0;
+      operationsInBatch = 0;
     }
   });
 
-  if (currentBatchSize > 0) {
+  if (operationsInBatch > 0) {
     batches.push(currentBatch);
   }
-
-  console.log(`Eliminando ${paymentsSnapshot.size} pagos en ${batches.length} lotes...`);
+  
+  console.log(`Se encontraron ${querySnapshot.size} pagos. Se procederá a eliminar en ${batches.length} lote(s).`);
 
   try {
     await Promise.all(batches.map(batch => batch.commit()));
-    console.log('¡Todos los pagos han sido eliminados con éxito!');
+    console.log(`¡Éxito! Se eliminaron ${querySnapshot.size} pagos del período ${mes}/${anio}.`);
   } catch (error) {
-    console.error('Error al eliminar los pagos:', error);
+    console.error('Error al eliminar los pagos en lotes:', error);
   }
 }
 
-deleteAllPayments().then(() => {
-  // Cierra la conexión o el proceso si es necesario.
-  // En un script simple, el proceso terminará automáticamente.
-}).catch(e => {
-    console.error(e)
+// Obtener mes y año de los argumentos de la línea de comandos
+const args = process.argv.slice(2);
+const mes = args[0];
+const anio = args[1];
+
+deletePaymentsByMonth(mes, anio).catch(error => {
+  console.error("Se produjo un error inesperado:", error);
 });
