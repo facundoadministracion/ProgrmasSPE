@@ -107,7 +107,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
     if (newRenovationActo) {
         const novedadDescripcion = `Renovación registrada con Acto Administrativo: ${newRenovationActo}`;
-        const newNovedad = {
+        const newNovedad: Omit<Novedad, 'id'> = {
             participantId: participant.id,
             descripcion: novedadDescripcion,
             type: 'RENOVACION',
@@ -115,7 +115,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             ownerId: user.uid,
         };
         const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
-        setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } }, ...prev]);
+        setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
 
         // The `renovaciones` array is part of participantChanges if it was modified in the form.
         // We ensure we are using the most up-to-date array.
@@ -153,7 +153,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       participantId: participant.id, descripcion, type: 'BAJA_DEFINITIVA', fechaRealCarga: serverTimestamp(), ownerId: user.uid
     };
     const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
-    setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}}, ...prev]);
+    setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}} as Novedad, ...prev]);
     setParticipant(prev => ({...prev, ...updatedParticipant}));
     toast({ title: "Participante Dado de Baja" });
     setIsBajaDialogOpen(false);
@@ -175,7 +175,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         actoAdministrativo: reactivationData.decree, fechaRealCarga: serverTimestamp(), ownerId: user.uid
     };
     const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
-    setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}}, ...prev]);
+    setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}} as Novedad, ...prev]);
     setParticipant(prev => ({...prev, ...updatedParticipant}));
     toast({ title: "Participante Reactivado" });
     setIsReactivateDialogOpen(false);
