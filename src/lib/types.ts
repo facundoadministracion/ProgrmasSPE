@@ -39,7 +39,7 @@ export type Participant = {
   estado?: 'Activo' | 'Ingresado' | 'Baja' | 'Requiere Atención';
   mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
   historialPagos?: string[]; // Array of "YYYY-MM"
-  renovaciones?: Renovacion[]; // Array de actos de renovación
+  renovaciones?: string[]; // Array de actos de renovación
 };
 
 export type Payment = {
@@ -73,7 +73,7 @@ export type Novedad = {
     descripcion: string;
     fechaRealCarga: any; // serverTimestamp
     ownerId: string;
-    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA' | 'REACTIVACION' | 'BAJA_DEFINITIVA';
+    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA' | 'REACTIVACION' | 'BAJA_DEFINITIVA' | 'RENOVACION';
 
     // Optional fields that may or may not be present
     participantName?: string;
