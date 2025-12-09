@@ -117,7 +117,7 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
         </Table>
       </div>
 
-      <Dialog open={!!editingParticipant} onOpenChange={handleCancelEdit}>
+      <Dialog open={!!editingParticipant} onOpenChange={(isOpen) => !isOpen && handleCancelEdit()}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar Legajo</DialogTitle>
@@ -127,6 +127,7 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
                 participant={editingParticipant}
                 onSave={handleSaveEdit}
                 formId={editFormId}
+                requiresRenovation={false}
             />
           )}
           <DialogFooter>
