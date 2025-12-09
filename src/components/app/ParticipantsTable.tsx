@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useId } from 'react';
 import {
   Table,
   TableBody,
@@ -20,6 +20,7 @@ import EditParticipantForm from './EditParticipantForm';
 import { FirebaseContext } from '@/firebase/provider';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 interface ParticipantsTableProps {
   participants: Participant[];
@@ -30,6 +31,7 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
   const { toast } = useToast();
   const firebaseContext = useContext(FirebaseContext);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
+  const editFormId = useId();
 
   if (participants.length === 0) {
     return <p className="text-center text-gray-500">No hay participantes que coincidan con el filtro actual.</p>;
@@ -54,7 +56,7 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
         return;
     }
 
-    const participantRef = doc(firebaseContext.firestore, "participantes", editingParticipant.id);
+    const participantRef = doc(firebaseContext.firestore, "participants", editingParticipant.id);
 
     try {
         await updateDoc(participantRef, updatedData);
@@ -115,13 +117,24 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
         </Table>
       </div>
 
-      {editingParticipant && (
-        <EditParticipantForm
-            participant={editingParticipant}
-            onSave={handleSaveEdit}
-            onCancel={handleCancelEdit}
-        />
-      )}
+      <Dialog open={!!editingParticipant} onOpenChange={handleCancelEdit}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Editar Legajo</DialogTitle>
+          </DialogHeader>
+          {editingParticipant && (
+            <EditParticipantForm
+                participant={editingParticipant}
+                onSave={handleSaveEdit}
+                formId={editFormId}
+            />
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelEdit}>Cancelar</Button>
+            <Button type="submit" form={editFormId}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
