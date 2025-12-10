@@ -113,3 +113,5 @@ export type MontoPrograma = {
     ownerId: string;
     createdAt: any;
 }
+
+export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;

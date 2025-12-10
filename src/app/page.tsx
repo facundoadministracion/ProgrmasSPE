@@ -7,7 +7,7 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Users, DollarSign, AlertTriangle, Search, Calendar, Briefcase, Settings, UserCheck, PlusCircle, Shield, LogOut, Loader2, Upload, History, ChevronLeft, ChevronRight, XCircle, Pencil } from 'lucide-react';
 
-import type { Participant, UserRole } from '@/lib/types';
+import type { Participant, UserRole, ParticipantFilter } from '@/lib/types';
 import { DEPARTAMENTOS, PROGRAMAS, CATEGORIAS_TUTORIAS, ROLES } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
@@ -32,8 +32,6 @@ import ConfiguracionHistorial, { type Configuracion } from '@/components/app/Con
 import ParticipantsTab from '@/components/app/ParticipantsTab';
 import Dashboard from '@/components/app/Dashboard'; // Importamos el nuevo componente
 import ImportarPagosPage from './admin/importar-pagos/page';
-
-type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
 
 const NewParticipantForm = ({ onFormSubmit } : { onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void }) => {
     const [selectedProgram, setSelectedProgram] = useState<string>(PROGRAMAS.TUTORIAS);
@@ -218,6 +216,13 @@ export default function App() {
   const handleFinishEditing = () => {
     setEditingConfig(null);
   };
+  
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (tab !== 'participants') {
+      setActiveFilter(null); 
+    }
+  };
 
   if (isUserLoading || !user) {
     return <div className="flex flex-col items-center justify-center h-screen text-gray-500 gap-4"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p>Iniciando sesión...</p></div>;
@@ -292,6 +297,7 @@ export default function App() {
                     onSearchHandled={() => setInitialSearch('')} 
                     activeFilter={activeFilter} 
                     onClearFilter={handleClearFilter} 
+                    onBackToDashboard={() => handleTabChange('dashboard')}
                   /> 
                 : null;
         case 'attendance': 
@@ -304,13 +310,6 @@ export default function App() {
             return isAdmin ? <ImportarPagosPage /> : null;
         default: 
             return null;
-    }
-  };
-
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    if (tab !== 'participants') {
-      setActiveFilter(null); 
     }
   };
 

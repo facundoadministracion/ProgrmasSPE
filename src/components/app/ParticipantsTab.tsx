@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Upload, PlusCircle, AlertTriangle, XCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Upload, PlusCircle, AlertTriangle, XCircle, Loader2, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 
-import type { Participant } from '@/lib/types';
+import type { Participant, ParticipantFilter } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
 import { PROGRAMAS } from '@/lib/constants';
 
@@ -13,9 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
-
-const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled, activeFilter, onClearFilter } : {
+const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled, activeFilter, onClearFilter, onBackToDashboard } : {
     participants: Participant[],
     isLoading: boolean,
     onSelect: (p: Participant | 'new') => void,
@@ -24,6 +22,7 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     onSearchHandled?: () => void,
     activeFilter: ParticipantFilter,
     onClearFilter: () => void,
+    onBackToDashboard: () => void,
 }) => {
     const [inputValue, setInputValue] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -119,7 +118,10 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                             <p>Mostrando {filteredCount} participantes que coinciden con el filtro.</p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={onClearFilter} className="bg-yellow-200 text-yellow-900 border-yellow-300 hover:bg-yellow-300"><XCircle className="mr-2 h-4 w-4"/> Quitar Filtro</Button>
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={onBackToDashboard} className="text-yellow-800 hover:bg-yellow-200"><ArrowLeft className="mr-2 h-4 w-4"/> Volver al Resumen</Button>
+                        <Button variant="outline" size="sm" onClick={onClearFilter} className="bg-yellow-200 text-yellow-900 border-yellow-300 hover:bg-yellow-300"><XCircle className="mr-2 h-4 w-4"/> Quitar Filtro</Button>
+                    </div>
                 </div>
             )}
 
