@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
+type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
 
 const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantWizard, initialSearchTerm, onSearchHandled, activeFilter, onClearFilter } : {
     participants: Participant[],
@@ -46,22 +46,29 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     }, [inputValue]);
 
     const paginatedParticipants = useMemo(() => {
-        if (!participants) return { paginated: [], totalPages: 0 };
+        if (!participants) return { paginated: [], totalPages: 0, filteredCount: 0 };
 
         let filtered = participants.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
 
-        if (activeFilter === 'requiresAttention') {
-            filtered = filtered.filter(p => p.estado === 'Requiere Atención');
-        } else if (activeFilter === 'paymentAlert') {
-            filtered = filtered.filter(p => {
-                const status = getAlertStatus(p);
-                return p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12) 
-            });
-        } else if (activeFilter === 'ageAlert') {
-             filtered = filtered.filter(p => {
-                const edad = getAlertStatus(p);
-                return p.activo && p.programa === PROGRAMAS.JOVEN && edad.msg.includes('Límite de Edad');
-            });
+        if (activeFilter) {
+             const baseFilter = (p: Participant) => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO);
+             switch (activeFilter) {
+                case 'requiresAttention':
+                    filtered = filtered.filter(p => p.estado === 'Requiere Atención');
+                    break;
+                case 'ageAlert':
+                    filtered = filtered.filter(p => baseFilter(p) && getAlertStatus(p).msg.includes('Límite de Edad'));
+                    break;
+                case 'paymentDue':
+                    filtered = filtered.filter(p => baseFilter(p) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 11));
+                    break;
+                case 'payment6':
+                    filtered = filtered.filter(p => baseFilter(p) && p.pagosAcumulados === 6);
+                    break;
+                case 'payment12':
+                    filtered = filtered.filter(p => baseFilter(p) && p.pagosAcumulados === 12);
+                    break;
+            }
         }
 
         filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -73,6 +80,15 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     }, [participants, searchTerm, currentPage, activeFilter]);
 
     const { paginated, totalPages, filteredCount } = paginatedParticipants;
+
+    const filterDescriptions: { [key in NonNullable<ParticipantFilter>]: string } = {
+        requiresAttention: 'Requieren Atención',
+        ageAlert: 'con Alerta de Edad',
+        paymentDue: 'Próximos a Vencer (5 o 11 pagos)',
+        payment6: 'con 6 Pagos (Continuidad)',
+        payment12: 'con 12 Pagos (Finalizados)',
+        paymentAlert: 'con Alerta de Pagos',
+    };
 
     return (
         <div className="space-y-6">
@@ -99,11 +115,11 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                     <div className="flex items-center">
                         <AlertTriangle className="h-5 w-5 mr-3" />
                         <div>
-                            <p className="font-bold">Filtro Activo</p>
-                            <p>Mostrando {filteredCount} participantes que requieren atención.</p>
+                            <p className="font-bold">Filtro Activo: {filterDescriptions[activeFilter]}</p>
+                            <p>Mostrando {filteredCount} participantes que coinciden con el filtro.</p>
                         </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={onClearFilter} className="text-yellow-800 hover:bg-yellow-200"><XCircle className="mr-2 h-4 w-4"/> Limpiar</Button>
+                    <Button variant="outline" size="sm" onClick={onClearFilter} className="bg-yellow-200 text-yellow-900 border-yellow-300 hover:bg-yellow-300"><XCircle className="mr-2 h-4 w-4"/> Quitar Filtro</Button>
                 </div>
             )}
 
