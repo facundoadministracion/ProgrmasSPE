@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { Users, DollarSign, AlertTriangle, Briefcase, UserCheck } from 'lucide-react';
+import { Users, DollarSign, AlertTriangle, Briefcase, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant } from '@/lib/types';
 import { PROGRAMAS } from '@/lib/constants';
@@ -12,7 +12,7 @@ import { getAlertStatus } from '@/lib/logic';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 
-type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | null;
+type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
 
 interface ProgramData {
     count: number;
@@ -73,7 +73,7 @@ const Dashboard = ({
                 }
 
                 const latestRecord = recordSnapshot.docs[0].data();
-                const settlementAmount = latestRecord.montoTotalLiquidado || 0; // <-- Correct field name
+                const settlementAmount = latestRecord.montoTotalLiquidado || 0;
                 const latestMes = latestRecord.mesLiquidacion;
                 const latestAnio = latestRecord.anoLiquidacion;
                 
@@ -101,15 +101,18 @@ const Dashboard = ({
     }
     
     const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
-    const paymentAlertCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 6 || p.pagosAcumulados === 11 || p.pagosAcumulados === 12)).length;
     const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
     
+    const aVencerCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 11)).length;
+    const seisPagosCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && p.pagosAcumulados === 6).length;
+    const docePagosCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && p.pagosAcumulados === 12).length;
+
     const totalParticipants = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
     const totalSettledAmount = Object.values(programData).reduce((sum, data) => sum + (data?.amount ?? 0), 0);
 
     return (
       <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <DashboardCard 
               title="Total Padrón Liquidado" 
               value={totalParticipants} 
@@ -119,8 +122,10 @@ const Dashboard = ({
               isLoading={isProgramDataLoading} 
             />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
-            <DashboardCard title="Alerta de Pagos" value={paymentAlertCount} icon={DollarSign} color="yellow" subtitle="Próximos a vencer/vencidos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentAlert')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
+            <DashboardCard title="Próximos a Vencer" value={aVencerCount} icon={DollarSign} color="yellow" subtitle="Participantes con 5 u 11 pagos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
+            <DashboardCard title="Continuidad (6 Pagos)" value={seisPagosCount} icon={UserPlus} color="green" subtitle="Elegibles para renovación" isLoading={participantsLoading} onClick={() => onSetFilter('payment6')} actionText="Ver Lista" />
+            <DashboardCard title="Finalizados (12 Pagos)" value={docePagosCount} icon={UserX} color="gray" subtitle="Completaron el ciclo" isLoading={participantsLoading} onClick={() => onSetFilter('payment12')} actionText="Ver Lista" />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-4">Liquidación Mensual</h2>
@@ -133,6 +138,7 @@ const Dashboard = ({
                             key={prog} 
                             title={prog} 
                             value={data?.count ?? 0} 
+                            secondaryValue={data ? formatCurrency(data.amount) : undefined}
                             icon={Briefcase} 
                             subtitle={subtitle}
                             onClick={() => setSelectedProgramDetail(prog)}
