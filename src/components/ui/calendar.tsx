@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -25,12 +26,6 @@ function Calendar({
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
         nav: "space-x-1 flex items-center",
-        nav_button: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-        ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
@@ -54,11 +49,29 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        icon_left: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
+        PreviousMonthButton: (props) => (
+            <button
+              {...props}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+                "absolute left-1"
+              )}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
         ),
-        icon_right: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
+        NextMonthButton: (props) => (
+            <button
+              {...props}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+                "absolute right-1"
+              )}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
         ),
       }}
       {...props}
