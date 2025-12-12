@@ -1,10 +1,10 @@
 'use client';
-import React, { useState, useEffect, useId } from 'react';
-import type { Participant, Novedad } from '@/lib/types';
+import React, { useState, useEffect, useMemo, useId } from 'react';
+import type { Participant, Novedad, PagoRegistrado } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil, FilePlus } from 'lucide-react';
+import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil, FilePlus, Wallet } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,8 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import EditParticipantForm from './EditParticipantForm';
 import BajaForm from './BajaForm';
 import { getAlertStatus } from '@/lib/logic';
-import { MONTHS as meses } from '@/lib/constants';
+import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { calculateSeniority } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+
 
 // Helper Functions
 const formatDate = (dateString: string | undefined | null) => {
@@ -23,7 +25,7 @@ const formatDate = (dateString: string | undefined | null) => {
   try {
     const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
     if (isNaN(date.getTime())) return 'Fecha inválida';
-    return `${meses[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+    return `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
   } catch (error) { return '-'; }
 };
 
@@ -36,7 +38,7 @@ const formatDateToMonthYear = (dateString: string | undefined | null) => {
   if (!dateString) return '-';
   try {
     const [year, month] = dateString.split('-');
-    return `${meses[parseInt(month, 10) - 1] || ''} ${year}`;
+    return `${MONTHS[parseInt(month, 10) - 1] || ''} ${year}`;
   } catch (e) { return '-'; }
 }
 
@@ -60,12 +62,20 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const [bajaToEdit, setBajaToEdit] = useState<Novedad | null>(null);
 
   const [novedadToDelete, setNovedadToDelete] = useState<Novedad | null>(null);
+  
+  const [paymentHistory, setPaymentHistory] = useState<PagoRegistrado[]>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
 
   const { firestore } = useFirebase();
   const { user } = useUser();
   const { toast } = useToast();
   const editFormId = useId();
   const alert = getAlertStatus(participant);
+
+  const isAuditableProgram = useMemo(() => 
+    participant.programa === PROGRAMAS.JOVEN || participant.programa === PROGRAMAS.TECNO, 
+    [participant.programa]
+  );
 
   // Effects
   useEffect(() => {
@@ -85,6 +95,36 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   }, [firestore, participant.id, toast]);
 
   useEffect(() => {
+    const fetchPaymentHistory = async () => {
+      if (!firestore || !participant.id || !isAuditableProgram) return;
+      setIsLoadingPayments(true);
+      try {
+        const q = query(collection(firestore, 'pagosRegistrados'), where('participantId', '==', participant.id));
+        const snapshot = await getDocs(q);
+        const payments = snapshot.docs.map(doc => doc.data() as PagoRegistrado);
+        setPaymentHistory(payments);
+      } catch (error) {
+        console.error("Error fetching payment history: ", error);
+        toast({ variant: 'destructive', title: 'Error al cargar historial de pagos.' });
+      } finally {
+        setIsLoadingPayments(false);
+      }
+    };
+
+    fetchPaymentHistory();
+  }, [firestore, participant.id, toast, isAuditableProgram]);
+
+  const groupedPayments = useMemo(() => {
+    if (!paymentHistory) return {};
+    return paymentHistory.reduce((acc, payment) => {
+      const year = payment.anio;
+      if (!acc[year]) acc[year] = [];
+      acc[year].push(parseInt(payment.mes, 10));
+      return acc;
+    }, {} as { [key: string]: number[] });
+  }, [paymentHistory]);
+
+  useEffect(() => {
     if (novedadToEditText) {
       setNewDescription(novedadToEditText.descripcion.replace('Respaldo:', 'Decreto N°:'));
     } else { setNewDescription(''); }
@@ -92,8 +132,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
   useEffect(() => {
     if (reactivationToEdit) {
-        setReactivationEditData({ month: reactivationToEdit.mesEvento || '', year: reactivationToEdit.anoEvento || '', decree: reactivationToEdit.actoAdministrativo || '' });
-    } else { setReactivationEditData({ month: '', year: '', decree: '' }); }
+        setReactivationEditData({ month: reactivationToEdit.mesEvento || '', year: reactivationToEdit.anoEvento || '', actoAdministrativo: reactivationToEdit.actoAdministrativo || '' });
+    } else { setReactivationEditData({ month: '', year: '', actoAdministrativo: '' }); }
   }, [reactivationToEdit]);
 
   // Data Handlers
@@ -117,8 +157,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
         setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
 
-        // The `renovaciones` array is part of participantChanges if it was modified in the form.
-        // We ensure we are using the most up-to-date array.
         finalChanges.renovaciones = updatedData.renovaciones;
         requiresUpdate = true;
     }
@@ -143,7 +181,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
 
-    const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
+    const monthName = MONTHS[parseInt(bajaData.mesBaja, 10) - 1];
     let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
     if(isActoAdmin && bajaData.causalInforme) descripcion += ` Causal: ${bajaData.causalInforme}.`;
     if(bajaData.detalle) descripcion += ` Detalles: ${bajaData.detalle}.`;
@@ -166,7 +204,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
     
-    const monthName = meses[parseInt(reactivationData.month, 10) - 1];
+    const monthName = MONTHS[parseInt(reactivationData.month, 10) - 1];
     let descripcion = `Reactivación registrada para ${monthName} de ${reactivationData.year}.`;
     if(reactivationData.decree) descripcion += ` Decreto N°: ${reactivationData.decree}.`;
 
@@ -188,7 +226,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
     const updatedParticipant: Partial<Participant> = { actoAdministrativo: actoAdmin || participant.actoAdministrativo };
 
-    const monthName = meses[parseInt(bajaData.mesBaja, 10) - 1];
+    const monthName = MONTHS[parseInt(bajaData.mesBaja, 10) - 1];
     let newDescription = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
     if(isActoAdmin && bajaData.causalInforme) newDescription += ` Causal: ${bajaData.causalInforme}.`;
     if(bajaData.detalle) newDescription += ` Detalles: ${bajaData.detalle}.`;
@@ -208,7 +246,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const handleUpdateReactivation = async () => {
     if (!firestore || !reactivationToEdit) return;
     const { month, year, decree } = reactivationEditData;
-    const monthName = meses[parseInt(month, 10) - 1];
+    const monthName = MONTHS[parseInt(month, 10) - 1];
     let newDescription = `Reactivación para ${monthName} de ${year}.`;
     if (decree) newDescription += ` Decreto N°: ${decree}.`;
 
@@ -261,6 +299,9 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   }
   const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, DEFAULT: <History/> }
 
+  const requiresRenovation = alert.msg === 'Requiere Renovación por 6 meses o Baja' || 
+                             (participant.programa === PROGRAMAS.TECNO && participant.activo && participant.pagosAcumulados === 6);
+
   return (
     <div className="pb-10">
       <div className="flex justify-between items-center mb-6">
@@ -295,6 +336,46 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </div>
         <Card><CardHeader><CardTitle>Información Clave</CardTitle></CardHeader><CardContent className="divide-y">{renderMetric()}{renderField('Último Pago', formatDateToMonthYear(participant.ultimoPago))}{renderField('Acto Administrativo', participant.actoAdministrativo)}{renderField('Estado', participant.estado)}</CardContent></Card>
       </div>
+
+      {isAuditableProgram && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Wallet/> Historial de Pagos Liquidados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPayments ? (
+              <p>Cargando historial de pagos...</p>
+            ) : (
+              <div>
+                <div className="mb-4 pb-4 border-b">
+                  <p className="text-sm font-medium text-gray-600">Conteo de Pagos</p>
+                  <p className={`text-lg font-bold ${paymentHistory.length !== participant.pagosAcumulados ? 'text-red-600' : 'text-green-600'}`}>
+                    {paymentHistory.length} encontrados vs. {participant.pagosAcumulados} en legajo
+                  </p>
+                  {paymentHistory.length !== participant.pagosAcumulados && 
+                    <p className="text-xs text-red-500">El conteo no coincide. Considere correr el script de corrección.</p>
+                   }
+                </div>
+                
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-gray-600">Meses liquidados por año</p>
+                  {Object.keys(groupedPayments).sort((a,b) => parseInt(b) - parseInt(a)).map(year => (
+                    <div key={year}>
+                      <h4 className="font-semibold text-md mb-2">{year}</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {groupedPayments[year].sort((a,b) => a - b).map(month => (
+                           <Badge key={`${year}-${month}`} variant="secondary" className="text-sm">{MONTHS[month - 1]}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {paymentHistory.length === 0 && <p className="text-sm text-gray-500">No se encontraron pagos registrados.</p>}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       
       <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">
         <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
@@ -312,7 +393,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             participant={participant} 
             onSave={handleSave} 
             formId={editFormId} 
-            requiresRenovation={alert.msg === 'Requiere Renovación por 6 meses o Baja'}
+            requiresRenovation={requiresRenovation}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditing(false)}>Cancelar</Button>
@@ -321,8 +402,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
-      {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{meses.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
+      <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
+      {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.actoAdministrativo} onChange={(e) => setReactivationEditData(p => ({...p, actoAdministrativo: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
       {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
       {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
     </div>
