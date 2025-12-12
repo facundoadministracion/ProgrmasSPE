@@ -139,6 +139,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
       const allPayments = [...analysis.regulars, ...analysis.newlyPaid];
 
       const totalAmount = allPayments.reduce((sum, item) => sum + item.monto, 0);
+      const fullAltaResolution = altaResolution ? `Decreto N° ${altaResolution}` : null;
 
       allPayments.forEach((item) => {
         const partRef = doc(firestore, 'participants', item.participant.id);
@@ -149,8 +150,8 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
           estado: 'Activo',
           mesAusencia: null,
         };
-        if (analysis.newlyPaid.some((np: any) => np.participant.id === item.participant.id) && altaResolution) {
-          updates.actoAdministrativo = altaResolution;
+        if (analysis.newlyPaid.some((np: any) => np.participant.id === item.participant.id) && fullAltaResolution) {
+          updates.actoAdministrativo = fullAltaResolution;
         }
         if (item.categoriaCalculada && item.categoriaCalculada !== 'MONTO NO COINCIDE') {
             updates.categoria = item.categoriaCalculada;
@@ -284,7 +285,10 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
                         <AccordionContent className="p-4 space-y-4 bg-white rounded-b-md">
                             <div>
                                 <Label htmlFor='alta-resolution' className='text-sm text-indigo-700 mb-2 block'>Decreto/Resolución de respaldo para las nuevas altas:</Label>
-                                <Input id='alta-resolution' type="text" placeholder="Ej: Dec. N° 123/24" value={altaResolution} onChange={(e) => setAltaResolution(e.target.value)} />
+                                <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-blue-500">
+                                    <span className="px-3 bg-gray-100 text-gray-600 border-r">Decreto N°</span>
+                                    <Input id='alta-resolution' type="text" placeholder="123/24" value={altaResolution} onChange={(e) => setAltaResolution(e.target.value)} className="border-none focus:ring-0" />
+                                </div>
                             </div>
                             <div className='mt-4'>
                                 <p className="text-sm font-bold mb-2">Lista de Altas:</p>
