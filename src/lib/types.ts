@@ -114,4 +114,12 @@ export type MontoPrograma = {
     createdAt: any;
 }
 
+export type PagoRegistrado = {
+  id: string;
+  participantId: string;
+  mes: string;
+  anio: string;
+  fechaDeCarga: any;
+}
+
 export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
