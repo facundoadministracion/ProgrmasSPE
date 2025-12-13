@@ -4,9 +4,9 @@ import type { Participant, Novedad, PagoRegistrado } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil, FilePlus, Wallet } from 'lucide-react';
+import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil, FilePlus, Wallet, ArrowRightLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import EditParticipantForm from './EditParticipantForm';
 import BajaForm from './BajaForm';
 import { getAlertStatus } from '@/lib/logic';
-import { MONTHS, PROGRAMAS } from '@/lib/constants';
+import { MONTHS, PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
 import { calculateSeniority } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -49,6 +49,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const [isEditing, setIsEditing] = useState(false);
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
+  const [isTraspasoDialogOpen, setIsTraspasoDialogOpen] = useState(false);
+  const [traspasoData, setTraspasoData] = useState({ nuevoPrograma: '', actoAdministrativo: '', month: (new Date().getMonth() + 1).toString(), year: new Date().getFullYear().toString() });
   const [reactivationData, setReactivationData] = useState({ month: '', year: new Date().getFullYear().toString(), decree: '' });
   const [history, setHistory] = useState<Novedad[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -76,6 +78,11 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     participant.programa === PROGRAMAS.JOVEN || participant.programa === PROGRAMAS.TECNO, 
     [participant.programa]
   );
+
+  const paymentCount = useMemo(() => {
+    if (!participant.programa || !participant.pagosPorPrograma) return 0;
+    return participant.pagosPorPrograma[participant.programa] || 0;
+  }, [participant.programa, participant.pagosPorPrograma]); 
 
   // Effects
   useEffect(() => {
@@ -132,8 +139,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
   useEffect(() => {
     if (reactivationToEdit) {
-        setReactivationEditData({ month: reactivationToEdit.mesEvento || '', year: reactivationToEdit.anoEvento || '', actoAdministrativo: reactivationToEdit.actoAdministrativo || '' });
-    } else { setReactivationEditData({ month: '', year: '', actoAdministrativo: '' }); }
+        setReactivationEditData({ month: reactivationToEdit.mesEvento || '', year: reactivationToEdit.anoEvento || '', decree: reactivationToEdit.actoAdministrativo || '' });
+    } else { setReactivationEditData({ month: '', year: '', decree: '' }); }
   }, [reactivationToEdit]);
 
   // Data Handlers
@@ -183,6 +190,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
     const monthName = MONTHS[parseInt(bajaData.mesBaja, 10) - 1];
     let descripcion = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
+    if (actoAdmin) descripcion += ` Acto: ${actoAdmin}.`;
     if(isActoAdmin && bajaData.causalInforme) descripcion += ` Causal: ${bajaData.causalInforme}.`;
     if(bajaData.detalle) descripcion += ` Detalles: ${bajaData.detalle}.`;
 
@@ -212,12 +220,55 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         participantId: participant.id, descripcion, type: 'REACTIVACION', mesEvento: reactivationData.month, anoEvento: reactivationData.year, 
         actoAdministrativo: reactivationData.decree, fechaRealCarga: serverTimestamp(), ownerId: user.uid
     };
+    
     const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
     setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}} as Novedad, ...prev]);
     setParticipant(prev => ({...prev, ...updatedParticipant}));
     toast({ title: "Participante Reactivado" });
     setIsReactivateDialogOpen(false);
   }
+
+  const handleTraspasoConfirm = async () => {
+    if (!firestore || !user || !traspasoData.nuevoPrograma) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un programa de destino.' });
+        return;
+    }
+
+    const { nuevoPrograma, actoAdministrativo, month, year } = traspasoData;
+    const previousPrograma = participant.programa;
+
+    const monthName = MONTHS[parseInt(month, 10) - 1];
+    const formattedDate = `${monthName} de ${year}`;
+
+    const updatedParticipant: Partial<Participant> = {
+        programa: nuevoPrograma,
+        actoAdministrativo: actoAdministrativo || participant.actoAdministrativo,
+    };
+
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, updatedParticipant);
+
+    let descripcion = `Traspaso del programa "${previousPrograma}" a "${nuevoPrograma}" con fecha de vigencia ${formattedDate}.`;
+    if (actoAdministrativo) {
+        descripcion += ` Respaldo por Acto Administrativo: ${actoAdministrativo}.`;
+    }
+
+    const newNovedad: Omit<Novedad, 'id'> = {
+        participantId: participant.id,
+        descripcion,
+        type: 'TRASPASO',
+        fechaEvento: `${year}-${month.padStart(2, '0')}`, // Guardamos como YYYY-MM
+        fechaRealCarga: serverTimestamp(),
+        ownerId: user.uid,
+    };
+    const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
+    
+    setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
+    setParticipant(prev => ({ ...prev, ...updatedParticipant }));
+    
+    toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma}.` });
+    setIsTraspasoDialogOpen(false);
+};
 
   const handleUpdateBaja = async (bajaData: any) => {
     if (!firestore || !bajaToEdit) return;
@@ -228,6 +279,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
     const monthName = MONTHS[parseInt(bajaData.mesBaja, 10) - 1];
     let newDescription = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
+    if (actoAdmin) newDescription += ` Acto: ${actoAdmin}.`;
     if(isActoAdmin && bajaData.causalInforme) newDescription += ` Causal: ${bajaData.causalInforme}.`;
     if(bajaData.detalle) newDescription += ` Detalles: ${bajaData.detalle}.`;
     
@@ -293,27 +345,27 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const renderField = (label: string, value: any) => (<div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>);
   const renderMetric = () => {
       const program = participant.programa?.toLowerCase();
-      if(program?.includes('tecno') || program?.includes('joven')) return renderField('Pagos Acumulados', participant.pagosAcumulados);
+      if(program?.includes('tecno') || program?.includes('joven')) return renderField('Pagos Acumulados', paymentCount);
       if (program?.includes('tutor')) return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
       return null;
   }
-  const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, DEFAULT: <History/> }
+  const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, TRASPASO: <ArrowRightLeft />, DEFAULT: <History/> }
 
-  const requiresRenovation = alert.msg === 'Requiere Renovación por 6 meses o Baja' || 
-                             (participant.programa === PROGRAMAS.TECNO && participant.activo && participant.pagosAcumulados === 6);
+  const requiresRenovation = alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION;
 
   return (
     <div className="pb-10">
       <div className="flex justify-between items-center mb-6">
         <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-2 h-4 w-4"/>Volver</Button>
-        <div className="flex items-center gap-2">
-          {participant.activo ? (
-            <Button variant="destructive" onClick={() => setIsBajaDialogOpen(true)}><Ban className="mr-2 h-4 w-4"/>Dar de Baja</Button>
-           ) : (
-            <Button variant="outline" className="border-green-500 text-green-600" onClick={() => setIsReactivateDialogOpen(true)}><CheckCircle className="mr-2 h-4 w-4"/>Reactivar</Button>
-           )}
-          <Button onClick={() => setIsEditing(true)}><Edit className="mr-2 h-4 w-4"/>Editar Legajo</Button>
-        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+  {participant.activo ? (
+    <Button variant="destructive" onClick={() => setIsBajaDialogOpen(true)}><Ban className="mr-2 h-4 w-4"/>Dar de Baja</Button>
+   ) : (
+    <Button variant="outline" className="border-green-500 text-green-600" onClick={() => setIsReactivateDialogOpen(true)}><CheckCircle className="mr-2 h-4 w-4"/>Reactivar</Button>
+   )}
+   <Button variant="secondary" onClick={() => setIsTraspasoDialogOpen(true)}><ArrowRightLeft className="mr-2 h-4 w-4" />Traspaso de Programa</Button>
+  <Button onClick={() => setIsEditing(true)}><Edit className="mr-2 h-4 w-4"/>Editar Legajo</Button>
+</div>
       </div>
       
       {alert && (<div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alert.type === 'red' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
@@ -349,12 +401,12 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
               <div>
                 <div className="mb-4 pb-4 border-b">
                   <p className="text-sm font-medium text-gray-600">Conteo de Pagos</p>
-                  <p className={`text-lg font-bold ${paymentHistory.length !== participant.pagosAcumulados ? 'text-red-600' : 'text-green-600'}`}>
-                    {paymentHistory.length} encontrados vs. {participant.pagosAcumulados} en legajo
-                  </p>
-                  {paymentHistory.length !== participant.pagosAcumulados && 
-                    <p className="text-xs text-red-500">El conteo no coincide. Considere correr el script de corrección.</p>
-                   }
+                  <p className={`text-lg font-bold ${paymentHistory.length !== paymentCount ? 'text-red-600' : 'text-green-600'}`}>
+  {paymentHistory.length} encontrados vs. {paymentCount} en legajo
+</p>
+{paymentHistory.length !== paymentCount && 
+  <p className="text-xs text-red-500">El conteo no coincide. Considere correr el script de corrección.</p>
+}
                 </div>
                 
                 <div className="space-y-3">
@@ -402,11 +454,90 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isTraspasoDialogOpen} onOpenChange={setIsTraspasoDialogOpen}>
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Traspaso de Programa</DialogTitle>
+            <DialogDescription>
+                Mover a {participant.nombre} a un nuevo programa. El programa actual es "{participant.programa}".
+            </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+    <div className="space-y-2">
+        <label htmlFor="nuevo-programa">Nuevo Programa</label>
+        <Select
+            value={traspasoData.nuevoPrograma}
+            onValueChange={(value) => setTraspasoData(prev => ({ ...prev, nuevoPrograma: value }))}
+        >
+            <SelectTrigger id="nuevo-programa">
+                <SelectValue placeholder="Seleccione el programa de destino" />
+            </SelectTrigger>
+            <SelectContent>
+                {Object.values(PROGRAMAS)
+                    .filter(p => p !== participant.programa)
+                    .map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+        </Select>
+    </div>
+
+    <div className="space-y-2">
+    <label>Fecha de Vigencia del Pase</label>
+    <div className="flex gap-2">
+        <div className="flex-1">
+            <Select
+                value={traspasoData.month}
+                onValueChange={(value) => setTraspasoData(prev => ({ ...prev, month: value }))}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                    {MONTHS.map((name, index) => (
+                        <SelectItem key={name} value={(index + 1).toString()}>{name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+        <div className="flex-1">
+            <Select
+                value={traspasoData.year}
+                onValueChange={(value) => setTraspasoData(prev => ({ ...prev, year: value }))}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent>
+                    {Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - 4 + i).map(year => (
+                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    </div>
+</div>
+    <div className="space-y-2">
+        <label htmlFor="acto-admin">Acto Administrativo (Opcional)</label>
+        <Input
+            id="acto-admin"
+            value={traspasoData.actoAdministrativo}
+            onChange={(e) => setTraspasoData(prev => ({ ...prev, actoAdministrativo: e.target.value }))}
+            placeholder="Ej: RES-2023-123-GDEBA"
+        />
+    </div>
+</div>
+
+        <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsTraspasoDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleTraspasoConfirm}>Confirmar Traspaso</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
       <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
-      {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.actoAdministrativo} onChange={(e) => setReactivationEditData(p => ({...p, actoAdministrativo: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
+      {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
       {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
       {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
-    </div>
+      </div>
   );
 };
 
