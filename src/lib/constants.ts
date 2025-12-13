@@ -40,6 +40,26 @@ export const ROLES = {
   TECNICO: 'tecnico'
 } as const;
 
-export const CAUSALES_GENERALES = ['Renuncia', 'Horas Docente', 'Trabajo Registrado', 'Solicitadas'];
+export const CAUSALES_GENERALES = ['Renuncia', 'Horas Docente', 'Trabajo Registrado', 'Solicitadas', 'Cumplimiento de 6 pagos', 'Cumplimiento de 12 pagos'];
 
 export const CAUSALES_SINTYS = ['Trabajo Registrado', 'Jubilación', 'Monotributo', 'Régimen General', 'Fallecimiento'];
+
+export const ALERT_TYPES = {
+  RED: 'red',
+  BLUE: 'blue',
+  YELLOW: 'yellow',
+  INDIGO: 'indigo',
+  PURPLE: 'purple',
+  GREEN: 'green',
+};
+
+export const ALERT_MESSAGES = {
+  BAJA: 'Baja',
+  INGRESADO: 'Ingresado',
+  REQUIERE_ATENCION: 'Requiere Atención',
+  EQUIPO_TECNICO: 'Equipo Técnico',
+  LIMITE_EDAD: (edad: number) => `Límite de Edad (${edad} años)`,
+  PROXIMO_VENCIMIENTO: 'Próximo a Vencimiento',
+  REQUIERE_AUTORIZACION: 'Requiere Autorización',
+  ACTIVO: 'Activo',
+};

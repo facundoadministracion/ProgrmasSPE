@@ -160,7 +160,7 @@ const BajaForm = ({
                             <label className="block text-sm font-bold mb-1">Año</label>
                             <Select value={anioBaja} onValueChange={(v) => handleInputChange('anioBaja', v)}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                                <SelectContent>{[2021, 2022, 2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                     </div>

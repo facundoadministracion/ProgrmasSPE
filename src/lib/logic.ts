@@ -1,28 +1,7 @@
 
-import { PROGRAMAS } from './constants';
+import { PROGRAMAS, ALERT_TYPES, ALERT_MESSAGES } from './constants';
 import type { Participant } from './types';
 import { calculateAgeAtEndOfMonth } from './utils';
-
-// Constants for getAlertStatus
-const ALERT_TYPES = {
-  RED: 'red',
-  BLUE: 'blue',
-  YELLOW: 'yellow',
-  INDIGO: 'indigo',
-  PURPLE: 'purple',
-  GREEN: 'green',
-};
-
-const ALERT_MESSAGES = {
-  BAJA: 'Baja',
-  INGRESADO: 'Ingresado',
-  REQUIERE_ATENCION: 'Requiere Atención',
-  EQUIPO_TECNICO: 'Equipo Técnico',
-  LIMITE_EDAD: (edad: number) => `Límite de Edad (${edad} años)`,
-  PROXIMO_VENCIMIENTO: 'Próximo a Vencimiento',
-  REQUIERE_AUTORIZACION: 'Requiere Autorización',
-  ACTIVO: 'Activo',
-};
 
 const AGE_LIMIT_JOVEN = 28;
 
@@ -49,8 +28,8 @@ export const getAlertStatus = (participant: Participant) => {
     }
   }
 
-  if (participant.programa === PROGRAMAS.JOVEN || participant.programa === PROGRAMAS.TECNO) {
-    const count = participant.pagosAcumulados || 0;
+  if (participant.programa && (participant.programa === PROGRAMAS.JOVEN || participant.programa === PROGRAMAS.TECNO)) {
+    const count = (participant.pagosPorPrograma && participant.pagosPorPrograma[participant.programa]) || 0;
     const renewalsNeeded = Math.floor(count / 6);
     const renewalsHeld = participant.renovaciones?.length || 0;
 

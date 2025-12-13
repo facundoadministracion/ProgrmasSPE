@@ -61,10 +61,6 @@
           "type": "boolean",
           "description": "Indicates if the participant is part of the technical team (staff)."
         },
-        "pagosAcumulados": {
-          "type": "number",
-          "description": "The number of payments accumulated by the participant."
-        },
         "fechaAlta": {
           "type": "string",
           "description": "The date the participant was registered.",

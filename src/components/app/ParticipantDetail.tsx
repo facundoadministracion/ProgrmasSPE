@@ -17,7 +17,7 @@ import { getAlertStatus } from '@/lib/logic';
 import { MONTHS, PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
 import { calculateSeniority } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-
+import HistoricalProgramDetails from './HistoricalProgramDetails';
 
 // Helper Functions
 const formatDate = (dateString: string | undefined | null) => {
@@ -52,6 +52,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const [isTraspasoDialogOpen, setIsTraspasoDialogOpen] = useState(false);
   const [traspasoData, setTraspasoData] = useState({ nuevoPrograma: '', actoAdministrativo: '', month: (new Date().getMonth() + 1).toString(), year: new Date().getFullYear().toString() });
   const [reactivationData, setReactivationData] = useState({ month: '', year: new Date().getFullYear().toString(), decree: '' });
+  const [isHistoricalProgramModalOpen, setIsHistoricalProgramModalOpen] = useState(false);
   const [history, setHistory] = useState<Novedad[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   
@@ -364,6 +365,11 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     <Button variant="outline" className="border-green-500 text-green-600" onClick={() => setIsReactivateDialogOpen(true)}><CheckCircle className="mr-2 h-4 w-4"/>Reactivar</Button>
    )}
    <Button variant="secondary" onClick={() => setIsTraspasoDialogOpen(true)}><ArrowRightLeft className="mr-2 h-4 w-4" />Traspaso de Programa</Button>
+   {history.some(n => n.type === 'TRASPASO') && (
+    <Button variant="outline" onClick={() => setIsHistoricalProgramModalOpen(true)}>
+        <History className="mr-2 h-4 w-4" />Ver Programas Anteriores
+    </Button>
+)}
   <Button onClick={() => setIsEditing(true)}><Edit className="mr-2 h-4 w-4"/>Editar Legajo</Button>
 </div>
       </div>
@@ -532,6 +538,22 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </DialogFooter>
     </DialogContent>
 </Dialog>
+
+{isHistoricalProgramModalOpen && (
+    <Dialog open={isHistoricalProgramModalOpen} onOpenChange={setIsHistoricalProgramModalOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Historial de Programas de {participant.nombre}</DialogTitle>
+                <DialogDescription>Detalle de participación en programas anteriores.</DialogDescription>
+            </DialogHeader>
+            {/* Aquí irá el contenido del nuevo componente que crearemos */}
+            <HistoricalProgramDetails participant={participant} history={history} />
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsHistoricalProgramModalOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+)}
 
       <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
       {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}

@@ -31,7 +31,7 @@ export type Participant = {
   email?: string;
   telefono?: string;
   esEquipoTecnico: boolean;
-  pagosAcumulados: number;
+  pagosPorPrograma: { [key: string]: number };
   activo: boolean;
   ownerId: string;
   fechaAlta: string;

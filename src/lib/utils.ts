@@ -101,6 +101,29 @@ export const formatDateToDDMMYYYY = (dateString: string | undefined | null): str
     }
 }
 
+export const formatTimestamp = (timestamp: any) => {
+    if (!timestamp) return '-';
+    // Asume que timestamp es un objeto Firestore Timestamp o similar
+    // Si es un objeto { seconds: number, nanoseconds: number }
+    if (timestamp && typeof timestamp.seconds === 'number') {
+      return new Date(timestamp.seconds * 1000).toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+    // Si ya es un objeto Date
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+    // Si es un string que Date puede parsear
+    try {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' });
+      }
+    } catch (e) {
+      // Ignorar error y retornar el string original si no se puede parsear
+    }
+    return String(timestamp); // Retorna el string original si todo lo demás falla
+};
+
 const meses = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'

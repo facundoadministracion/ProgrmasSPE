@@ -179,48 +179,81 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
     }
   };
 
-  const handleFixPagosAcumulados = async () => {
+  const handleFixPagosPorPrograma = async () => {
     if (!firestore) return;
-    toast({ title: 'Iniciando corrección...', description: 'Este proceso puede tardar unos segundos.' });
+    toast({ title: 'Iniciando corrección de contadores por programa...', description: 'Este proceso puede tardar.' });
+
     try {
-      const pagosRef = collection(firestore, 'pagosRegistrados');
-      const pagosSnapshot = await getDocs(pagosRef);
-      
-      const paymentCounts = new Map<string, number>();
-      pagosSnapshot.forEach(doc => {
-        const payment = doc.data();
-        if (payment.participantId) {
-          paymentCounts.set(payment.participantId, (paymentCounts.get(payment.participantId) || 0) + 1);
-        }
-      });
+        // 1. Fetch all participants and map them by ID
+        const participantsRef = collection(firestore, 'participants');
+        const participantsSnapshot = await getDocs(participantsRef);
+        const participantsMap = new Map();
+        participantsSnapshot.forEach(doc => {
+            participantsMap.set(doc.id, doc.data());
+        });
 
-      const participantsRef = collection(firestore, 'participants');
-      const participantsSnapshot = await getDocs(participantsRef);
-      
-      const batch = writeBatch(firestore);
-      let updatesNeeded = 0;
-      
-      participantsSnapshot.forEach(doc => {
-        const participantId = doc.id;
-        const participant = doc.data();
-        const correctCount = paymentCounts.get(participantId) || 0;
-        
-        if ((participant.pagosAcumulados || 0) !== correctCount) {
-          batch.update(doc.ref, { pagosAcumulados: correctCount });
-          updatesNeeded++;
-        }
-      });
+        // 2. Fetch all payments
+        const pagosRef = collection(firestore, 'pagosRegistrados');
+        const pagosSnapshot = await getDocs(pagosRef);
 
-      if (updatesNeeded > 0) {
-        await batch.commit();
-        toast({ title: '¡Corrección Completada!', description: `Se han actualizado los contadores de ${updatesNeeded} participante(s).` });
-      } else {
-        toast({ title: 'Diagnóstico Finalizado', description: 'Todos los contadores ya estaban sincronizados. No se necesitaron cambios.' });
-      }
+        // 3. Calculate correct counts for each participant and program
+        const correctCountsByParticipant = new Map<string, { [program: string]: number }>();
+        pagosSnapshot.forEach(pagoDoc => {
+            const pago = pagoDoc.data();
+            if (pago.participantId) {
+                const participant = participantsMap.get(pago.participantId);
+                if (participant && participant.programa) { // Check if participant and program exist
+                    const program = participant.programa;
+                    const currentCounts = correctCountsByParticipant.get(pago.participantId) || {};
+                    currentCounts[program] = (currentCounts[program] || 0) + 1;
+                    correctCountsByParticipant.set(pago.participantId, currentCounts);
+                }
+            }
+        });
+
+        // 4. Compare with stored data and batch update if necessary
+        const batch = writeBatch(firestore);
+        let updatesNeeded = 0;
+
+        const areObjectsEqual = (obj1: any, obj2: any) => {
+            const o1 = obj1 || {};
+            const o2 = obj2 || {};
+            const keys1 = Object.keys(o1);
+            const keys2 = Object.keys(o2);
+
+            if (keys1.length !== keys2.length) return false;
+
+            for (const key of keys1) {
+                if (!o2.hasOwnProperty(key) || o1[key] !== o2[key]) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        participantsSnapshot.forEach(doc => {
+            const participantId = doc.id;
+            const participantData = doc.data();
+            const storedCounts = participantData.pagosPorPrograma;
+            const correctCounts = correctCountsByParticipant.get(participantId);
+
+            if (!areObjectsEqual(storedCounts, correctCounts)) {
+                batch.update(doc.ref, { pagosPorPrograma: correctCounts || {} });
+                updatesNeeded++;
+            }
+        });
+
+        // 5. Commit batch and provide feedback
+        if (updatesNeeded > 0) {
+            await batch.commit();
+            toast({ title: '¡Corrección Completada!', description: `Se han actualizado los contadores por programa de ${updatesNeeded} participante(s).` });
+        } else {
+            toast({ title: 'Diagnóstico Finalizado', description: 'Todos los contadores por programa ya estaban sincronizados.' });
+        }
 
     } catch (error) {
-      console.error('Error al corregir los pagos acumulados:', error);
-      toast({ variant: "destructive", title: 'Error en la corrección', description: 'Ocurrió un error inesperado. Revisa la consola para más detalles.' });
+        console.error('Error al corregir los pagos por programa:', error);
+        toast({ variant: "destructive", title: 'Error en la corrección', description: 'Ocurrió un error inesperado. Revisa la consola.' });
     }
   };
 
@@ -233,7 +266,7 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
             <Button variant="outline" onClick={handleCorrectDates}>
               <Calendar className="mr-2 h-4 w-4" /> Corregir Fechas (Tecnoempleo)
             </Button>
-            <Button variant="outline" onClick={handleFixPagosAcumulados}>
+            <Button variant="outline" onClick={handleFixPagosPorPrograma}>
               <Wrench className="mr-2 h-4 w-4" /> Corregir Contadores
             </Button>
             <Button onClick={() => setCreateDialogOpen(true)}>

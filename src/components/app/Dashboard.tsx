@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Users, DollarSign, AlertTriangle, Briefcase, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS } from '@/lib/constants';
+import { PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 
-type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
+type ParticipantFilter = 'requiresAttention' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'finalized';
 
 interface ProgramData {
     count: number;
@@ -42,7 +42,7 @@ const Dashboard = ({
 } : {
     participants: Participant[];
     participantsLoading: boolean;
-    onSetFilter: (filter: ParticipantFilter) => void;
+    onSetFilter: (filter: any) => void;
     onSelectParticipant: (participant: Participant) => void;
 }) => {
     const firestore = useFirestore();
@@ -96,17 +96,38 @@ const Dashboard = ({
 
     }, [firestore]);
 
+    const { 
+        attentionRequiredCount, 
+        ageAlertCount, 
+        aVencerCount, 
+        renewalRequiredCount,
+        finalizedCount
+    } = useMemo(() => {
+        const getParticipantPayments = (p: Participant) => {
+            if (!p.programa || !p.pagosPorPrograma) return 0;
+            return p.pagosPorPrograma[p.programa] || 0;
+        };
+
+        const participantAlerts = (participants || [])
+            .map(p => ({ 
+                ...p, 
+                alert: getAlertStatus(p),
+                payments: getParticipantPayments(p)
+            }));
+
+        return {
+            attentionRequiredCount: (participants || []).filter(p => p.estado === 'Requiere Atención').length,
+            ageAlertCount: participantAlerts.filter(p => p.alert.msg.includes('Límite de Edad')).length,
+            aVencerCount: participantAlerts.filter(p => p.alert.msg === ALERT_MESSAGES.PROXIMO_VENCIMIENTO).length,
+            renewalRequiredCount: participantAlerts.filter(p => p.alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION && p.payments < 12).length,
+            finalizedCount: participantAlerts.filter(p => p.alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION && p.payments >= 12).length,
+        };
+    }, [participants]);
+
     if (selectedProgramDetail) {
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} onSelectParticipant={onSelectParticipant}/>
     }
     
-    const attentionRequiredCount = (participants || []).filter(p => p.estado === 'Requiere Atención').length;
-    const ageAlertCount = (participants || []).filter(p => p.activo && p.programa === PROGRAMAS.JOVEN && getAlertStatus(p).msg.includes('Límite de Edad')).length;
-    
-    const aVencerCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 11)).length;
-    const seisPagosCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && p.pagosAcumulados === 6).length;
-    const docePagosCount = (participants || []).filter(p => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO) && p.pagosAcumulados === 12).length;
-
     const totalParticipants = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
     const totalSettledAmount = Object.values(programData).reduce((sum, data) => sum + (data?.amount ?? 0), 0);
 
@@ -123,9 +144,9 @@ const Dashboard = ({
             />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
-            <DashboardCard title="Próximos a Vencer" value={aVencerCount} icon={DollarSign} color="yellow" subtitle="Participantes con 5 u 11 pagos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
-            <DashboardCard title="Continuidad (6 Pagos)" value={seisPagosCount} icon={UserPlus} color="green" subtitle="Elegibles para renovación" isLoading={participantsLoading} onClick={() => onSetFilter('payment6')} actionText="Ver Lista" />
-            <DashboardCard title="Finalizados (12 Pagos)" value={docePagosCount} icon={UserX} color="gray" subtitle="Completaron el ciclo" isLoading={participantsLoading} onClick={() => onSetFilter('payment12')} actionText="Ver Lista" />
+            <DashboardCard title="Próximos a Vencer" value={aVencerCount} icon={DollarSign} color="yellow" subtitle="A 1 pago de necesitar renovación" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
+            <DashboardCard title="Requieren Continuidad" value={renewalRequiredCount} icon={UserPlus} color="green" subtitle="Necesitan acto de renovación" isLoading={participantsLoading} onClick={() => onSetFilter('renewalRequired')} actionText="Ver Lista" />
+            <DashboardCard title="Finalizados" value={finalizedCount} icon={UserX} color="gray" subtitle="Completaron 12 pagos o más" isLoading={participantsLoading} onClick={() => onSetFilter('finalized')} actionText="Ver Lista" />
         </div>
         <div className="border-t pt-6">
             <h2 className="text-xl font-bold text-gray-700 mb-4">Liquidación Mensual</h2>
