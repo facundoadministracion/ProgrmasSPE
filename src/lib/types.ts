@@ -73,12 +73,13 @@ export type Novedad = {
     descripcion: string;
     fechaRealCarga: any; // serverTimestamp
     ownerId: string;
-    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA' | 'REACTIVACION' | 'BAJA_DEFINITIVA' | 'RENOVACION';
+    type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA' | 'REACTIVACION' | 'BAJA_DEFINITIVA' | 'RENOVACION' | 'TRASPASO';
 
     // Optional fields that may or may not be present
     participantName?: string;
     dni?: string;
     fecha?: string; // YYYY-MM-DD
+    fechaEvento?: string; // Formato YYYY-MM-DD
 
     // Fields from Baja/Reactivacion forms
     mesEvento?: string;
