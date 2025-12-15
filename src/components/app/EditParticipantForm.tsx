@@ -79,8 +79,9 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
             <MemoizedTextField id="dni" label="DNI" value={participant.dni || ''} onUpdate={() => {}} disabled />
             <MemoizedTextField id="fechaNacimiento" label="Fecha de Nacimiento" type="date" value={formData.fechaNacimiento || ''} onUpdate={handleUpdate} />
             <MemoizedTextField id="fechaIngreso" label="Fecha de Ingreso" type="date" value={formData.fechaIngreso || ''} onUpdate={handleUpdate} />
+            <MemoizedTextField id="actoAdministrativo" label="Nº de Decreto de Alta" value={formData.actoAdministrativo || ''} onUpdate={handleUpdate} />
             <MemoizedTextField id="domicilio" label="Domicilio" value={formData.domicilio || ''} onUpdate={handleUpdate} />
-            <MemoizedSelectField id="localidad" label="Localidad" value={formData.localidad || ''} onUpdate={handleUpdate} options={DEPARTAMENTOS} />
+            <MemoizedSelectField id="departamento" label="Departamento" value={formData.departamento || ''} onUpdate={handleUpdate} options={DEPARTAMENTOS} />
             <MemoizedSelectField id="programa" label="Programa" value={formData.programa || ''} onUpdate={handleUpdate} options={Object.values(PROGRAMAS)} />
             <MemoizedSelectField id="estado" label="Estado" value={formData.estado || ''} onUpdate={handleUpdate} options={ESTADOS_PARTICIPANTE} />
             {formData.programa === PROGRAMAS.TUTORIAS && (

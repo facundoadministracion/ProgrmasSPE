@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeAdminApp } from '@/firebase-admin';
 
-// Helper to split an array into chunks
+// Helper to split an array into chunks of a specific size
 function chunkArray<T>(array: T[], size: number): T[][] {
     const chunks: T[][] = [];
     for (let i = 0; i < array.length; i += size) {
@@ -11,24 +11,24 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     return chunks;
 }
 
-// Helper function to parse CSV from a string
+// Helper to parse the CSV content. IMPORTANT: It uses semicolon (;) as a delimiter.
 function parseCSV(csvString: string): Record<string, string>[] {
     const lines = csvString.trim().split(/\r?\n/);
     if (lines.length < 2) return [];
 
+    // Use semicolon as delimiter and remove BOM from the first header
     const headers = lines[0].split(';').map((h, i) => {
         const header = h.trim();
         return i === 0 ? header.replace(/^\uFEFF/, '') : header;
     });
 
     const records = [];
-
     for (let i = 1; i < lines.length; i++) {
         if (!lines[i]) continue;
         const values = lines[i].split(';').map(v => v.trim());
         if (values.length === headers.length) {
             const record = headers.reduce((obj, header, index) => {
-                obj[header] = values[index];
+                obj[header.toLowerCase()] = values[index]; // Standardize headers to lowercase
                 return obj;
             }, {} as Record<string, string>);
             records.push(record);
@@ -59,13 +59,10 @@ export async function POST(request: Request) {
     const requiredHeaders = ['dni', 'programa', 'mes', 'anio'];
     const csvHeaders = records.length > 0 ? Object.keys(records[0]) : [];
 
-    const formattedCsvHeaders = csvHeaders.map(h => h.trim().toLowerCase());
-
-    if (!requiredHeaders.every(h => formattedCsvHeaders.includes(h))) {
+    if (!requiredHeaders.every(h => csvHeaders.includes(h))) {
         return NextResponse.json({ 
             success: false, 
-            message: `El encabezado del CSV es incorrecto. Debe contener las columnas: ${requiredHeaders.join(', ')}.`,
-            details: `Columnas encontradas: ${csvHeaders.join(', ')}`
+            message: `El encabezado del CSV es incorrecto. Debe contener: ${requiredHeaders.join(', ')}.`,
         }, { status: 400 });
     }
 
@@ -73,42 +70,37 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: 'El archivo CSV está vacío o tiene un formato incorrecto.' }, { status: 400 });
     }
     
-    const configsSnapshot = await db.collection('configuracion').orderBy('anoVigencia', 'desc').orderBy('mesVigencia', 'desc').get();
-    const configs = configsSnapshot.docs.map(doc => doc.data());
+    // --- 1. Fetch all participants from CSV ---
+    const dnisInCsv = [...new Set(records.map(r => r.dni).filter(Boolean))];
+    const participantDocsMap = new Map<string, {id: string, ref: FirebaseFirestore.DocumentReference, data: FirebaseFirestore.DocumentData}>();
 
-    const findConfigAmount = (programa: string, anio: number, mes: number): number => {
-        const validConfig = configs.find(c => {
-           const configDate = new Date(c.anoVigencia, c.mesVigencia - 1);
-           const paymentDate = new Date(anio, mes - 1);
-           return configDate <= paymentDate;
-        });
-
-        if (!validConfig) return 0;
-        
-        if (programa.trim().toLowerCase() === 'programa tecnoempleo') return validConfig.montoTecno || 0;
-        if (programa.trim().toLowerCase() === 'programa empleo joven') return validConfig.montoJoven || 0;
-        if (programa.trim().toLowerCase() === 'tutorias') return validConfig.montoTutorias || 0;
-        return 0;
-    };
-
-    const dnis = [...new Set(records.map(r => r.dni).filter(Boolean))];
-    const participantDocs = new Map<string, {id: string, ref: FirebaseFirestore.DocumentReference}>();
-
-    const dniChunks = chunkArray(dnis, 30);
+    const dniChunks = chunkArray(dnisInCsv, 30); // Firestore 'in' query limit is 30
     for (const chunk of dniChunks) {
         const snapshot = await db.collection('participants').where('dni', 'in', chunk).get();
         snapshot.forEach(doc => {
-            participantDocs.set(doc.data().dni, { id: doc.id, ref: doc.ref });
+            participantDocsMap.set(doc.data().dni, { id: doc.id, ref: doc.ref, data: doc.data() });
         });
     }
 
-    const processingErrors: string[] = [];
-    const paymentHistorySummary: { [key: string]: { programa: string, mes: string, anio: string, count: number, totalAmount: number } } = {};
-    let processedCount = 0;
+    // --- 2. Fetch existing payments for these participants to avoid duplicates ---
+    const participantIds = Array.from(participantDocsMap.values()).map(p => p.id);
+    const existingPayments = new Set<string>();
     
-    const batches: FirebaseFirestore.WriteBatch[] = [db.batch()];
-    let currentBatchIndex = 0;
-    let operationsInCurrentBatch = 0;
+    if (participantIds.length > 0) {
+        const idChunks = chunkArray(participantIds, 30);
+        for (const chunk of idChunks) {
+            const paymentsSnapshot = await db.collection('pagosRegistrados').where('participantId', 'in', chunk).get();
+            paymentsSnapshot.forEach(doc => {
+                const { participantId, anio, mes } = doc.data();
+                existingPayments.add(`${participantId}-${anio}-${mes.padStart(2, '0')}`);
+            });
+        }
+    }
+    
+    // --- 3. Identify new payments to be created ---
+    const processingErrors: string[] = [];
+    const newPaymentDocs: any[] = [];
+    const affectedParticipants = new Set<string>(); // Store IDs of participants with new payments
 
     for (let i = 0; i < records.length; i++) {
         const record = records[i];
@@ -119,74 +111,85 @@ export async function POST(request: Request) {
             continue;
         }
 
-        const participantData = participantDocs.get(dni);
+        const participantData = participantDocsMap.get(dni);
         if (!participantData) {
             processingErrors.push(`Línea ${i + 2}: No se encontró participante con DNI ${dni}.`);
             continue;
         }
 
-        // Find the amount. If not found, it will correctly be 0.
-        const amount = findConfigAmount(programa, parseInt(anio), parseInt(mes));
-
-        if (operationsInCurrentBatch >= 498) {
-            batches.push(db.batch());
-            currentBatchIndex++;
-            operationsInCurrentBatch = 0;
+        const paymentKey = `${participantData.id}-${anio}-${mes.padStart(2, '0')}`;
+        if (existingPayments.has(paymentKey)) {
+            continue; // Skip existing payment
         }
-        const currentBatch = batches[currentBatchIndex];
+        
+        // Add to list for creation and mark as non-duplicate for this run
+        existingPayments.add(paymentKey); 
+        affectedParticipants.add(participantData.id);
 
-        const paymentRef = db.collection('pagosRegistrados').doc();
-        currentBatch.set(paymentRef, {
+        newPaymentDocs.push({
             participantId: participantData.id,
-            dni: dni,
-            programa: programa,
-            mes: mes,
-            anio: anio,
-            montoPagado: amount, // This will be 0 for historical payments
+            dni,
+            programa,
+            mes: mes.padStart(2, '0'),
+            anio,
             fechaDeCarga: Timestamp.now(),
         });
+    }
 
-        currentBatch.update(participantData.ref, { pagosAcumulados: FieldValue.increment(1) });
-        operationsInCurrentBatch += 2;
-
-        const historyKey = `${programa}-${mes}-${anio}`;
-        if (!paymentHistorySummary[historyKey]) {
-            paymentHistorySummary[historyKey] = { programa, mes, anio, count: 0, totalAmount: 0 };
+    // --- 4. Batch-create new payment documents ---
+    if (newPaymentDocs.length > 0) {
+        const paymentChunks = chunkArray(newPaymentDocs, 499); // Firestore batch limit is 500
+        for (const chunk of paymentChunks) {
+            const batch = db.batch();
+            chunk.forEach(docData => {
+                const newDocRef = db.collection('pagosRegistrados').doc();
+                batch.create(newDocRef, docData);
+            });
+            await batch.commit();
         }
-        paymentHistorySummary[historyKey].count++;
-        paymentHistorySummary[historyKey].totalAmount += amount;
-
-        processedCount++;
     }
-
-    for (const key in paymentHistorySummary) {
-        const summary = paymentHistorySummary[key];
-        const historyId = `${summary.programa}-${summary.mes}-${summary.anio}`;
-        const historyRef = db.collection('paymentHistory').doc(historyId);
+    
+    // --- 5. Recalculate and batch-update participant payment summaries (`pagosPorPrograma`) ---
+    if (affectedParticipants.size > 0) {
+        const affectedParticipantIds = Array.from(affectedParticipants);
+        const updateChunks = chunkArray(affectedParticipantIds, 499);
         
-        const lastBatch = batches[batches.length - 1];
-        lastBatch.set(historyRef, {
-            programa: summary.programa,
-            mesLiquidacion: summary.mes,
-            anoLiquidacion: summary.anio,
-            cantidadPagos: summary.count,
-            montoTotalLiquidado: summary.totalAmount,
-            fechaDeCarga: Timestamp.now(),
-        }, { merge: true });
-    }
+        for (const chunk of updateChunks) {
+            const batch = db.batch();
+            const paymentsSnapshot = await db.collection('pagosRegistrados')
+                .where('participantId', 'in', chunk)
+                .get();
 
-    if (processedCount > 0) {
-      await Promise.all(batches.map(batch => batch.commit()));
+            const paymentsByParticipant = new Map<string, any[]>();
+            paymentsSnapshot.forEach(doc => {
+                const payment = doc.data();
+                if (!paymentsByParticipant.has(payment.participantId)) {
+                    paymentsByParticipant.set(payment.participantId, []);
+                }
+                paymentsByParticipant.get(payment.participantId)!.push(payment);
+            });
+            
+            for (const participantId of chunk) {
+                const participantRef = db.collection('participants').doc(participantId);
+                const allPayments = paymentsByParticipant.get(participantId) || [];
+                
+                const newPagosPorPrograma = allPayments.reduce((acc, payment) => {
+                    acc[payment.programa] = (acc[payment.programa] || 0) + 1;
+                    return acc;
+                }, {} as Record<string, number>);
+
+                batch.update(participantRef, { pagosPorPrograma: newPagosPorPrograma });
+            }
+            await batch.commit();
+        }
     }
+    
+    const successMessage = `Importación finalizada. Se crearon ${newPaymentDocs.length} nuevos registros de pago.`;
 
     return NextResponse.json({ 
         success: true, 
-        message: `Importación finalizada. Se procesaron ${processedCount} de ${records.length} registros.` + (processingErrors.length > 0 ? ' Algunos registros tuvieron errores.' : ''),
-        details: {
-            registrosProcesados: processedCount,
-            registrosTotales: records.length,
-            errores: processingErrors,
-        }
+        message: successMessage + (processingErrors.length > 0 ? ' Algunos registros tuvieron errores.' : ''),
+        details: { errores: processingErrors }
     });
 
   } catch (error: any) {

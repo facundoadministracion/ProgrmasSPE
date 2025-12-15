@@ -4,22 +4,13 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UploadCloud, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-
-interface ApiResponse {
-  success: boolean;
-  message: string;
-  details?: {
-    registrosProcesados?: number;
-    registrosTotales?: number;
-    errores?: string[];
-  } | string;
-}
+import { UploadCloud, Loader2 } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
 
 export default function ImportarPagosPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [response, setResponse] = useState<ApiResponse | null>(null);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -30,12 +21,11 @@ export default function ImportarPagosPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!file) {
-      alert('Por favor, selecciona un archivo CSV.');
+      toast({ variant: "destructive", title: "Error", description: "Por favor, selecciona un archivo CSV." });
       return;
     }
 
     setUploading(true);
-    setResponse(null);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -47,12 +37,33 @@ export default function ImportarPagosPage() {
       });
 
       const data = await res.json();
-      setResponse(data);
+
+      if (data.success) {
+        toast({
+          variant: "default",
+          title: "Importación Exitosa",
+          description: data.message,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error en la Importación",
+          description: data.message + (data.details ? ` Detalles: ${typeof data.details === 'string' ? data.details : JSON.stringify(data.details)}` : ''),
+        });
+      }
 
     } catch (error: any) {
-      setResponse({ success: false, message: `Error en la comunicación con el servidor: ${error.message}` });
+      toast({
+        variant: "destructive",
+        title: "Error de Conexión",
+        description: `No se pudo comunicar con el servidor: ${error.message}`,
+      });
     } finally {
       setUploading(false);
+      // Reset file input to allow re-uploading the same file
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if(fileInput) fileInput.value = '';
+      setFile(null);
     }
   };
 
@@ -97,34 +108,6 @@ export default function ImportarPagosPage() {
               </Button>
             </div>
           </form>
-
-          {response && (
-            <div className={`mt-6 p-4 rounded-lg ${response.success ? 'bg-green-100 text-green-900' : 'bg-red-100 text-red-900'}`}>
-              <div className="flex items-start">
-                {response.success ? <CheckCircle className="h-5 w-5 mr-3 text-green-500" /> : <AlertCircle className="h-5 w-5 mr-3 text-red-500" />}
-                <div>
-                  <h3 className="font-bold">{response.success ? 'Proceso Finalizado' : 'Error en la Importación'}</h3>
-                  <p className="text-sm">{response.message}</p>
-                </div>
-              </div>
-
-              {response.details && typeof response.details === 'object' && response.details.errores && response.details.errores.length > 0 && (
-                <div className='mt-4'>
-                  <h4 className='font-semibold text-sm'>Los siguientes registros no se pudieron procesar:</h4>
-                  <ul className='list-disc list-inside text-sm mt-2 bg-white/60 p-3 rounded'>
-                    {response.details.errores.map((err, i) => <li key={i}>{err}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {response.details && typeof response.details === 'string' && (
-                 <div className='mt-4'>
-                    <h4 className='font-semibold text-sm'>Detalle del error interno del servidor:</h4>
-                    <pre className="mt-2 text-xs whitespace-pre-wrap bg-white/60 p-3 rounded font-mono">{response.details}</pre>
-                 </div>
-              )}
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

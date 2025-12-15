@@ -80,11 +80,11 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     [participant.programa]
   );
 
-  const paymentCount = useMemo(() => {
-    if (!participant.programa || !participant.pagosPorPrograma) return 0;
-    return participant.pagosPorPrograma[participant.programa] || 0;
-  }, [participant.programa, participant.pagosPorPrograma]); 
-
+  const totalPaymentCountInLegajo = useMemo(() => {
+    if (!participant.pagosPorPrograma) return 0;
+    return Object.values(participant.pagosPorPrograma).reduce((sum, count) => sum + count, 0);
+}, [participant.pagosPorPrograma]);
+ 
   // Effects
   useEffect(() => {
     const fetchHistory = async () => {
@@ -107,7 +107,10 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       if (!firestore || !participant.id || !isAuditableProgram) return;
       setIsLoadingPayments(true);
       try {
-        const q = query(collection(firestore, 'pagosRegistrados'), where('participantId', '==', participant.id));
+        const q = query(
+          collection(firestore, 'pagosRegistrados'), 
+          where('participantId', '==', participant.id)
+        );
         const snapshot = await getDocs(q);
         const payments = snapshot.docs.map(doc => doc.data() as PagoRegistrado);
         setPaymentHistory(payments);
@@ -125,12 +128,18 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const groupedPayments = useMemo(() => {
     if (!paymentHistory) return {};
     return paymentHistory.reduce((acc, payment) => {
-      const year = payment.anio;
-      if (!acc[year]) acc[year] = [];
-      acc[year].push(parseInt(payment.mes, 10));
-      return acc;
-    }, {} as { [key: string]: number[] });
-  }, [paymentHistory]);
+        const program = payment.programa || 'General';
+        if (!acc[program]) {
+            acc[program] = {};
+        }
+        const year = payment.anio;
+        if (!acc[program][year]) {
+            acc[program][year] = [];
+        }
+        acc[program][year].push(parseInt(payment.mes, 10));
+        return acc;
+    }, {} as { [program: string]: { [year: string]: number[] } });
+}, [paymentHistory]);
 
   useEffect(() => {
     if (novedadToEditText) {
@@ -345,11 +354,17 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   // Render Helpers
   const renderField = (label: string, value: any) => (<div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>);
   const renderMetric = () => {
-      const program = participant.programa?.toLowerCase();
-      if(program?.includes('tecno') || program?.includes('joven')) return renderField('Pagos Acumulados', paymentCount);
-      if (program?.includes('tutor')) return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
-      return null;
-  }
+    const currentProgram = participant.programa?.toLowerCase() || '';
+    if (currentProgram.includes('tutor')) {
+        return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
+    }
+    
+    if (isAuditableProgram) {
+        return renderField('Pagos Acumulados (Legajo)', totalPaymentCountInLegajo);
+    }
+    
+    return null;
+}
   const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, TRASPASO: <ArrowRightLeft />, DEFAULT: <History/> }
 
   const requiresRenovation = alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION;
@@ -406,29 +421,34 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             ) : (
               <div>
                 <div className="mb-4 pb-4 border-b">
-                  <p className="text-sm font-medium text-gray-600">Conteo de Pagos</p>
-                  <p className={`text-lg font-bold ${paymentHistory.length !== paymentCount ? 'text-red-600' : 'text-green-600'}`}>
-  {paymentHistory.length} encontrados vs. {paymentCount} en legajo
-</p>
-{paymentHistory.length !== paymentCount && 
-  <p className="text-xs text-red-500">El conteo no coincide. Considere correr el script de corrección.</p>
-}
-                </div>
+    <p className="text-sm font-medium text-gray-600">Conteo de Pagos</p>
+    <p className={`text-lg font-bold ${paymentHistory.length !== totalPaymentCountInLegajo ? 'text-red-600' : 'text-green-600'}`}>
+        {paymentHistory.length} encontrados vs. {totalPaymentCountInLegajo} en legajo
+    </p>
+    {paymentHistory.length !== totalPaymentCountInLegajo && 
+        <p className="text-xs text-red-500">El conteo no coincide. Considere correr el script de corrección.</p>
+    }
+</div>
                 
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-gray-600">Meses liquidados por año</p>
-                  {Object.keys(groupedPayments).sort((a,b) => parseInt(b) - parseInt(a)).map(year => (
-                    <div key={year}>
-                      <h4 className="font-semibold text-md mb-2">{year}</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {groupedPayments[year].sort((a,b) => a - b).map(month => (
-                           <Badge key={`${year}-${month}`} variant="secondary" className="text-sm">{MONTHS[month - 1]}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  {paymentHistory.length === 0 && <p className="text-sm text-gray-500">No se encontraron pagos registrados.</p>}
-                </div>
+<div className="space-y-4">
+  <p className="text-sm font-medium text-gray-600">Meses liquidados por programa y año</p>
+  {Object.keys(groupedPayments).sort().map(program => (
+    <div key={program} className="py-2">
+      <h3 className="font-bold text-md text-gray-800">{program}</h3>
+      {Object.keys(groupedPayments[program]).sort((a,b) => parseInt(b) - parseInt(a)).map(year => (
+        <div key={year} className="mt-2 pl-4">
+          <h4 className="font-semibold text-md mb-2">{year}</h4>
+          <div className="flex flex-wrap gap-2">
+            {groupedPayments[program][year].sort((a,b) => a - b).map(month => (
+               <Badge key={`${program}-${year}-${month}`} variant="secondary" className="text-sm">{MONTHS[month - 1]}</Badge>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  ))}
+  {paymentHistory.length === 0 && <p className="text-sm text-gray-500 mt-2">No se encontraron pagos registrados para los programas de este participante.</p>}
+</div>
               </div>
             )}
           </CardContent>
@@ -555,10 +575,10 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     </Dialog>
 )}
 
-      <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
-      {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
-      {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
-      {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
+<Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}><DialogContent><DialogHeader><DialogTitle>Reactivar a {participant.nombre}</DialogTitle><DialogDescription>Reactivar a {participant.nombre} en el programa.</DialogDescription></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationData.month} onValueChange={(v) => setReactivationData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input type="number" value={reactivationData.year} onChange={(e) => setReactivationData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationData.decree} onChange={(e) => setReactivationData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsReactivateDialogOpen(false)}>Cancelar</Button><Button onClick={handleReactivate}>Confirmar</Button></DialogFooter></DialogContent></Dialog>
+{reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle><DialogDescription>Modifique los datos de la reactivación.</DialogDescription></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
+{novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle><DialogDescription>Esta acción no se puede deshacer. La novedad será eliminada permanentemente.</DialogDescription></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
+{novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle><DialogDescription>Modifique la descripción de la novedad.</DialogDescription></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
       </div>
   );
 };
