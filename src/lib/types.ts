@@ -121,6 +121,7 @@ export type PagoRegistrado = {
   participantId: string;
   mes: string;
   anio: string;
+  programa: string;
   fechaDeCarga: any;
 }
 
