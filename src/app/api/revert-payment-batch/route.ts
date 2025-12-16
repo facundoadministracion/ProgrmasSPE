@@ -1,0 +1,97 @@
+
+import { NextResponse } from 'next/server';
+import { initializeAdminApp } from '@/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+
+// Asegúrate de que esta función se llame solo una vez
+const db = initializeAdminApp();
+
+// Función para convertir el nombre del mes a número de string
+const getMonthNumber = (monthName: string): string => {
+    const months: { [key: string]: string } = {
+        'enero': '1', 'febrero': '2', 'marzo': '3', 'abril': '4', 'mayo': '5', 'junio': '6',
+        'julio': '7', 'agosto': '8', 'septiembre': '9', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+    };
+    return months[monthName.toLowerCase()] || '0';
+};
+
+
+export async function POST(request: Request) {
+  try {
+    const { programa, mes: mesNombre, anio } = await request.json();
+
+    if (!programa || !mesNombre || !anio) {
+      return NextResponse.json({ error: 'Faltan parámetros requeridos (programa, mes, anio).' }, { status: 400 });
+    }
+
+    // Usaremos los tipos de datos STRING como están en Firestore
+    const mes = getMonthNumber(mesNombre);
+    const anioStr = anio.toString();
+    const programaStr = programa.toString();
+    
+    // --- Iniciar Transacción ---
+    const batch = db.batch();
+
+    // 1. Revertir pagos individuales y actualizar participantes
+    const paymentRecordsQuery = db.collection('paymentRecords')
+      .where('programa', '==', programaStr)
+      .where('mesLiquidacion', '==', mes) 
+      .where('anoLiquidacion', '==', anioStr);
+      
+    const paymentRecordsSnapshot = await paymentRecordsQuery.get();
+    
+    const participantsToUpdate: { [key: string]: { ultimoPago: string } } = {};
+
+    paymentRecordsSnapshot.forEach(doc => {
+      const payment = doc.data();
+      const participantId = payment.participantId;
+
+      // Marcar registro de pago para eliminación
+      batch.delete(doc.ref);
+
+      // Descontar pago del participante
+      if (participantId) {
+        const participantRef = db.collection('participants').doc(participantId);
+        const programPaymentField = `pagosPorPrograma.${programaStr}`;
+        
+        // Calcular mes anterior
+        const currentMonth = parseInt(mes);
+        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevYear = currentMonth === 1 ? parseInt(anioStr) - 1 : parseInt(anioStr);
+
+        batch.update(participantRef, {
+            pagosAcumulados: FieldValue.increment(-1),
+            [programPaymentField]: FieldValue.increment(-1),
+            ultimoPago: `${prevMonth.toString()}/${prevYear.toString()}`, // Ajusta esto según tu lógica
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+    });
+
+    // 2. Eliminar el registro de resumen de `paymentHistory`
+    const paymentHistoryQuery = db.collection('paymentHistory')
+      .where('programa', '==', programaStr)
+      .where('mesLiquidacion', '==', mes)
+      .where('anoLiquidacion', '==', anioStr);
+
+    const paymentHistorySnapshot = await paymentHistoryQuery.get();
+    
+    paymentHistorySnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
+    // Ejecutar todas las operaciones en la transacción
+    await batch.commit();
+
+    return NextResponse.json({ 
+        message: 'Reversión completada exitosamente.',
+        revertedPayments: paymentRecordsSnapshot.size,
+        revertedHistory: paymentHistorySnapshot.size,
+    });
+
+  } catch (error) {
+    console.error('Error en la función de reversión de lote de pago:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido';
+    return NextResponse.json({ error: 'Error interno del servidor', details: errorMessage }, { status: 500 });
+  }
+}
