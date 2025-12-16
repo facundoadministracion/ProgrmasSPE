@@ -1,0 +1,13 @@
+fix(data): Aumenta la robustez de la ingesta y visualización de datos
+
+Este commit introduce dos mejoras clave para la integridad y estabilidad de los datos de la aplicación.
+
+1.  **API de Importación (`/api/import-pagos`):**
+    - Se añade una lógica de estandarización para los nombres de los programas.
+    - Ahora, sin importar cómo se escriba un programa en el CSV de importación (ej: "empleo joven", "Empleo Joven"), se guardará en la base de datos con el nombre oficial definido en las constantes.
+    - Esto soluciona el problema de la fragmentación de datos y los errores de lógica derivados de la sensibilidad a mayúsculas/minúsculas.
+
+2.  **Componente de Historial (`PaymentHistory.tsx`):**
+    - Se refactoriza el componente para que sea resiliente a datos duplicados en la colección `paymentHistory`.
+    - Antes, la presencia de múltiples documentos para el mismo lote (mes/año/programa) causaba un crash en React por claves duplicadas.
+    - Ahora, el componente agrupa los registros duplicados y suma sus conteos, mostrando una vista consolidada y correcta de los datos, y previniendo cualquier caída de la aplicación.

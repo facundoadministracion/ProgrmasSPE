@@ -41,15 +41,34 @@ const PaymentHistory = () => {
     const historySnapshot = await getDocs(collection(firestore, 'paymentHistory'));
     const historyDocs = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PaymentHistoryDoc[];
 
-    const sortedHistory = historyDocs.sort((a, b) => {
-        if (a.anoLiquidacion !== b.anoLiquidacion) return parseInt(b.anoLiquidacion) - parseInt(a.anoLiquidacion);
-        return parseInt(b.mesLiquidacion) - parseInt(a.mesLiquidacion);
-    }).map(doc => ({
-        mes: doc.mesLiquidacion, 
-        anio: doc.anoLiquidacion, 
-        programa: doc.programa || 'General', 
-        count: doc.cantidadPagos || 0
-    }));
+    // --- FIX: De-duplicate and aggregate records ---
+    const uniqueHistoryMap = new Map<string, GroupedPayment>();
+    historyDocs.forEach(doc => {
+        const programa = doc.programa || 'General';
+        const key = `${doc.mesLiquidacion}-${doc.anoLiquidacion}-${programa}`;
+        
+        if (uniqueHistoryMap.has(key)) {
+            // If key exists, aggregate the count
+            const existing = uniqueHistoryMap.get(key)!;
+            existing.count += doc.cantidadPagos || 0;
+            uniqueHistoryMap.set(key, existing);
+        } else {
+            // If key doesn't exist, create a new entry
+            uniqueHistoryMap.set(key, {
+                mes: doc.mesLiquidacion,
+                anio: doc.anoLiquidacion,
+                programa: programa,
+                count: doc.cantidadPagos || 0
+            });
+        }
+    });
+    const aggregatedHistory = Array.from(uniqueHistoryMap.values());
+    // --- End of FIX ---
+
+    const sortedHistory = aggregatedHistory.sort((a, b) => {
+        if (a.anio !== b.anio) return parseInt(b.anio) - parseInt(a.anio);
+        return parseInt(a.mes) - parseInt(a.mes);
+    });
 
     setHistory(sortedHistory);
     setLoading(false);
@@ -82,7 +101,7 @@ const PaymentHistory = () => {
             },
             body: JSON.stringify({
                 programa: batchData.programa,
-                mes: mesNombre, // Enviamos el nombre del mes a la API
+                mes: mesNombre, 
                 anio: batchData.anio,
             }),
         });
