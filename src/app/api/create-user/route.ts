@@ -1,11 +1,11 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp } from '@/firebase-admin';
+import { getAdminApp } from '@/firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 async function getAdminServices() {
-  const adminApp = initializeAdminApp();
+  const adminApp = getAdminApp();
   const adminAuth = getAuth(adminApp);
   const firestore = getFirestore(adminApp);
   return { adminAuth, firestore };
