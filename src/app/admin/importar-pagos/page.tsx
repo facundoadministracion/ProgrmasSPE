@@ -4,17 +4,27 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UploadCloud, Loader2 } from 'lucide-react';
+import { UploadCloud, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+
+interface ImportResult {
+  success: boolean;
+  message: string;
+  details?: {
+    errores?: string[];
+  };
+}
 
 export default function ImportarPagosPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFile(e.target.files[0]);
+      setImportResult(null); // Reset result when a new file is selected
     }
   };
 
@@ -26,6 +36,7 @@ export default function ImportarPagosPage() {
     }
 
     setUploading(true);
+    setImportResult(null);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -36,27 +47,27 @@ export default function ImportarPagosPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const data: ImportResult = await res.json();
 
-      if (data.success) {
-        toast({
-          variant: "default",
-          title: "Importación Exitosa",
-          description: data.message,
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error en la Importación",
-          description: data.message + (data.details ? ` Detalles: ${typeof data.details === 'string' ? data.details : JSON.stringify(data.details)}` : ''),
-        });
+      if (!res.ok) {
+          throw new Error(data.message || 'Ocurrió un error en el servidor.');
       }
 
+      setImportResult(data);
+
+      toast({
+        variant: data.success ? "default" : "destructive",
+        title: data.success ? "Importación Finalizada" : "Error en la Importación",
+        description: data.message,
+      });
+
     } catch (error: any) {
+      const errorMessage = error.message || 'No se pudo comunicar con el servidor.';
+      setImportResult({ success: false, message: errorMessage });
       toast({
         variant: "destructive",
         title: "Error de Conexión",
-        description: `No se pudo comunicar con el servidor: ${error.message}`,
+        description: errorMessage,
       });
     } finally {
       setUploading(false);
@@ -108,6 +119,27 @@ export default function ImportarPagosPage() {
               </Button>
             </div>
           </form>
+
+          {importResult && (
+            <div className="mt-6 p-4 rounded-lg border bg-slate-50">
+                <div className="flex items-center">
+                    {importResult.success ? <CheckCircle className="h-5 w-5 text-green-500 mr-2" /> : <AlertCircle className="h-5 w-5 text-red-500 mr-2" />}
+                    <h3 className={`font-semibold ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                        {importResult.success ? 'Importación Finalizada' : 'La importación tuvo problemas'}
+                    </h3>
+                </div>
+                <p className="text-sm text-slate-600 mt-2 ml-7">{importResult.message}</p>
+                {importResult.details?.errores && importResult.details.errores.length > 0 && (
+                <div className="mt-3 ml-7">
+                    <p className="text-sm font-semibold text-slate-700">Detalles de errores encontrados:</p>
+                    <ul className="list-disc list-inside text-sm text-red-700 mt-1 max-h-40 overflow-y-auto bg-red-50 p-2 rounded">
+                    {importResult.details.errores.map((err, i) => <li key={i}>{err}</li>)}
+                    </ul>
+                </div>
+                )}
+            </div>
+          )}
+
         </CardContent>
       </Card>
     </div>
