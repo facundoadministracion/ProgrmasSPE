@@ -1,4 +1,3 @@
-
 export type UserRole = {
   uid: string;
   name: string;
@@ -41,6 +40,7 @@ export type Participant = {
   mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
   historialPagos?: string[]; // Array of "YYYY-MM"
   renovaciones?: string[]; // Array de actos de renovación
+  historialProgramas?: { [key: string]: { fechaInicio: string; fechaFin: string; motivo: string; } };
 };
 
 export type Payment = {
