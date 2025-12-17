@@ -56,6 +56,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const [isHistoricalProgramModalOpen, setIsHistoricalProgramModalOpen] = useState(false);
   const [history, setHistory] = useState<Novedad[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   const [novedadToEditText, setNovedadToEditText] = useState<Novedad | null>(null);
   const [newDescription, setNewDescription] = useState('');
@@ -346,6 +347,31 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     } catch (error) { toast({ variant: 'destructive', title: 'Error al actualizar' }); }
   };
 
+  const handleDeleteParticipant = async () => {
+    if (!firestore || !user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se ha podido conectar con el servicio.' });
+      return;
+    }
+    
+    try {
+      const functions = getFunctions();
+      const deleteParticipantFunction = httpsCallable(functions, 'deleteParticipant');
+      
+      toast({ title: 'Eliminando...', description: 'Este proceso puede tardar unos segundos.' });
+
+      await deleteParticipantFunction({ participantId: participant.id });
+
+      toast({ title: '¡Legajo Eliminado!', description: `El legajo de ${participant.nombre} ha sido borrado permanentemente.` });
+      
+      setIsDeleteDialogOpen(false);
+      onBack(); // Vuelve a la pantalla anterior
+
+    } catch (error) {
+      console.error("Error deleting participant:", error);
+      toast({ variant: 'destructive', title: 'Error al eliminar', description: 'Ocurrió un error inesperado. Por favor, intenta de nuevo.' });
+    }
+  };
+
   const handleEditClick = (item: Novedad) => {
       if (item.type === 'REACTIVACION') setReactivationToEdit(item);
       else if (item.type === 'BAJA_DEFINITIVA') setBajaToEdit(item);
@@ -387,6 +413,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     </Button>
 )}
   <Button onClick={() => setIsEditing(true)}><Edit className="mr-2 h-4 w-4"/>Editar Legajo</Button>
+  <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}><Trash2 className="mr-2 h-4 w-4"/>Eliminar Legajo</Button>
 </div>
       </div>
       
@@ -580,6 +607,24 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle><DialogDescription>Modifique los datos de la reactivación.</DialogDescription></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
 {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle><DialogDescription>Esta acción no se puede deshacer. La novedad será eliminada permanentemente.</DialogDescription></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
 {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle><DialogDescription>Modifique la descripción de la novedad.</DialogDescription></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
+<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>¿Estás seguro que deseas eliminar este legajo?</DialogTitle>
+      <DialogDescription>
+        <div className="py-4 text-red-600 font-medium">
+          <p>¡ATENCIÓN! ESTA ACCIÓN ES IRREVERSIBLE.</p>
+          <p className="mt-2">Se eliminará permanentemente el legajo de <span className="font-bold">{participant.nombre}</span>, junto con todo su historial de pagos, novedades y cualquier otro dato asociado.</p>
+          <p className="mt-2">Una vez borrado, no podrá ser recuperado.</p>
+        </div>
+      </DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+      <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
+      <Button variant="destructive" onClick={handleDeleteParticipant}>Sí, eliminar permanentemente</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
       </div>
   );
 };
