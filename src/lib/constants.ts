@@ -34,6 +34,8 @@ export const MONTHS = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+export const YEARS = Array.from({ length: new Date().getFullYear() - 2018 + 6 }, (_, i) => 2018 + i);
+
 export const ROLES = {
   ADMIN: 'admin',
   DATA_ENTRY: 'data-entry',

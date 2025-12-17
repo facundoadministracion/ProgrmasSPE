@@ -200,14 +200,11 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
         const correctCountsByParticipant = new Map<string, { [program: string]: number }>();
         pagosSnapshot.forEach(pagoDoc => {
             const pago = pagoDoc.data();
-            if (pago.participantId) {
-                const participant = participantsMap.get(pago.participantId);
-                if (participant && participant.programa) { // Check if participant and program exist
-                    const program = participant.programa;
-                    const currentCounts = correctCountsByParticipant.get(pago.participantId) || {};
-                    currentCounts[program] = (currentCounts[program] || 0) + 1;
-                    correctCountsByParticipant.set(pago.participantId, currentCounts);
-                }
+            if (pago.participantId && pago.programa) { // Check if participantId and program exist
+                const program = pago.programa; // <-- BUG FIXED HERE
+                const currentCounts = correctCountsByParticipant.get(pago.participantId) || {};
+                currentCounts[program] = (currentCounts[program] || 0) + 1;
+                correctCountsByParticipant.set(pago.participantId, currentCounts);
             }
         });
 

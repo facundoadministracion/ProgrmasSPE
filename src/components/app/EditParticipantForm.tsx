@@ -1,18 +1,17 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE, DEPARTAMENTOS } from '@/lib/constants';
+import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE, DEPARTAMENTOS, MONTHS, YEARS } from '@/lib/constants';
 import MemoizedTextField from './edit-participant-form-parts/MemoizedTextField';
 import MemoizedSelectField from './edit-participant-form-parts/MemoizedSelectField';
 import MemoizedSwitchField from './edit-participant-form-parts/MemoizedSwitchField';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FilePlus } from 'lucide-react';
 
-
 interface EditParticipantFormProps {
   participant: Participant;
-  onSave: (updatedData: any) => void; // Changed to any to accommodate newRenovationActo
+  onSave: (updatedData: any) => void;
   formId: string;
   requiresRenovation: boolean;
 }
@@ -21,9 +20,35 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
   const [formData, setFormData] = useState(participant);
   const [newRenovationActo, setNewRenovationActo] = useState('');
 
+  // Initialize state for month and year selectors
+  const getInitialDateParts = () => {
+    if (participant.fechaIngreso && participant.fechaIngreso.includes('-')) {
+      const parts = participant.fechaIngreso.split('-');
+      return {
+        year: parts[0],
+        month: (parseInt(parts[1], 10) - 1).toString() // Month is 0-indexed for state
+      };
+    }
+    const today = new Date();
+    return { year: today.getFullYear().toString(), month: today.getMonth().toString() };
+  };
+
+  const [ingresoYear, setIngresoYear] = useState(getInitialDateParts().year);
+  const [ingresoMonth, setIngresoMonth] = useState(getInitialDateParts().month);
+
   const handleUpdate = useCallback((id: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [id]: value }));
   }, []);
+
+  // Update fechaIngreso in formData when month or year changes
+  useEffect(() => {
+    const monthNumber = parseInt(ingresoMonth, 10) + 1;
+    const monthPadded = monthNumber.toString().padStart(2, '0');
+    const newDate = `${ingresoYear}-${monthPadded}-01`;
+    if (newDate !== formData.fechaIngreso) {
+        handleUpdate('fechaIngreso', newDate);
+    }
+  }, [ingresoMonth, ingresoYear, handleUpdate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,11 +61,11 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
     
     for (const key in currentData) {
       const pKey = key as keyof Participant;
-      if (pKey === 'renovaciones') continue; // Handled separately
+      if (pKey === 'renovaciones') continue;
       const formValue = currentData[pKey as keyof typeof currentData] || '';
       const participantValue = participant[pKey] || '';
 
-      if (formValue !== participantValue) {
+      if (String(formValue) !== String(participantValue)) {
         (changes as any)[pKey] = formValue;
       }
     }
@@ -56,6 +81,9 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
     onSave(finalChanges);
   };
   
+  const monthOptions = MONTHS.map((name, index) => ({ value: index.toString(), label: name }));
+  const yearOptions = YEARS.map(year => ({ value: year.toString(), label: year.toString() }));
+
   return (
     <form id={formId} onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
@@ -78,7 +106,22 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
             <MemoizedTextField id="nombre" label="Nombre Completo" value={formData.nombre || ''} onUpdate={handleUpdate} />
             <MemoizedTextField id="dni" label="DNI" value={participant.dni || ''} onUpdate={() => {}} disabled />
             <MemoizedTextField id="fechaNacimiento" label="Fecha de Nacimiento" type="date" value={formData.fechaNacimiento || ''} onUpdate={handleUpdate} />
-            <MemoizedTextField id="fechaIngreso" label="Fecha de Ingreso" type="date" value={formData.fechaIngreso || ''} onUpdate={handleUpdate} />
+            
+            <div className="grid grid-cols-2 gap-2">
+                <MemoizedSelectField 
+                    id="ingresoMonth" 
+                    label="Mes Ingreso" 
+                    value={ingresoMonth} 
+                    onUpdate={(_, val) => setIngresoMonth(val as string)} 
+                    options={monthOptions} />
+                <MemoizedSelectField 
+                    id="ingresoYear" 
+                    label="Año Ingreso" 
+                    value={ingresoYear} 
+                    onUpdate={(_, val) => setIngresoYear(val as string)} 
+                    options={yearOptions} />
+            </div>
+
             <MemoizedTextField id="actoAdministrativo" label="Nº de Decreto de Alta" value={formData.actoAdministrativo || ''} onUpdate={handleUpdate} />
             <MemoizedTextField id="domicilio" label="Domicilio" value={formData.domicilio || ''} onUpdate={handleUpdate} />
             <MemoizedSelectField id="departamento" label="Departamento" value={formData.departamento || ''} onUpdate={handleUpdate} options={DEPARTAMENTOS} />

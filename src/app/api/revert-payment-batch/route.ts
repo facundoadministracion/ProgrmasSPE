@@ -40,8 +40,6 @@ export async function POST(request: Request) {
       
     const paymentRecordsSnapshot = await paymentRecordsQuery.get();
     
-    const participantsToUpdate: { [key: string]: { ultimoPago: string } } = {};
-
     paymentRecordsSnapshot.forEach(doc => {
       const payment = doc.data();
       const participantId = payment.participantId;
