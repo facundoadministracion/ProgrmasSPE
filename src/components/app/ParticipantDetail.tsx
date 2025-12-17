@@ -83,9 +83,9 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   );
 
   const totalPaymentCountInLegajo = useMemo(() => {
-    if (!participant.pagosPorPrograma) return 0;
-    return Object.values(participant.pagosPorPrograma).reduce((sum, count) => sum + count, 0);
-}, [participant.pagosPorPrograma]);
+    if (!participant.pagosPorPrograma || !participant.programa) return 0;
+    return participant.pagosPorPrograma[participant.programa] || 0;
+  }, [participant.pagosPorPrograma, participant.programa]);
  
   // Effects
   useEffect(() => {
@@ -127,21 +127,21 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     fetchPaymentHistory();
   }, [firestore, participant.id, toast, isAuditableProgram]);
 
-  const groupedPayments = useMemo(() => {
-    if (!paymentHistory) return {};
-    return paymentHistory.reduce((acc, payment) => {
-        const program = payment.programa || 'General';
-        if (!acc[program]) {
-            acc[program] = {};
-        }
+  const currentProgramPayments = useMemo(() => {
+    if (!paymentHistory || !participant.programa) return [];
+    return paymentHistory.filter(p => p.programa === participant.programa);
+  }, [paymentHistory, participant.programa]);
+
+  const groupedCurrentProgramPayments = useMemo(() => {
+    return currentProgramPayments.reduce((acc, payment) => {
         const year = payment.anio;
-        if (!acc[program][year]) {
-            acc[program][year] = [];
+        if (!acc[year]) {
+            acc[year] = [];
         }
-        acc[program][year].push(parseInt(payment.mes, 10));
+        acc[year].push(parseInt(payment.mes, 10));
         return acc;
-    }, {} as { [program: string]: { [year: string]: number[] } });
-}, [paymentHistory]);
+    }, {} as { [year: string]: number[] });
+  }, [currentProgramPayments]);
 
   useEffect(() => {
     if (novedadToEditText) {
@@ -260,142 +260,142 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
 
-    let descripcion = `Traspaso del programa "${previousPrograma}" a "${nuevoPrograma}" con fecha de vigencia ${formattedDate}.`;
-    if (actoAdministrativo) {
-        descripcion += ` Respaldo por Acto Administrativo: ${actoAdministrativo}.`;
-    }
-
-    const newNovedad: Omit<Novedad, 'id'> = {
-        participantId: participant.id,
-        descripcion,
-        type: 'TRASPASO',
-        fechaEvento: `${year}-${month.padStart(2, '0')}`, // Guardamos como YYYY-MM
-        fechaRealCarga: serverTimestamp(),
-        ownerId: user.uid,
+    let descripcion = `Traspaso del programa "${previousPrograma}" a "${
+      nuevoPrograma}" con fecha de vigencia ${formattedDate}.`;
+      if (actoAdministrativo) {
+          descripcion += ` Respaldo por Acto Administrativo: ${actoAdministrativo}.`;
+      }
+  
+      const newNovedad: Omit<Novedad, 'id'> = {
+          participantId: participant.id,
+          descripcion,
+          type: 'TRASPASO',
+          fechaEvento: `${year}-${month.padStart(2, '0')}`, // Guardamos como YYYY-MM
+          fechaRealCarga: serverTimestamp(),
+          ownerId: user.uid,
+      };
+      const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
+      
+      setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
+      setParticipant(prev => ({ ...prev, ...updatedParticipant }));
+      
+      toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma}.` });
+      setIsTraspasoDialogOpen(false);
+  };
+  
+    const handleUpdateBaja = async (bajaData: any) => {
+      if (!firestore || !bajaToEdit) return;
+  
+      const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
+      const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
+      const updatedParticipant: Partial<Participant> = { actoAdministrativo: actoAdmin || participant.actoAdministrativo };
+  
+      const monthName = MONTHS[parseInt(bajaData.mesBaja, 10) - 1];
+      let newDescription = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
+      if (actoAdmin) newDescription += ` Acto: ${actoAdmin}.`;
+      if(isActoAdmin && bajaData.causalInforme) newDescription += ` Causal: ${bajaData.causalInforme}.`;
+      if(bajaData.detalle) newDescription += ` Detalles: ${bajaData.detalle}.`;
+      
+      const novedadRef = doc(firestore, 'novedades', bajaToEdit.id);
+      await updateDoc(novedadRef, { ...bajaData, descripcion: newDescription });
+  
+      const partRef = doc(firestore, 'participants', participant.id);
+      await updateDoc(partRef, updatedParticipant);
+  
+      toast({ title: 'Baja Actualizada' });
+      setHistory(prev => prev.map(h => h.id === bajaToEdit.id ? { ...h, ...bajaData, descripcion: newDescription } : h));
+      setParticipant(prev => ({...prev, ...updatedParticipant}));
+      setBajaToEdit(null);
     };
-    const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
-    
-    setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
-    setParticipant(prev => ({ ...prev, ...updatedParticipant }));
-    
-    toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma}.` });
-    setIsTraspasoDialogOpen(false);
-};
-
-  const handleUpdateBaja = async (bajaData: any) => {
-    if (!firestore || !bajaToEdit) return;
-
-    const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
-    const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
-    const updatedParticipant: Partial<Participant> = { actoAdministrativo: actoAdmin || participant.actoAdministrativo };
-
-    const monthName = MONTHS[parseInt(bajaData.mesBaja, 10) - 1];
-    let newDescription = `Baja registrada. Motivo: ${bajaData.motivo}. Período: ${monthName} ${bajaData.anioBaja}.`;
-    if (actoAdmin) newDescription += ` Acto: ${actoAdmin}.`;
-    if(isActoAdmin && bajaData.causalInforme) newDescription += ` Causal: ${bajaData.causalInforme}.`;
-    if(bajaData.detalle) newDescription += ` Detalles: ${bajaData.detalle}.`;
-    
-    const novedadRef = doc(firestore, 'novedades', bajaToEdit.id);
-    await updateDoc(novedadRef, { ...bajaData, descripcion: newDescription });
-
-    const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, updatedParticipant);
-
-    toast({ title: 'Baja Actualizada' });
-    setHistory(prev => prev.map(h => h.id === bajaToEdit.id ? { ...h, ...bajaData, descripcion: newDescription } : h));
-    setParticipant(prev => ({...prev, ...updatedParticipant}));
-    setBajaToEdit(null);
-  };
-
-  const handleUpdateReactivation = async () => {
-    if (!firestore || !reactivationToEdit) return;
-    const { month, year, decree } = reactivationEditData;
-    const monthName = MONTHS[parseInt(month, 10) - 1];
-    let newDescription = `Reactivación para ${monthName} de ${year}.`;
-    if (decree) newDescription += ` Decreto N°: ${decree}.`;
-
-    const novedadRef = doc(firestore, 'novedades', reactivationToEdit.id);
-    await updateDoc(novedadRef, { descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree });
-
-    const updatedParticipant: Partial<Participant> = { actoAdministrativo: decree || participant.actoAdministrativo };
-    const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, updatedParticipant);
-
-    toast({ title: 'Reactivación Actualizada'});
-    setHistory(prev => prev.map(h => h.id === reactivationToEdit.id ? { ...h, descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree } : h));
-    setParticipant(prev => ({...prev, ...updatedParticipant}));
-    setReactivationToEdit(null);
-  }
-
-  const handleDeleteNovedad = async () => {
-      if (!firestore || !novedadToDelete) return;
+  
+    const handleUpdateReactivation = async () => {
+      if (!firestore || !reactivationToEdit) return;
+      const { month, year, decree } = reactivationEditData;
+      const monthName = MONTHS[parseInt(month, 10) - 1];
+      let newDescription = `Reactivación para ${monthName} de ${year}.`;
+      if (decree) newDescription += ` Decreto N°: ${decree}.`;
+  
+      const novedadRef = doc(firestore, 'novedades', reactivationToEdit.id);
+      await updateDoc(novedadRef, { descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree });
+  
+      const updatedParticipant: Partial<Participant> = { actoAdministrativo: decree || participant.actoAdministrativo };
+      const partRef = doc(firestore, 'participants', participant.id);
+      await updateDoc(partRef, updatedParticipant);
+  
+      toast({ title: 'Reactivación Actualizada'});
+      setHistory(prev => prev.map(h => h.id === reactivationToEdit.id ? { ...h, descripcion: newDescription, mesEvento: month, anoEvento: year, actoAdministrativo: decree } : h));
+      setParticipant(prev => ({...prev, ...updatedParticipant}));
+      setReactivationToEdit(null);
+    }
+  
+    const handleDeleteNovedad = async () => {
+        if (!firestore || !novedadToDelete) return;
+        try {
+            await deleteDoc(doc(firestore, 'novedades', novedadToDelete.id));
+            toast({ title: 'Novedad Eliminada' });
+            setHistory(prev => prev.filter(h => h.id !== novedadToDelete.id));
+            setNovedadToDelete(null);
+        } catch (error) { toast({ variant: 'destructive', title: 'Error al eliminar' }); }
+    };
+  
+    const handleUpdateNovedadText = async () => {
+      if (!firestore || !novedadToEditText) return;
       try {
-          await deleteDoc(doc(firestore, 'novedades', novedadToDelete.id));
-          toast({ title: 'Novedad Eliminada' });
-          setHistory(prev => prev.filter(h => h.id !== novedadToDelete.id));
-          setNovedadToDelete(null);
-      } catch (error) { toast({ variant: 'destructive', title: 'Error al eliminar' }); }
-  };
-
-  const handleUpdateNovedadText = async () => {
-    if (!firestore || !novedadToEditText) return;
-    try {
-        await updateDoc(doc(firestore, 'novedades', novedadToEditText.id), { descripcion: newDescription });
-        toast({ title: 'Novedad Actualizada' });
-        setHistory(prev => prev.map(h => h.id === novedadToEditText.id ? { ...h, descripcion: newDescription } : h));
-        setNovedadToEditText(null);
-    } catch (error) { toast({ variant: 'destructive', title: 'Error al actualizar' }); }
-  };
-
-  const handleDeleteParticipant = async () => {
-    if (!firestore || !user) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se ha podido conectar con el servicio.' });
-      return;
-    }
-    
-    try {
-      const functions = getFunctions();
-      const deleteParticipantFunction = httpsCallable(functions, 'deleteParticipant');
+          await updateDoc(doc(firestore, 'novedades', novedadToEditText.id), { descripcion: newDescription });
+          toast({ title: 'Novedad Actualizada' });
+          setHistory(prev => prev.map(h => h.id === novedadToEditText.id ? { ...h, descripcion: newDescription } : h));
+          setNovedadToEditText(null);
+      } catch (error) { toast({ variant: 'destructive', title: 'Error al actualizar' }); }
+    };
+  
+    const handleDeleteParticipant = async () => {
+      if (!firestore || !user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se ha podido conectar con el servicio.' });
+        return;
+      }
       
-      toast({ title: 'Eliminando...', description: 'Este proceso puede tardar unos segundos.' });
-
-      await deleteParticipantFunction({ participantId: participant.id });
-
-      toast({ title: '¡Legajo Eliminado!', description: `El legajo de ${participant.nombre} ha sido borrado permanentemente.` });
-      
-      setIsDeleteDialogOpen(false);
-      onBack(); // Vuelve a la pantalla anterior
-
-    } catch (error) {
-      console.error("Error deleting participant:", error);
-      toast({ variant: 'destructive', title: 'Error al eliminar', description: 'Ocurrió un error inesperado. Por favor, intenta de nuevo.' });
+      try {
+        const functions = getFunctions();
+        const deleteParticipantFunction = httpsCallable(functions, 'deleteParticipant');
+        
+        toast({ title: 'Eliminando...', description: 'Este proceso puede tardar unos segundos.' });
+  
+        await deleteParticipantFunction({ participantId: participant.id });
+  
+        toast({ title: '¡Legajo Eliminado!', description: `El legajo de ${participant.nombre} ha sido borrado permanentemente.` });
+        
+        setIsDeleteDialogOpen(false);
+        onBack(); // Vuelve a la pantalla anterior
+  
+      } catch (error) {
+        console.error("Error deleting participant:", error);
+        toast({ variant: 'destructive', title: 'Error al eliminar', description: 'Ocurrió un error inesperado. Por favor, intenta de nuevo.' });
+      }
+    };
+  
+    const handleEditClick = (item: Novedad) => {
+        if (item.type === 'REACTIVACION') setReactivationToEdit(item);
+        else if (item.type === 'BAJA_DEFINITIVA') setBajaToEdit(item);
+        else setNovedadToEditText(item);
     }
-  };
-
-  const handleEditClick = (item: Novedad) => {
-      if (item.type === 'REACTIVACION') setReactivationToEdit(item);
-      else if (item.type === 'BAJA_DEFINITIVA') setBajaToEdit(item);
-      else setNovedadToEditText(item);
+  
+    // Render Helpers
+    const renderField = (label: string, value: any) => (<div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>);
+    const renderMetric = () => {
+      const currentProgram = participant.programa?.toLowerCase() || '';
+      if (currentProgram.includes('tutor')) {
+          return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
+      }
+      
+      if (isAuditableProgram) {
+          return renderField('Pagos Acumulados (Legajo)', totalPaymentCountInLegajo);
+      }
+      
+      return null;
   }
-
-  // Render Helpers
-  const renderField = (label: string, value: any) => (<div className="py-2"><p className="text-sm font-medium text-gray-500">{label}</p><p className="text-md text-gray-800">{value || '-'}</p></div>);
-  const renderMetric = () => {
-    const currentProgram = participant.programa?.toLowerCase() || '';
-    if (currentProgram.includes('tutor')) {
-        return renderField('Antigüedad', calculateSeniority(participant.fechaIngreso));
-    }
-    
-    if (isAuditableProgram) {
-        return renderField('Pagos Acumulados (Legajo)', totalPaymentCountInLegajo);
-    }
-    
-    return null;
-}
-  const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, TRASPASO: <ArrowRightLeft />, DEFAULT: <History/> }
-
-  const requiresRenovation = alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION;
-
+    const historyIcons: { [key: string]: React.ReactElement } = { BAJA_DEFINITIVA: <Ban/>, REACTIVACION: <Check/>, ALTA: <FileText/>, RENOVACION: <FilePlus/>, TRASPASO: <ArrowRightLeft />, DEFAULT: <History/> }
+  
+    const requiresRenovation = alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION;
   return (
     <div className="pb-10">
       <div className="flex justify-between items-center mb-6">
@@ -409,7 +409,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
    <Button variant="secondary" onClick={() => setIsTraspasoDialogOpen(true)}><ArrowRightLeft className="mr-2 h-4 w-4" />Traspaso de Programa</Button>
    {history.some(n => n.type === 'TRASPASO') && (
     <Button variant="outline" onClick={() => setIsHistoricalProgramModalOpen(true)}>
-        <History className="mr-2 h-4 w-4" />Ver Programas Anteriores
+        <History className="mr-2 h-4 w-4" />Ver Historial de Pagos
     </Button>
 )}
   <Button onClick={() => setIsEditing(true)}><Edit className="mr-2 h-4 w-4"/>Editar Legajo</Button>
@@ -417,9 +417,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 </div>
       </div>
       
-      {alert && (<div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alert.type === 'red' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
-        {alert.type === 'red' ? <XCircle/> : <AlertTriangle/>}
-        <div><h3 className="font-bold text-sm">{alert.msg}</h3>
+      {alert && (<div className={`mb-6 p-4 rounded-lg flex items-start gap-3 border ${alert.type === 'red' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>        {alert.type === 'red' ? <XCircle/> : <AlertTriangle/>}        <div><h3 className="font-bold text-sm">{alert.msg}</h3>
         {participant.estado === 'Requiere Atención' && participant.mesAusencia && <p className="text-xs mt-1">{`Ausente en ${participant.mesAusencia.replace('/', ' de ')}`}.</p>}</div>
       </div>)}
 
@@ -441,7 +439,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       {isAuditableProgram && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Wallet/> Historial de Pagos Liquidados</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Wallet/> Historial de Pagos Liquidados del Programa Actual</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingPayments ? (
@@ -449,33 +447,27 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             ) : (
               <div>
                 <div className="mb-4 pb-4 border-b">
-    <p className="text-sm font-medium text-gray-600">Conteo de Pagos</p>
-    <p className={`text-lg font-bold ${paymentHistory.length !== totalPaymentCountInLegajo ? 'text-red-600' : 'text-green-600'}`}>
-        {paymentHistory.length} encontrados vs. {totalPaymentCountInLegajo} en legajo
+    <p className="text-sm font-medium text-gray-600">Conteo de Pagos ({participant.programa})</p>
+    <p className={`text-lg font-bold ${currentProgramPayments.length !== totalPaymentCountInLegajo ? 'text-red-600' : 'text-green-600'}`}>        {currentProgramPayments.length} encontrados vs. {totalPaymentCountInLegajo} en legajo
     </p>
-    {paymentHistory.length !== totalPaymentCountInLegajo && 
+    {currentProgramPayments.length !== totalPaymentCountInLegajo && 
         <p className="text-xs text-red-500">El conteo no coincide. Considere correr el script de corrección.</p>
     }
 </div>
                 
 <div className="space-y-4">
-  <p className="text-sm font-medium text-gray-600">Meses liquidados por programa y año</p>
-  {Object.keys(groupedPayments).sort().map(program => (
-    <div key={program} className="py-2">
-      <h3 className="font-bold text-md text-gray-800">{program}</h3>
-      {Object.keys(groupedPayments[program]).sort((a,b) => parseInt(b) - parseInt(a)).map(year => (
-        <div key={year} className="mt-2 pl-4">
+  <p className="text-sm font-medium text-gray-600">Meses liquidados por año</p>
+      {Object.keys(groupedCurrentProgramPayments).sort((a,b) => parseInt(b) - parseInt(a)).map(year => (
+        <div key={year} className="mt-2">
           <h4 className="font-semibold text-md mb-2">{year}</h4>
           <div className="flex flex-wrap gap-2">
-            {groupedPayments[program][year].sort((a,b) => a - b).map(month => (
-               <Badge key={`${program}-${year}-${month}`} variant="secondary" className="text-sm">{MONTHS[month - 1]}</Badge>
+            {groupedCurrentProgramPayments[year].sort((a,b) => a - b).map(month => (
+               <Badge key={`${year}-${month}`} variant="secondary" className="text-sm">{MONTHS[month - 1]}</Badge>
             ))}
           </div>
         </div>
       ))}
-    </div>
-  ))}
-  {paymentHistory.length === 0 && <p className="text-sm text-gray-500 mt-2">No se encontraron pagos registrados para los programas de este participante.</p>}
+  {currentProgramPayments.length === 0 && <p className="text-sm text-gray-500 mt-2">No se encontraron pagos para el programa actual.</p>}
 </div>
               </div>
             )}
@@ -483,15 +475,13 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </Card>
       )}
       
-      <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">
-        <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
+      <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial de Novedades</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">\n        <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
         <div className="flex opacity-0 group-hover:opacity-100"><Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}><Pencil/></Button><Button variant="ghost" size="icon" onClick={() => setNovedadToDelete(item)}><XCircle/></Button></div></li>))} <li className="flex items-start gap-3 px-2"><div className="mt-1 text-gray-500">{historyIcons.ALTA}</div><div><p>Alta inicial.</p><p className="text-xs text-gray-500">{formatDate(participant.fechaIngreso)}</p></div></li></ul>)}</CardContent></Card>
 
       {isBajaDialogOpen && <BajaForm participantName={participant.nombre} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
       {bajaToEdit && <BajaForm participantName={participant.nombre} onConfirm={handleUpdateBaja} onCancel={() => setBajaToEdit(null)} initialData={bajaToEdit} isEditing={true} />}
       
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent className="max-w-4xl">
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>\n        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar Legajo</DialogTitle>
           </DialogHeader>
@@ -508,12 +498,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isTraspasoDialogOpen} onOpenChange={setIsTraspasoDialogOpen}>
-    <DialogContent>
-        <DialogHeader>
-            <DialogTitle>Traspaso de Programa</DialogTitle>
-            <DialogDescription>
-                Mover a {participant.nombre} a un nuevo programa. El programa actual es "{participant.programa}".
+      <Dialog open={isTraspasoDialogOpen} onOpenChange={setIsTraspasoDialogOpen}>\n    <DialogContent>\n        <DialogHeader>\n            <DialogTitle>Traspaso de Programa</DialogTitle>
+            <DialogDescription>\n                Mover a {participant.nombre} a un nuevo programa. El programa actual es "{participant.programa}".
             </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -522,8 +508,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         <Select
             value={traspasoData.nuevoPrograma}
             onValueChange={(value) => setTraspasoData(prev => ({ ...prev, nuevoPrograma: value }))}
-        >
-            <SelectTrigger id="nuevo-programa">
+        >\n            <SelectTrigger id="nuevo-programa">
                 <SelectValue placeholder="Seleccione el programa de destino" />
             </SelectTrigger>
             <SelectContent>
@@ -541,8 +526,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             <Select
                 value={traspasoData.month}
                 onValueChange={(value) => setTraspasoData(prev => ({ ...prev, month: value }))}
-            >
-                <SelectTrigger>
+            >\n                <SelectTrigger>
                     <SelectValue placeholder="Mes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -556,8 +540,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
             <Select
                 value={traspasoData.year}
                 onValueChange={(value) => setTraspasoData(prev => ({ ...prev, year: value }))}
-            >
-                <SelectTrigger>
+            >\n                <SelectTrigger>
                     <SelectValue placeholder="Año" />
                 </SelectTrigger>
                 <SelectContent>
@@ -588,14 +571,12 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 </Dialog>
 
 {isHistoricalProgramModalOpen && (
-    <Dialog open={isHistoricalProgramModalOpen} onOpenChange={setIsHistoricalProgramModalOpen}>
-        <DialogContent className="max-w-4xl">
+    <Dialog open={isHistoricalProgramModalOpen} onOpenChange={setIsHistoricalProgramModalOpen}>\n        <DialogContent className="max-w-4xl">
             <DialogHeader>
                 <DialogTitle>Historial de Programas de {participant.nombre}</DialogTitle>
-                <DialogDescription>Detalle de participación en programas anteriores.</DialogDescription>
+                <DialogDescription>Detalle de participación y pagos en programas anteriores.</DialogDescription>
             </DialogHeader>
-            {/* Aquí irá el contenido del nuevo componente que crearemos */}
-            <HistoricalProgramDetails participant={participant} history={history} />
+            <HistoricalProgramDetails participant={participant} allPayments={paymentHistory} />
             <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsHistoricalProgramModalOpen(false)}>Cerrar</Button>
             </DialogFooter>
@@ -607,12 +588,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle><DialogDescription>Modifique los datos de la reactivación.</DialogDescription></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
 {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle><DialogDescription>Esta acción no se puede deshacer. La novedad será eliminada permanentemente.</DialogDescription></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
 {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle><DialogDescription>Modifique la descripción de la novedad.</DialogDescription></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
-<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>¿Estás seguro que deseas eliminar este legajo?</DialogTitle>
-      <DialogDescription>
-        <div className="py-4 text-red-600 font-medium">
+<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>\n  <DialogContent>\n    <DialogHeader>\n      <DialogTitle>¿Estás seguro que deseas eliminar este legajo?</DialogTitle>
+      <DialogDescription>\n        <div className="py-4 text-red-600 font-medium">
           <p>¡ATENCIÓN! ESTA ACCIÓN ES IRREVERSIBLE.</p>
           <p className="mt-2">Se eliminará permanentemente el legajo de <span className="font-bold">{participant.nombre}</span>, junto con todo su historial de pagos, novedades y cualquier otro dato asociado.</p>
           <p className="mt-2">Una vez borrado, no podrá ser recuperado.</p>
@@ -630,3 +607,4 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 };
 
 export default ParticipantDetail;
+  
