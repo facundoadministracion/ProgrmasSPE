@@ -1,8 +1,8 @@
 
-import { initializeAdminApp } from '../src/firebase-admin';
+import { db } from '../src/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const db = initializeAdminApp();
+// db is now imported directly and is already initialized.
 
 async function cleanupOldProgramName() {
   const participantsRef = db.collection('participants');

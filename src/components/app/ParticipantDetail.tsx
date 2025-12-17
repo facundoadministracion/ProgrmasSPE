@@ -51,7 +51,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   const [isBajaDialogOpen, setIsBajaDialogOpen] = useState(false);
   const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
   const [isTraspasoDialogOpen, setIsTraspasoDialogOpen] = useState(false);
-  const [traspasoData, setTraspasoData] = useState({ nuevoPrograma: '', actoAdministrativo: '', month: (new Date().getMonth() + 1).toString(), year: new Date().getFullYear().toString() });
+// LÍNEA 59 MODIFICADA
+  const [traspasoData, setTraspasoData] = useState({ nuevoPrograma: '', actoAdministrativoAlta: '', actoAdministrativoBaja: '', month: (new Date().getMonth() + 1).toString(), year: new Date().getFullYear().toString() });
   const [reactivationData, setReactivationData] = useState({ month: '', year: new Date().getFullYear().toString(), decree: '' });
   const [isHistoricalProgramModalOpen, setIsHistoricalProgramModalOpen] = useState(false);
   const [history, setHistory] = useState<Novedad[]>([]);
@@ -240,48 +241,54 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     setIsReactivateDialogOpen(false);
   }
 
-  const handleTraspasoConfirm = async () => {
-    if (!firestore || !user || !traspasoData.nuevoPrograma) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un programa de destino.' });
-        return;
-    }
+  // BLOQUE MODIFICADO (para reemplazar el anterior)
+const handleTraspasoConfirm = async () => {
+  if (!firestore || !user || !traspasoData.nuevoPrograma) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un programa de destino.' });
+      return;
+  }
 
-    const { nuevoPrograma, actoAdministrativo, month, year } = traspasoData;
-    const previousPrograma = participant.programa;
+  const { nuevoPrograma, actoAdministrativoAlta, actoAdministrativoBaja, month, year } = traspasoData;
+  const previousPrograma = participant.programa;
 
-    const monthName = MONTHS[parseInt(month, 10) - 1];
-    const formattedDate = `${monthName} de ${year}`;
+  const monthName = MONTHS[parseInt(month, 10) - 1];
+  const formattedDate = `${monthName} de ${year}`;
 
-    const updatedParticipant: Partial<Participant> = {
-        programa: nuevoPrograma,
-        actoAdministrativo: actoAdministrativo || participant.actoAdministrativo,
-    };
-
-    const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, updatedParticipant);
-
-    let descripcion = `Traspaso del programa "${previousPrograma}" a "${
-      nuevoPrograma}" con fecha de vigencia ${formattedDate}.`;
-      if (actoAdministrativo) {
-          descripcion += ` Respaldo por Acto Administrativo: ${actoAdministrativo}.`;
-      }
-  
-      const newNovedad: Omit<Novedad, 'id'> = {
-          participantId: participant.id,
-          descripcion,
-          type: 'TRASPASO',
-          fechaEvento: `${year}-${month.padStart(2, '0')}`, // Guardamos como YYYY-MM
-          fechaRealCarga: serverTimestamp(),
-          ownerId: user.uid,
-      };
-      const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
-      
-      setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
-      setParticipant(prev => ({ ...prev, ...updatedParticipant }));
-      
-      toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma}.` });
-      setIsTraspasoDialogOpen(false);
+  // ¡IMPORTANTE! Reactiva al participante y actualiza su estado
+  const updatedParticipant: Partial<Participant> = {
+      programa: nuevoPrograma,
+      actoAdministrativo: actoAdministrativoAlta || participant.actoAdministrativo,
+      activo: true, 
+      estado: 'Activo',
   };
+
+  const partRef = doc(firestore, 'participants', participant.id);
+  await updateDoc(partRef, updatedParticipant);
+
+  let descripcion = `Traspaso del programa "${previousPrograma}" a "${nuevoPrograma}" con vigencia en ${formattedDate}.`;
+  if (actoAdministrativoBaja) {
+      descripcion += ` Acto de baja del programa anterior: ${actoAdministrativoBaja}.`;
+  }
+  if (actoAdministrativoAlta) {
+      descripcion += ` Acto de alta al nuevo programa: ${actoAdministrativoAlta}.`;
+  }
+
+    const newNovedad: Omit<Novedad, 'id'> = {
+        participantId: participant.id,
+        descripcion,
+        type: 'TRASPASO',
+        fechaEvento: `${year}-${month.padStart(2, '0')}`,
+        fechaRealCarga: serverTimestamp(),
+        ownerId: user.uid,
+    };
+    const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
+    
+    setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
+    setParticipant(prev => ({ ...prev, ...updatedParticipant }));
+    
+    toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma} y está activo.` });
+    setIsTraspasoDialogOpen(false);
+};
   
     const handleUpdateBaja = async (bajaData: any) => {
       if (!firestore || !bajaToEdit) return;
@@ -475,13 +482,13 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </Card>
       )}
       
-      <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial de Novedades</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">\n        <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
+      <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial de Novedades</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">        <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
         <div className="flex opacity-0 group-hover:opacity-100"><Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}><Pencil/></Button><Button variant="ghost" size="icon" onClick={() => setNovedadToDelete(item)}><XCircle/></Button></div></li>))} <li className="flex items-start gap-3 px-2"><div className="mt-1 text-gray-500">{historyIcons.ALTA}</div><div><p>Alta inicial.</p><p className="text-xs text-gray-500">{formatDate(participant.fechaIngreso)}</p></div></li></ul>)}</CardContent></Card>
 
       {isBajaDialogOpen && <BajaForm participantName={participant.nombre} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
       {bajaToEdit && <BajaForm participantName={participant.nombre} onConfirm={handleUpdateBaja} onCancel={() => setBajaToEdit(null)} initialData={bajaToEdit} isEditing={true} />}
       
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>\n        <DialogContent className="max-w-4xl">
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar Legajo</DialogTitle>
           </DialogHeader>
@@ -498,70 +505,85 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isTraspasoDialogOpen} onOpenChange={setIsTraspasoDialogOpen}>\n    <DialogContent>\n        <DialogHeader>\n            <DialogTitle>Traspaso de Programa</DialogTitle>
-            <DialogDescription>\n                Mover a {participant.nombre} a un nuevo programa. El programa actual es "{participant.programa}".
+<Dialog open={isTraspasoDialogOpen} onOpenChange={setIsTraspasoDialogOpen}>
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Traspaso de Programa</DialogTitle>
+            <DialogDescription>
+                Mover a {participant.nombre} a un nuevo programa. El programa actual es "{participant.programa}".
+                Esta acción reactivará al participante si se encuentra de baja.
             </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
-    <div className="space-y-2">
-        <label htmlFor="nuevo-programa">Nuevo Programa</label>
-        <Select
-            value={traspasoData.nuevoPrograma}
-            onValueChange={(value) => setTraspasoData(prev => ({ ...prev, nuevoPrograma: value }))}
-        >\n            <SelectTrigger id="nuevo-programa">
-                <SelectValue placeholder="Seleccione el programa de destino" />
-            </SelectTrigger>
-            <SelectContent>
-                {Object.values(PROGRAMAS)
-                    .filter(p => p !== participant.programa)
-                    .map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-            </SelectContent>
-        </Select>
-    </div>
+            <div className="space-y-2">
+                <label htmlFor="nuevo-programa">Nuevo Programa</label>
+                <Select
+                    value={traspasoData.nuevoPrograma}
+                    onValueChange={(value) => setTraspasoData(prev => ({ ...prev, nuevoPrograma: value }))}
+                >
+                    <SelectTrigger id="nuevo-programa">
+                        <SelectValue placeholder="Seleccione el programa de destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Object.values(PROGRAMAS)
+                            .filter(p => p !== participant.programa)
+                            .map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
 
-    <div className="space-y-2">
-    <label>Fecha de Vigencia del Pase</label>
-    <div className="flex gap-2">
-        <div className="flex-1">
-            <Select
-                value={traspasoData.month}
-                onValueChange={(value) => setTraspasoData(prev => ({ ...prev, month: value }))}
-            >\n                <SelectTrigger>
-                    <SelectValue placeholder="Mes" />
-                </SelectTrigger>
-                <SelectContent>
-                    {MONTHS.map((name, index) => (
-                        <SelectItem key={name} value={(index + 1).toString()}>{name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <div className="space-y-2">
+                <label>Fecha de Vigencia del Pase</label>
+                <div className="flex gap-2">
+                    <div className="flex-1">
+                        <Select
+                            value={traspasoData.month}
+                            onValueChange={(value) => setTraspasoData(prev => ({ ...prev, month: value }))}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Mes" /></SelectTrigger>
+                            <SelectContent>
+                                {MONTHS.map((name, index) => (
+                                    <SelectItem key={name} value={(index + 1).toString()}>{name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex-1">
+                        <Select
+                            value={traspasoData.year}
+                            onValueChange={(value) => setTraspasoData(prev => ({ ...prev, year: value }))}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Año" /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - 4 + i).map(year => (
+                                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <label htmlFor="acto-admin-baja">Acto Administrativo de Baja del Programa Anterior (Opcional)</label>
+                <Input
+                    id="acto-admin-baja"
+                    value={traspasoData.actoAdministrativoBaja}
+                    onChange={(e) => setTraspasoData(prev => ({ ...prev, actoAdministrativoBaja: e.target.value }))}
+                    placeholder="Ej: RES-2023-123-GDEBA (Baja)"
+                />
+            </div>
+            
+            <div className="space-y-2">
+                <label htmlFor="acto-admin-alta">Acto Administrativo de Alta al Nuevo Programa (Opcional)</label>
+                <Input
+                    id="acto-admin-alta"
+                    value={traspasoData.actoAdministrativoAlta}
+                    onChange={(e) => setTraspasoData(prev => ({ ...prev, actoAdministrativoAlta: e.target.value }))}
+                    placeholder="Ej: RES-2024-456-GDEBA (Alta)"
+                />
+            </div>
         </div>
-        <div className="flex-1">
-            <Select
-                value={traspasoData.year}
-                onValueChange={(value) => setTraspasoData(prev => ({ ...prev, year: value }))}
-            >\n                <SelectTrigger>
-                    <SelectValue placeholder="Año" />
-                </SelectTrigger>
-                <SelectContent>
-                    {Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - 4 + i).map(year => (
-                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-    </div>
-</div>
-    <div className="space-y-2">
-        <label htmlFor="acto-admin">Acto Administrativo (Opcional)</label>
-        <Input
-            id="acto-admin"
-            value={traspasoData.actoAdministrativo}
-            onChange={(e) => setTraspasoData(prev => ({ ...prev, actoAdministrativo: e.target.value }))}
-            placeholder="Ej: RES-2023-123-GDEBA"
-        />
-    </div>
-</div>
 
         <DialogFooter>
             <Button variant="ghost" onClick={() => setIsTraspasoDialogOpen(false)}>Cancelar</Button>
@@ -571,7 +593,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 </Dialog>
 
 {isHistoricalProgramModalOpen && (
-    <Dialog open={isHistoricalProgramModalOpen} onOpenChange={setIsHistoricalProgramModalOpen}>\n        <DialogContent className="max-w-4xl">
+    <Dialog open={isHistoricalProgramModalOpen} onOpenChange={setIsHistoricalProgramModalOpen}>       <DialogContent className="max-w-4xl">
             <DialogHeader>
                 <DialogTitle>Historial de Programas de {participant.nombre}</DialogTitle>
                 <DialogDescription>Detalle de participación y pagos en programas anteriores.</DialogDescription>
@@ -588,8 +610,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 {reactivationToEdit && <Dialog open={!!reactivationToEdit} onOpenChange={() => setReactivationToEdit(null)}><DialogContent><DialogHeader><DialogTitle>Editar Reactivación</DialogTitle><DialogDescription>Modifique los datos de la reactivación.</DialogDescription></DialogHeader><div className="py-4 grid grid-cols-2 gap-4"><div className="space-y-2"><label>Mes</label><Select value={reactivationEditData.month} onValueChange={(v) => setReactivationEditData(p => ({...p, month: v}))}><SelectTrigger/><SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><label>Año</label><Input value={reactivationEditData.year} onChange={(e) => setReactivationEditData(p => ({...p, year: e.target.value}))}/></div><div className="space-y-2 col-span-2"><label>Acto Administrativo (Opcional)</label><Input value={reactivationEditData.decree} onChange={(e) => setReactivationEditData(p => ({...p, decree: e.target.value}))}/></div></div><DialogFooter><Button variant="ghost" onClick={() => setReactivationToEdit(null)}>Cancelar</Button><Button onClick={handleUpdateReactivation}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
 {novedadToDelete && <Dialog open={!!novedadToDelete} onOpenChange={() => setNovedadToDelete(null)}><DialogContent><DialogHeader><DialogTitle>Confirmar Eliminación</DialogTitle><DialogDescription>Esta acción no se puede deshacer. La novedad será eliminada permanentemente.</DialogDescription></DialogHeader><div className="py-4"><p>{novedadToDelete?.descripcion}</p></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToDelete(null)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteNovedad}>Eliminar</Button></DialogFooter></DialogContent></Dialog>}
 {novedadToEditText && <Dialog open={!!novedadToEditText} onOpenChange={() => setNovedadToEditText(null)}><DialogContent><DialogHeader><DialogTitle>Editar Novedad</DialogTitle><DialogDescription>Modifique la descripción de la novedad.</DialogDescription></DialogHeader><div className="py-4"><Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={4}/></div><DialogFooter><Button variant="ghost" onClick={() => setNovedadToEditText(null)}>Cancelar</Button><Button onClick={handleUpdateNovedadText}>Guardar</Button></DialogFooter></DialogContent></Dialog>}
-<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>\n  <DialogContent>\n    <DialogHeader>\n      <DialogTitle>¿Estás seguro que deseas eliminar este legajo?</DialogTitle>
-      <DialogDescription>\n        <div className="py-4 text-red-600 font-medium">
+<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>  <DialogContent>    <DialogHeader>      <DialogTitle>¿Estás seguro que deseas eliminar este legajo?</DialogTitle>
+      <DialogDescription>        <div className="py-4 text-red-600 font-medium">
           <p>¡ATENCIÓN! ESTA ACCIÓN ES IRREVERSIBLE.</p>
           <p className="mt-2">Se eliminará permanentemente el legajo de <span className="font-bold">{participant.nombre}</span>, junto con todo su historial de pagos, novedades y cualquier otro dato asociado.</p>
           <p className="mt-2">Una vez borrado, no podrá ser recuperado.</p>

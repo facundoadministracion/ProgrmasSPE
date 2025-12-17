@@ -1,23 +1,15 @@
 
 import { NextResponse } from 'next/server';
-import { getAdminApp } from '@/firebase-admin';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-
-async function getAdminServices() {
-  const adminApp = getAdminApp();
-  const adminAuth = getAuth(adminApp);
-  const firestore = getFirestore(adminApp);
-  return { adminAuth, firestore };
-}
+// Import the initialized auth and db services directly
+import { auth, db } from '@/firebase-admin';
 
 export async function POST(request: Request) {
   try {
-    const { adminAuth, firestore } = await getAdminServices();
+    // No need for the old getAdminServices() function
     const { name, email, password, role } = await request.json();
 
-    // 1. Create user in Firebase Authentication
-    const userRecord = await adminAuth.createUser({
+    // 1. Create user in Firebase Authentication using the imported auth service
+    const userRecord = await auth.createUser({
       email: email,
       password: password,
       displayName: name,
@@ -26,10 +18,10 @@ export async function POST(request: Request) {
     const uid = userRecord.uid;
 
     // 2. Set custom claim for the user's role
-    await adminAuth.setCustomUserClaims(uid, { role: role });
+    await auth.setCustomUserClaims(uid, { role: role });
 
-    // 3. Create user document in Firestore 'users' collection
-    await firestore.collection('users').doc(uid).set({
+    // 3. Create user document in Firestore 'users' collection using the imported db service
+    await db.collection('users').doc(uid).set({
       uid: uid,
       name: name,
       email: email,

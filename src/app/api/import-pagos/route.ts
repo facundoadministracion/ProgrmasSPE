@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { initializeAdminApp } from '@/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
+import { db } from '@/firebase-admin'; // Use the initialized db directly
 import { PROGRAMAS } from '@/lib/constants';
 
-// --- Helper Functions ---
+// --- Helper Functions (assuming they are correct and don't need changes) ---
 
 function chunkArray<T>(array: T[], size: number): T[][] {
     const chunks: T[][] = [];
@@ -47,8 +47,7 @@ function getOfficialProgramName(name: string): string {
 
 export async function POST(request: Request) {
   try {
-    await initializeAdminApp();
-    const db = getFirestore();
+    // No need for initializeAdminApp() or getFirestore() anymore
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;

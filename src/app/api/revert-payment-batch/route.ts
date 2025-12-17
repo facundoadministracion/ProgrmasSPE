@@ -1,12 +1,12 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp } from '@/firebase-admin';
+// Import the initialized db service directly
+import { db } from '@/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// Asegúrate de que esta función se llame solo una vez
-const db = initializeAdminApp();
+// No need to initialize anything here, db is ready to be used.
 
-// Función para convertir el nombre del mes a número de string
+// Function to convert month name to string number
 const getMonthNumber = (monthName: string): string => {
     const months: { [key: string]: string } = {
         'enero': '1', 'febrero': '2', 'marzo': '3', 'abril': '4', 'mayo': '5', 'junio': '6',
@@ -24,15 +24,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Faltan parámetros requeridos (programa, mes, anio).' }, { status: 400 });
     }
 
-    // Usaremos los tipos de datos STRING como están en Firestore
+    // We will use STRING data types as they are in Firestore
     const mes = getMonthNumber(mesNombre);
     const anioStr = anio.toString();
     const programaStr = programa.toString();
     
-    // --- Iniciar Transacción ---
+    // --- Start Transaction ---
     const batch = db.batch();
 
-    // 1. Revertir pagos individuales y actualizar participantes
+    // 1. Revert individual payments and update participants
     const paymentRecordsQuery = db.collection('paymentRecords')
       .where('programa', '==', programaStr)
       .where('mesLiquidacion', '==', mes) 
@@ -44,15 +44,15 @@ export async function POST(request: Request) {
       const payment = doc.data();
       const participantId = payment.participantId;
 
-      // Marcar registro de pago para eliminación
+      // Mark payment record for deletion
       batch.delete(doc.ref);
 
-      // Descontar pago del participante
+      // Subtract payment from the participant
       if (participantId) {
         const participantRef = db.collection('participants').doc(participantId);
         const programPaymentField = `pagosPorPrograma.${programaStr}`;
         
-        // Calcular mes anterior
+        // Calculate previous month
         const currentMonth = parseInt(mes);
         const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
         const prevYear = currentMonth === 1 ? parseInt(anioStr) - 1 : parseInt(anioStr);
@@ -60,13 +60,13 @@ export async function POST(request: Request) {
         batch.update(participantRef, {
             pagosAcumulados: FieldValue.increment(-1),
             [programPaymentField]: FieldValue.increment(-1),
-            ultimoPago: `${prevMonth.toString()}/${prevYear.toString()}`, // Ajusta esto según tu lógica
+            ultimoPago: `${prevMonth.toString()}/${prevYear.toString()}`, // Adjust this according to your logic
             updatedAt: FieldValue.serverTimestamp(),
         });
       }
     });
 
-    // 2. Eliminar el registro de resumen de `paymentHistory`
+    // 2. Delete the summary record from `paymentHistory`
     const paymentHistoryQuery = db.collection('paymentHistory')
       .where('programa', '==', programaStr)
       .where('mesLiquidacion', '==', mes)
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       batch.delete(doc.ref);
     });
 
-    // Ejecutar todas las operaciones en la transacción
+    // Execute all operations in the transaction
     await batch.commit();
 
     return NextResponse.json({ 

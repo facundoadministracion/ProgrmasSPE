@@ -1,48 +1,36 @@
 
 import * as admin from 'firebase-admin';
-import { App } from 'firebase-admin/app';
-import * as fs from 'fs';
-import * as path from 'path';
+import { App, getApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
-function initializeFirebase() {
-  if (admin.apps.length > 0) {
-    return admin.app();
-  }
+let app: App;
 
+// We check if the app is already initialized.
+if (getApps().length === 0) {
+  // If not, we initialize it.
+  // The service account is automatically available in the App Hosting environment.
+  // For local development, we use a try-catch to load it from a file.
   try {
-    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
-
-    if (!fs.existsSync(serviceAccountPath)) {
-      console.error('CRITICAL: Service account file not found at:', serviceAccountPath);
-      throw new Error(`serviceAccountKey.json not found at ${serviceAccountPath}.`);
-    }
-
-    const serviceAccountString = fs.readFileSync(serviceAccountPath, 'utf8');
-    const serviceAccount = JSON.parse(serviceAccountString);
-
-    if (!serviceAccount.private_key || !serviceAccount.client_email || !serviceAccount.project_id) {
-        throw new Error('Service account file is missing one of the required fields: private_key, client_email, or project_id.');
-    }
-
-    const credential = admin.credential.cert({
-      projectId: serviceAccount.project_id,
-      clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
+    // This will succeed in local dev if the file exists.
+    // Using eval('require') prevents the bundler from trying to package the file.
+    const serviceAccount = eval('require')('../../serviceAccountKey.json');
+    app = admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
     });
-    
-    return admin.initializeApp({ credential });
-
-  } catch (error: any) {
-    console.error('CRITICAL-FINAL: Firebase Admin initialization failed unexpectedly. Raw Error:', error);
-    throw new Error('Could not initialize Firebase Admin SDK. Please check service account credentials file and server logs for critical errors.');
+  } catch (e) {
+    // This will be caught during the build process on the server if the file is missing.
+    // In the cloud (App Hosting), initializeApp() without arguments works perfectly.
+    console.log('Initializing admin app with default Google Application Credentials');
+    app = admin.initializeApp();
   }
+} else {
+  // If the app is already initialized, we get the existing app.
+  app = getApp();
 }
 
-export function getAdminApp(): App {
-    return initializeFirebase();
-}
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-export function initializeAdminApp() {
-    const app = initializeFirebase();
-    return admin.firestore(app);
-}
+// Export the initialized services for use in other parts of the application.
+export { app, db, auth };
