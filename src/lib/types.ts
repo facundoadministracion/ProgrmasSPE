@@ -79,6 +79,7 @@ export type Novedad = {
     // Optional fields that may or may not be present
     participantName?: string;
     dni?: string;
+    programa?: string;
     fecha?: string; // YYYY-MM-DD
     fechaEvento?: string; // Formato YYYY-MM-DD
 

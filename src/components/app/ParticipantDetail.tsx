@@ -482,8 +482,61 @@ const handleTraspasoConfirm = async () => {
         </Card>
       )}
       
-      <Card className="mt-6"><CardHeader><CardTitle className="flex items-center"><History/>Historial de Novedades</CardTitle></CardHeader><CardContent>{isLoadingHistory ? <p>Cargando...</p> : (<ul className="space-y-4"> {history.map(item => (<li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">        <div className="flex items-start gap-3"><div className="mt-1 text-gray-500">{historyIcons[item.type] || historyIcons.DEFAULT}</div><div><p>{item.descripcion}</p><p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p></div></div>
-        <div className="flex opacity-0 group-hover:opacity-100"><Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}><Pencil/></Button><Button variant="ghost" size="icon" onClick={() => setNovedadToDelete(item)}><XCircle/></Button></div></li>))} <li className="flex items-start gap-3 px-2"><div className="mt-1 text-gray-500">{historyIcons.ALTA}</div><div><p>Alta inicial.</p><p className="text-xs text-gray-500">{formatDate(participant.fechaIngreso)}</p></div></li></ul>)}</CardContent></Card>
+      <Card className="mt-6">
+  <CardHeader>
+    <CardTitle className="flex items-center">
+      <History />
+      Historial de Novedades
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    {isLoadingHistory ? (
+      <p>Cargando...</p>
+    ) : (
+      <ul className="space-y-4">
+        {history.map(item => {
+          let displayedDescription = item.descripcion;
+
+          // Si la novedad es una "POSIBLE_BAJA" y tiene datos del programa,
+          // creamos una descripción más detallada para mostrar.
+          if (item.type === 'POSIBLE_BAJA' && item.programa && item.mesEvento && item.anoEvento) {
+            const monthName = MONTHS[parseInt(item.mesEvento, 10) - 1] || '';
+            displayedDescription = `Ausente en liquidación ${monthName} ${item.anoEvento} en el programa "${item.programa}". Posible baja.`;
+          }
+
+          return (
+            <li key={item.id} className="flex items-start justify-between gap-3 group py-2 rounded-md hover:bg-gray-50 px-2 -mx-2">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 text-gray-500">
+                  {historyIcons[item.type] || historyIcons.DEFAULT}
+                </div>
+                <div>
+                  <p>{displayedDescription}</p>
+                  <p className="text-xs text-gray-500">{formatTimestamp(item.fechaRealCarga)}</p>
+                </div>
+              </div>
+              <div className="flex opacity-0 group-hover:opacity-100">
+                <Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}>
+                  <Pencil />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setNovedadToDelete(item)}>
+                  <XCircle />
+                </Button>
+              </div>
+            </li>
+          );
+        })}
+        <li className="flex items-start gap-3 px-2">
+          <div className="mt-1 text-gray-500">{historyIcons.ALTA}</div>
+          <div>
+            <p>Alta inicial.</p>
+            <p className="text-xs text-gray-500">{formatDate(participant.fechaIngreso)}</p>
+          </div>
+        </li>
+      </ul>
+    )}
+  </CardContent>
+</Card>
 
       {isBajaDialogOpen && <BajaForm participantName={participant.nombre} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
       {bajaToEdit && <BajaForm participantName={participant.nombre} onConfirm={handleUpdateBaja} onCancel={() => setBajaToEdit(null)} initialData={bajaToEdit} isEditing={true} />}
