@@ -1,39 +1,36 @@
 'use strict';
 
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {log} from "firebase-functions/logger";
+import {initializeApp} from "firebase-admin/app";
+import {getFirestore} from "firebase-admin/firestore";
 
-if (admin.apps.length === 0) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
+initializeApp();
+const db = getFirestore();
 
 /**
  * Elimina un participante y todos sus datos asociados (pagos, novedades)
  * de forma atómica.
  */
-export const deleteParticipant = functions
-  .region("southamerica-east1")
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
+export const deleteParticipant = onCall({region: "southamerica-east1"}, async (request) => {
+    if (!request.auth) {
+      throw new HttpsError(
         "unauthenticated",
         "La función solo puede ser utilizada por un usuario autenticado."
       );
     }
 
-    const userRole = context.auth.token.role;
+    const userRole = request.auth.token.role;
     if (userRole !== "admin") {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "permission-denied",
         "Acción no permitida. Se requiere rol de administrador."
       );
     }
 
-    const participantId = data.participantId;
+    const participantId = request.data.participantId;
     if (!participantId || typeof participantId !== "string") {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         "invalid-argument",
         "El ID del participante es inválido o no fue proporcionado."
       );
@@ -62,7 +59,7 @@ export const deleteParticipant = functions
 
       await batch.commit();
 
-      console.log(`Borrado exitoso del participante ${participantId} por el usuario ${context.auth.uid}. Se eliminaron ${paymentsSnapshot.size} pagos y ${novedadesSnapshot.size} novedades.`);
+      log(`Borrado exitoso del participante ${participantId} por el usuario ${request.auth.uid}. Se eliminaron ${paymentsSnapshot.size} pagos y ${novedadesSnapshot.size} novedades.`);
 
       return {
         status: "success",
@@ -70,8 +67,8 @@ export const deleteParticipant = functions
       };
 
     } catch (error) {
-      console.error("Error en la transacción de borrado:", error);
-      throw new functions.https.HttpsError(
+      log("Error en la transacción de borrado:", error);
+      throw new HttpsError(
         "internal",
         "Ocurrió un error inesperado al intentar eliminar los datos del participante."
       );
