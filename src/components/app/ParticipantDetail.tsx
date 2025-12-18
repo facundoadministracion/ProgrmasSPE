@@ -88,6 +88,23 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     return participant.pagosPorPrograma[participant.programa] || 0;
   }, [participant.pagosPorPrograma, participant.programa]);
  
+  const displayedActoAdministrativo = useMemo(() => {
+    // Si el participante está INACTIVO (de baja)
+    if (!participant.activo) {
+      // Buscamos en el historial la PRIMERA novedad de baja (la más reciente)
+      const bajaNovedad = history.find(h => h.type === 'BAJA_DEFINITIVA');
+      if (bajaNovedad) {
+        // Reconstruimos el decreto a partir de los datos guardados en la novedad
+        const isActoAdmin = bajaNovedad.motivo === 'Acto Administrativo' || bajaNovedad.motivo === 'Cruce SINTyS';
+        if (isActoAdmin && bajaNovedad.tipoActo && bajaNovedad.numeroActo) {
+            return `${bajaNovedad.tipoActo} N° ${bajaNovedad.numeroActo}`;
+        }
+      }
+    }
+    // Si está ACTIVO, o si no se encontró un decreto de baja, mostramos el del legajo principal (Alta/Reactivación)
+    return participant.actoAdministrativo;
+  }, [participant, history]); // Se recalcula si cambia el legajo o su historial
+
   // Effects
   useEffect(() => {
     const fetchHistory = async () => {
@@ -196,7 +213,11 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if (!firestore || !user) return;
     const isActoAdmin = bajaData.motivo === 'Acto Administrativo' || bajaData.motivo === 'Cruce SINTyS';
     const actoAdmin = isActoAdmin ? `${bajaData.tipoActo} N° ${bajaData.numeroActo}` : '';
-    const updatedParticipant: Partial<Participant> = { activo: false, estado: 'Baja', actoAdministrativo: actoAdmin || participant.actoAdministrativo };
+    
+    // --- MODIFICACIÓN CLAVE ---
+    // Ya no actualizamos el 'actoAdministrativo' principal del participante.
+    // Solo cambiamos su estado. El decreto de baja se guarda solo en la novedad.
+    const updatedParticipant: Partial<Participant> = { activo: false, estado: 'Baja' };
 
     const partRef = doc(firestore, 'participants', participant.id);
     await updateDoc(partRef, updatedParticipant);
@@ -207,6 +228,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     if(isActoAdmin && bajaData.causalInforme) descripcion += ` Causal: ${bajaData.causalInforme}.`;
     if(bajaData.detalle) descripcion += ` Detalles: ${bajaData.detalle}.`;
 
+    // La 'novedad' ya contiene toda la información de la baja, incluido el decreto.
     const newNovedad: Omit<Novedad, 'id'> = {
       ...bajaData,
       participantId: participant.id, descripcion, type: 'BAJA_DEFINITIVA', fechaRealCarga: serverTimestamp(), ownerId: user.uid
@@ -241,7 +263,6 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     setIsReactivateDialogOpen(false);
   }
 
-  // BLOQUE MODIFICADO (para reemplazar el anterior)
 const handleTraspasoConfirm = async () => {
   if (!firestore || !user || !traspasoData.nuevoPrograma) {
       toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un programa de destino.' });
@@ -440,7 +461,7 @@ const handleTraspasoConfirm = async () => {
             </CardContent>
           </Card>
         </div>
-        <Card><CardHeader><CardTitle>Información Clave</CardTitle></CardHeader><CardContent className="divide-y">{renderMetric()}{renderField('Último Pago', formatDateToMonthYear(participant.ultimoPago))}{renderField('Acto Administrativo', participant.actoAdministrativo)}{renderField('Estado', participant.estado)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Información Clave</CardTitle></CardHeader><CardContent className="divide-y">{renderMetric()}{renderField('Último Pago', formatDateToMonthYear(participant.ultimoPago))}{renderField('Acto Administrativo', displayedActoAdministrativo)}{renderField('Estado', participant.estado)}</CardContent></Card>
       </div>
 
       {isAuditableProgram && (
