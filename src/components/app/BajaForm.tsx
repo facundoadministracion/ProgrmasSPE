@@ -1,7 +1,15 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, FileText } from 'lucide-react';
+import { Calendar, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -88,16 +96,16 @@ const BajaForm = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl relative max-h-full overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">{isEditing ? 'Editar Baja de Participante' : 'Registrar Baja de Participante'}</h2>
-            <Button variant="ghost" size="icon" onClick={onCancel}><X className="h-5 w-5"/></Button>
-          </div>
-          <p className="text-sm text-gray-600 mb-6">Estás gestionando la baja de <strong>{participantName}</strong>.</p>
+    <Dialog open={true} onOpenChange={onCancel}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? 'Editar Baja de Participante' : 'Registrar Baja de Participante'}</DialogTitle>
+          <DialogDescription>
+            Estás gestionando la baja de <strong>{participantName}</strong>.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 py-4">
             {/* Columna Izquierda */}
             <div className="space-y-4">
                 <div>
@@ -171,16 +179,14 @@ const BajaForm = ({
                     <Textarea value={detalle} onChange={(e) => handleInputChange('detalle', e.target.value)} placeholder="Añada cualquier información relevante..." rows={isActoAdministrativo || isCausalRequired ? 3 : 6}/>
                 </div>
             </div>
-
-          </div>
         </div>
-
-        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-2 border-t">
+        
+        <DialogFooter>
           <Button variant="outline" onClick={onCancel}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={!motivo || (isActoAdministrativo && (!tipoActo || !numeroActo)) || (isCausalRequired && !causalInforme)}>Confirmar</Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

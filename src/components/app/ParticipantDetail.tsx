@@ -599,9 +599,13 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
       {isBajaDialogOpen && <BajaForm participantName={participant.nombre} onConfirm={handleBajaConfirm} onCancel={() => setIsBajaDialogOpen(false)} mesAusencia={participant.mesAusencia}/>}
       {bajaToEdit && <BajaForm participantName={participant.nombre} onConfirm={handleUpdateBaja} onCancel={() => setBajaToEdit(null)} initialData={bajaToEdit} isEditing={true} />}
       
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>        <DialogContent className="max-w-4xl">
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar Legajo</DialogTitle>
+            <DialogDescription>
+              Modifica los datos principales del legajo. Haz clic en guardar cuando hayas terminado.
+            </DialogDescription>
           </DialogHeader>
           <EditParticipantForm 
             participant={participant} 
