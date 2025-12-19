@@ -83,6 +83,11 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     [participant.programa]
   );
 
+  const hasProgramHistory = useMemo(() =>
+    participant.historialProgramas && Object.keys(participant.historialProgramas).length > 0,
+    [participant.historialProgramas]
+  );
+
   const totalPaymentCountInLegajo = useMemo(() => {
     if (!participant.pagosPorPrograma || !participant.programa) return 0;
     return participant.pagosPorPrograma[participant.programa] || 0;
@@ -124,7 +129,13 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
 
   useEffect(() => {
     const fetchPaymentHistory = async () => {
-      if (!firestore || !participant.id || !isAuditableProgram) return;
+      // CORRECCIÓN: Ahora también buscamos pagos si hay un historial de programas.
+      if (!firestore || !participant.id || (!isAuditableProgram && !hasProgramHistory)) {
+        setIsLoadingPayments(false);
+        setPaymentHistory([]); // Limpiamos por si había datos de una vista anterior.
+        return;
+      }
+
       setIsLoadingPayments(true);
       try {
         const q = query(
@@ -143,7 +154,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     };
 
     fetchPaymentHistory();
-  }, [firestore, participant.id, toast, isAuditableProgram]);
+  }, [firestore, participant.id, toast, isAuditableProgram, hasProgramHistory]); 
 
   const currentProgramPayments = useMemo(() => {
     if (!paymentHistory || !participant.programa) return [];
@@ -263,51 +274,77 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     setIsReactivateDialogOpen(false);
   }
 
-const handleTraspasoConfirm = async () => {
-  if (!firestore || !user || !traspasoData.nuevoPrograma) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un programa de destino.' });
-      return;
-  }
+  const handleTraspasoConfirm = async () => {
+    if (!firestore || !user || !traspasoData.nuevoPrograma) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un programa de destino.' });
+        return;
+    }
 
-  const { nuevoPrograma, actoAdministrativoAlta, actoAdministrativoBaja, month, year } = traspasoData;
-  const previousPrograma = participant.programa;
+    const { nuevoPrograma, actoAdministrativoAlta, actoAdministrativoBaja, month, year } = traspasoData;
+    
+    // 1. Capturar datos del programa que se abandona.
+    const previousPrograma = participant.programa;
+    if (!previousPrograma) {
+        toast({ variant: 'destructive', title: 'Error', description: 'El participante no tiene un programa actual para traspasar.' });
+        return;
+    }
+    const paymentsInPreviousProgram = participant.pagosPorPrograma?.[previousPrograma] || 0;
+    const fechaFinAnterior = `${year}-${String(month).padStart(2, '0')}-01`;
 
-  const monthName = MONTHS[parseInt(month, 10) - 1];
-  const formattedDate = `${monthName} de ${year}`;
+    // 2. Crear el objeto de historial para el programa anterior.
+    const historyEntry = {
+        fechaInicio: participant.fechaIngreso, // Fecha en que ingresó al programa anterior.
+        fechaFin: fechaFinAnterior,             // Fecha en que finaliza (inicio del traspaso).
+        totalPagos: paymentsInPreviousProgram   // Total de pagos acumulados.
+    };
+    
+    // 3. Preparar todos los datos que se actualizarán en el legajo del participante.
+    const updatedParticipantData: Partial<Participant> = {
+        programa: nuevoPrograma,
+        actoAdministrativo: actoAdministrativoAlta || '', // Usar el nuevo acto o limpiarlo si no se provee.
+        activo: true,
+        estado: 'Activo',
+        fechaIngreso: fechaFinAnterior, // La fecha de ingreso al nuevo programa es la de vigencia del traspaso.
+        
+        // Unir el historial existente con el nuevo registro del programa que se deja.
+        historialProgramas: {
+            ...participant.historialProgramas,
+            [previousPrograma]: historyEntry
+        },
 
-  // ¡IMPORTANTE! Reactiva al participante y actualiza su estado
-  const updatedParticipant: Partial<Participant> = {
-      programa: nuevoPrograma,
-      actoAdministrativo: actoAdministrativoAlta || participant.actoAdministrativo,
-      activo: true, 
-      estado: 'Activo',
-  };
+        // Mantener los conteos de pago anteriores y añadir el nuevo programa con 0 pagos.
+        pagosPorPrograma: {
+            ...participant.pagosPorPrograma,
+            [nuevoPrograma]: 0
+        }
+    };
 
-  const partRef = doc(firestore, 'participants', participant.id);
-  await updateDoc(partRef, updatedParticipant);
+    // 4. Ejecutar la actualización en la base de datos.
+    const partRef = doc(firestore, 'participants', participant.id);
+    await updateDoc(partRef, updatedParticipantData);
 
-  let descripcion = `Traspaso del programa "${previousPrograma}" a "${nuevoPrograma}" con vigencia en ${formattedDate}.`;
-  if (actoAdministrativoBaja) {
-      descripcion += ` Acto de baja del programa anterior: ${actoAdministrativoBaja}.`;
-  }
-  if (actoAdministrativoAlta) {
-      descripcion += ` Acto de alta al nuevo programa: ${actoAdministrativoAlta}.`;
-  }
+    // 5. Crear la novedad para el log de eventos.
+    const monthName = MONTHS[parseInt(month, 10) - 1];
+    const formattedDate = `${monthName} de ${year}`;
+    let descripcion = `Traspaso del programa "${previousPrograma}" a "${nuevoPrograma}" con vigencia en ${formattedDate}.`;
+    if (actoAdministrativoBaja) descripcion += ` Acto de baja del programa anterior: ${actoAdministrativoBaja}.`;
+    if (actoAdministrativoAlta) descripcion += ` Acto de alta al nuevo programa: ${actoAdministrativoAlta}.`;
 
     const newNovedad: Omit<Novedad, 'id'> = {
         participantId: participant.id,
         descripcion,
         type: 'TRASPASO',
-        fechaEvento: `${year}-${month.padStart(2, '0')}`,
+        fechaEvento: `${year}-${String(month).padStart(2, '0')}`,
         fechaRealCarga: serverTimestamp(),
         ownerId: user.uid,
     };
     const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
-    
+
+    // 6. Actualizar el estado de la aplicación para reflejar los cambios en la UI.
     setHistory(prev => [{ ...newNovedad, id: docRef.id, fechaRealCarga: { seconds: Date.now() / 1000 } } as Novedad, ...prev]);
-    setParticipant(prev => ({ ...prev, ...updatedParticipant }));
+    setParticipant(prev => ({ ...prev, ...updatedParticipantData }));
     
-    toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma} y está activo.` });
+    toast({ title: 'Traspaso Exitoso', description: `${participant.nombre} ahora pertenece a ${nuevoPrograma} y su historial ha sido archivado.` });
     setIsTraspasoDialogOpen(false);
 };
   
