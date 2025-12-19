@@ -5,6 +5,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { MONTHS } from '@/lib/constants';
 
+// Helper function to format date as "Mes de AAAA"
+const formatMonthYear = (dateString: string | undefined | null) => {
+    if (!dateString) return '-';
+    try {
+        // Ensure date is parsed as UTC by adding T00:00:00
+        const date = new Date(dateString.includes('T') ? dateString : dateString + 'T00:00:00');
+        if (isNaN(date.getTime())) return 'Fecha inválida';
+        
+        const monthName = MONTHS[date.getUTCMonth()];
+        const year = date.getUTCFullYear();
+        
+        return `${monthName} de ${year}`;
+    } catch (error) {
+        return '-';
+    }
+};
+
 const HistoricalProgramDetails = ({ participant, allPayments }: { participant: Participant, allPayments: PagoRegistrado[] }) => {
     
     const historicalProgramsData = useMemo(() => {
@@ -39,7 +56,7 @@ const HistoricalProgramDetails = ({ participant, allPayments }: { participant: P
             }, {} as { [year: string]: number[] });
 
             const description = programDateData 
-                ? `Participó desde ${new Date(programDateData.fechaInicio + 'T00:00:00').toLocaleDateString('es-AR')} hasta ${new Date(programDateData.fechaFin + 'T00:00:00').toLocaleDateString('es-AR')}`
+                ? `Participó desde ${formatMonthYear(programDateData.fechaInicio)} hasta ${formatMonthYear(programDateData.fechaFin)}`
                 : `Se encontraron pagos en este programa, pero las fechas de participación no están registradas.`;
 
             return {
