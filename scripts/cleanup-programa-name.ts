@@ -1,10 +1,10 @@
-
-import { db } from '../src/firebase-admin';
+import { getFirebaseAdmin } from '../src/firebase-admin'; // CORRECTED: Import the lazy initializer
 import { FieldValue } from 'firebase-admin/firestore';
 
-// db is now imported directly and is already initialized.
-
 async function cleanupOldProgramName() {
+  // CORRECTED: Initialize services at the start of the script execution
+  const { db } = getFirebaseAdmin();
+
   const participantsRef = db.collection('participants');
   const snapshot = await participantsRef.get();
 

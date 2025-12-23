@@ -1,14 +1,14 @@
-
 import { NextResponse } from 'next/server';
-// Import the initialized auth and db services directly
-import { auth, db } from '@/firebase-admin';
+import { getFirebaseAdmin } from '@/firebase-admin'; // CORRECTED: Import the lazy initializer
 
 export async function POST(request: Request) {
+  // Initialize admin at the start of the function call
+  const { auth, db } = getFirebaseAdmin(); // CORRECTED: Get services at runtime
+
   try {
-    // No need for the old getAdminServices() function
     const { name, email, password, role } = await request.json();
 
-    // 1. Create user in Firebase Authentication using the imported auth service
+    // 1. Create user in Firebase Authentication
     const userRecord = await auth.createUser({
       email: email,
       password: password,
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     // 2. Set custom claim for the user's role
     await auth.setCustomUserClaims(uid, { role: role });
 
-    // 3. Create user document in Firestore 'users' collection using the imported db service
+    // 3. Create user document in Firestore 'users' collection
     await db.collection('users').doc(uid).set({
       uid: uid,
       name: name,

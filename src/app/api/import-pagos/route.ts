@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import { db } from '@/firebase-admin'; // Use the initialized db directly
+import { getFirebaseAdmin } from '@/firebase-admin'; // CORRECTED: Import the lazy initializer
 import { PROGRAMAS } from '@/lib/constants';
 
-// --- Helper Functions (assuming they are correct and don't need changes) ---
+// --- Helper Functions ---
 
 function chunkArray<T>(array: T[], size: number): T[][] {
     const chunks: T[][] = [];
@@ -35,20 +35,19 @@ function parseCSV(csvString: string): Record<string, string>[] {
     return records;
 }
 
-// Function to standardize program names
 const OFFICIAL_PROGRAM_NAMES = Object.values(PROGRAMAS);
 function getOfficialProgramName(name: string): string {
     const lowerCaseName = name.toLowerCase();
     const officialName = OFFICIAL_PROGRAM_NAMES.find(p => p.toLowerCase() === lowerCaseName);
-    return officialName || name; // Return original name if no match is found, to be safe
+    return officialName || name;
 }
 
 // --- Main POST Handler ---
 
 export async function POST(request: Request) {
-  try {
-    // No need for initializeAdminApp() or getFirestore() anymore
+  const { db } = getFirebaseAdmin(); // CORRECTED: Get DB instance at runtime
 
+  try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -59,9 +58,9 @@ export async function POST(request: Request) {
     const fileContent = await file.text();
     const records = parseCSV(fileContent);
 
-    const requiredHeaders = ['dni', 'programa', 'mes', 'anio'];
+    const requiredHeaders = ['dni', 'programa', 'mes', 'anio', 'monto'];
     if (records.length === 0 || !requiredHeaders.every(h => Object.keys(records[0]).includes(h))) {
-        return NextResponse.json({ success: false, message: `El CSV debe contener: ${requiredHeaders.join(', ')}.` }, { status: 400 });
+        return NextResponse.json({ success: false, message: `El CSV debe contener las columnas: ${requiredHeaders.join(', ')}.` }, { status: 400 });
     }
     
     const dnisInCsv = [...new Set(records.map(r => r.dni).filter(Boolean))];
@@ -91,10 +90,10 @@ export async function POST(request: Request) {
 
     for (let i = 0; i < records.length; i++) {
         const record = records[i];
-        const { dni, programa, mes, anio } = record;
+        const { dni, programa, mes, anio, monto } = record;
 
-        if (!dni || !programa || !mes || !anio) {
-            processingErrors.push(`Línea ${i + 2}: Fila incompleta.`);
+        if (!dni || !programa || !mes || !anio || !monto) {
+            processingErrors.push(`Línea ${i + 2}: Fila incompleta. Se requieren dni, programa, mes, anio y monto.`);
             continue;
         }
 
@@ -110,12 +109,19 @@ export async function POST(request: Request) {
         existingPayments.add(paymentKey);
         affectedParticipants.add(participantData.id);
 
+        const parsedMonto = parseFloat(monto.replace(/[^0-9,-]+/g, '').replace(',', '.'));
+        if (isNaN(parsedMonto)) {
+            processingErrors.push(`Línea ${i + 2}: Monto inválido para el DNI ${dni}.`);
+            continue;
+        }
+
         newPaymentDocs.push({
             participantId: participantData.id,
             dni,
-            programa: getOfficialProgramName(programa), // Standardize program name
+            programa: getOfficialProgramName(programa),
             mes: mes.toString().padStart(2, '0'),
             anio,
+            monto: parsedMonto,
             fechaDeCarga: Timestamp.now(),
         });
     }
@@ -151,7 +157,7 @@ export async function POST(request: Request) {
                 const allPayments = paymentsByParticipant.get(participantId) || [];
                 
                 const newPagosPorPrograma = allPayments.reduce((acc, payment) => {
-                    const officialProgram = getOfficialProgramName(payment.programa); // Standardize here too
+                    const officialProgram = getOfficialProgramName(payment.programa);
                     acc[officialProgram] = (acc[officialProgram] || 0) + 1;
                     return acc;
                 }, {} as Record<string, number>);

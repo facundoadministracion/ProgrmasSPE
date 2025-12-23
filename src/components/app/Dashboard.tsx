@@ -58,10 +58,12 @@ const Dashboard = ({
             const data: { [key: string]: ProgramData } = {};
 
             for (const prog of Object.values(PROGRAMAS)) {
+                // CORRECTED QUERY: Order by settlement year and month instead of upload date.
                 const recordsQuery = query(
                     collection(firestore, 'paymentHistory'),
                     where('programa', '==', prog),
-                    orderBy('uploadedAt', 'desc'),
+                    orderBy('anoLiquidacion', 'desc'),
+                    orderBy('mesLiquidacion', 'desc'),
                     limit(1)
                 );
 
@@ -92,7 +94,12 @@ const Dashboard = ({
             setIsProgramDataLoading(false);
         };
 
-        fetchProgramData().catch(console.error);
+        fetchProgramData().catch(error => {
+            console.error("Error fetching dashboard program data:", error);
+            // This error might indicate a missing Firestore index. 
+            // The console will have a link to create it.
+            setIsProgramDataLoading(false);
+        });
 
     }, [firestore]);
 

@@ -1,45 +1,10 @@
-
-# Settings for the App Hosting Backend
-runConfig:
-  # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
-  # Injects Firebase project config as environment variables
-  firebase: {}
-
-# Environment variables and secrets
+run:
+  build: npm run build
+  start: npm start
 env:
-  # Map the injected Firebase config to the variables your app expects
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: ${FIREBASE_API_KEY}
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: ${FIREBASE_AUTH_DOMAIN}
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: ${FIREBASE_PROJECT_ID}
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: ${FIREBASE_STORAGE_BUCKET}
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: ${FIREBASE_MESSAGING_SENDER_ID}
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: ${FIREBASE_APP_ID}
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: ${FIREBASE_MEASUREMENT_ID}
-    availability:
-      - BUILD
-      - RUNTIME
+  - variable: FIREBASE_API_KEY
+    value: "AIzaSyAIAoyr8-zy0_TpU3jvXZ52e3Rfza_ViCc"
+  - variable: FIREBASE_AUTH_DOMAIN
+    value: "programas-de-empleo-lr.firebaseapp.com"
+  - variable: FIREBASE_PROJECT_ID
+    value: "programas-de-empleo-lr"

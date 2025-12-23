@@ -41,19 +41,16 @@ const PaymentHistory = () => {
     const historySnapshot = await getDocs(collection(firestore, 'paymentHistory'));
     const historyDocs = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PaymentHistoryDoc[];
 
-    // --- FIX: De-duplicate and aggregate records ---
     const uniqueHistoryMap = new Map<string, GroupedPayment>();
     historyDocs.forEach(doc => {
         const programa = doc.programa || 'General';
         const key = `${doc.mesLiquidacion}-${doc.anoLiquidacion}-${programa}`;
         
         if (uniqueHistoryMap.has(key)) {
-            // If key exists, aggregate the count
             const existing = uniqueHistoryMap.get(key)!;
             existing.count += doc.cantidadPagos || 0;
             uniqueHistoryMap.set(key, existing);
         } else {
-            // If key doesn't exist, create a new entry
             uniqueHistoryMap.set(key, {
                 mes: doc.mesLiquidacion,
                 anio: doc.anoLiquidacion,
@@ -63,11 +60,10 @@ const PaymentHistory = () => {
         }
     });
     const aggregatedHistory = Array.from(uniqueHistoryMap.values());
-    // --- End of FIX ---
 
     const sortedHistory = aggregatedHistory.sort((a, b) => {
         if (a.anio !== b.anio) return parseInt(b.anio) - parseInt(a.anio);
-        return parseInt(a.mes) - parseInt(a.mes);
+        return parseInt(b.mes) - parseInt(a.mes);
     });
 
     setHistory(sortedHistory);
@@ -86,7 +82,7 @@ const PaymentHistory = () => {
   
   const handleDeleteBatch = async (batchData: GroupedPayment) => {
     const mesNombre = MONTHS[parseInt(batchData.mes) - 1];
-    if (!window.confirm(`¿Seguro que quieres revertir el lote de ${batchData.count} pagos de ${mesNombre} ${batchData.anio} para ${batchData.programa}? \n\nEsta acción es PERMANENTE y hará lo siguiente:\n- Revertirá el pago a cada participante.\n- Eliminará los registros de pago individuales.\n- Eliminará este resumen del historial.`)) {
+    if (!window.confirm(`¿Seguro que quieres ELIMINAR la carga de ${batchData.count} pagos de ${mesNombre} ${batchData.anio} para ${batchData.programa}? \n\nEsta acción es PERMANENTE y borrará todos los registros asociados (pagos, historial y novedades).`)) {
         return;
     }
 
@@ -106,23 +102,29 @@ const PaymentHistory = () => {
             }),
         });
 
+        // CRUCIAL CHANGE: First, get the response body as JSON.
         const result = await response.json();
 
+        // THEN, check if the response was not OK.
         if (!response.ok) {
-            throw new Error(result.details || 'Error desconocido en el servidor');
+            // If not OK, 'result' contains the JSON error object from the server.
+            // We throw an error with the detailed message from the server.
+            throw new Error(result.details || 'Error desconocido en el servidor. El servidor no proporcionó detalles.');
         }
 
+        // If we are here, the response was OK.
         toast({ 
-            title: "Reversión Exitosa", 
-            description: `Se revirtieron ${result.revertedPayments} pagos y ${result.revertedHistory} registros de historial.`
+            title: "Carga Eliminada", 
+            description: `Se eliminaron ${result.revertedPayments || 0} pagos, ${result.revertedHistory || 0} historiales y ${result.revertedNovedades || 0} novedades.`
         });
 
         await fetchHistory(); // Recargar el historial
 
     } catch (error) {
-        console.error("Error revirtiendo el lote de pagos: ", error);
+        console.error("Error eliminando la carga de pagos: ", error);
         toast({ 
-            title: "Error en la Reversión", 
+            title: "Error al Eliminar", 
+            // The error message will now be the detailed one from the server.
             description: error instanceof Error ? error.message : 'Ocurrió un error. Revise la consola.', 
             variant: "destructive"
         });
@@ -155,7 +157,7 @@ const PaymentHistory = () => {
                     <p className="text-sm text-gray-600"><span className="font-semibold">{batch.programa}</span> - {batch.count} pagos registrados</p>
                   </div>
                   <Button variant="destructive" size="sm" onClick={() => handleDeleteBatch(batch)} disabled={isDeleting}>
-                    {isDeleting ? <Loader size={16} className="animate-spin" /> : <Trash2 size={16} />}<span className="ml-2">Revertir Lote</span>
+                    {isDeleting ? <Loader size={16} className="animate-spin" /> : <Trash2 size={16} />}<span className="ml-2">Eliminar Carga</span>
                   </Button>
                 </div>
               );
@@ -164,7 +166,7 @@ const PaymentHistory = () => {
               <div className="flex items-center justify-end space-x-2 pt-4">
                 <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeft className="h-4 w-4" /> Anterior</Button>
                 <div className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</div>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente <ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente <ChevronRight className="h-4" /></Button>
               </div>
             )}
           </div>

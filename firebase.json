@@ -9,10 +9,15 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "frameworksBackend": {
-      "id": "my-web-app",
-      "region": "us-central1"
-    }
+    "rewrites": [
+      {
+        "source": "**",
+        "function": {
+          "functionId": "ssrprogramasdeempleolr",
+          "region": "us-central1"
+        }
+      }
+    ]
   },
   "functions": {
     "source": "functions"
