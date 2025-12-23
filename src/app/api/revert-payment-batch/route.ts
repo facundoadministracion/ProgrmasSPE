@@ -1,20 +1,23 @@
 
 import { NextResponse } from 'next/server';
-// Import the initialized db service directly
-import { db } from '@/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import * as admin from 'firebase-admin';
 
-// No need to initialize anything here, db is ready to be used.
+// --- FINAL INITIALIZATION LOGIC ---
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
+const db = admin.firestore();
+// --- END OF INITIALIZATION LOGIC ---
 
-// Function to convert month name to string number
 const getMonthNumber = (monthName: string): string => {
     const months: { [key: string]: string } = {
         'enero': '1', 'febrero': '2', 'marzo': '3', 'abril': '4', 'mayo': '5', 'junio': '6',
         'julio': '7', 'agosto': '8', 'septiembre': '9', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
     };
-    return months[monthName.toLowerCase()] || '0';
+    // Devuelve el número con dos dígitos, ej: "01", "10"
+    const monthNum = months[monthName.toLowerCase().trim()];
+    return monthNum ? monthNum.padStart(2, '0') : '0';
 };
-
 
 export async function POST(request: Request) {
   try {
@@ -24,72 +27,67 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Faltan parámetros requeridos (programa, mes, anio).' }, { status: 400 });
     }
 
-    // We will use STRING data types as they are in Firestore
-    const mes = getMonthNumber(mesNombre);
+    const mesStr = getMonthNumber(mesNombre);
     const anioStr = anio.toString();
-    const programaStr = programa.toString();
+
+    if (mesStr === '0') {
+      return NextResponse.json({ error: 'Nombre de mes inválido.', details: `El mes recibido '${mesNombre}' no es válido.` }, { status: 400 });
+    }
     
-    // --- Start Transaction ---
-    const batch = db.batch();
+    const mesNumero = parseInt(mesStr.replace(/^0+/, ''), 10);
+    const anioNumero = parseInt(anioStr, 10);
 
-    // 1. Revert individual payments and update participants
-    const paymentRecordsQuery = db.collection('paymentRecords')
-      .where('programa', '==', programaStr)
-      .where('mesLiquidacion', '==', mes) 
-      .where('anoLiquidacion', '==', anioStr);
-      
-    const paymentRecordsSnapshot = await paymentRecordsQuery.get();
-    
-    paymentRecordsSnapshot.forEach(doc => {
-      const payment = doc.data();
-      const participantId = payment.participantId;
+    let revertedPayments = 0;
+    let revertedHistory = 0;
+    let revertedNovedades = 0;
 
-      // Mark payment record for deletion
-      batch.delete(doc.ref);
+    await db.runTransaction(async (transaction) => {
+        // --- 1. BORRAR PAGOS de 'pagosRegistrados' ---
+        const paymentsQuery = db.collection('pagosRegistrados')
+            .where('programa', '==', programa)
+            .where('mes', '==', mesNumero)
+            .where('anio', '==', anioNumero);
+        const paymentsSnapshot = await transaction.get(paymentsQuery);
+        revertedPayments = paymentsSnapshot.size;
+        paymentsSnapshot.forEach(doc => transaction.delete(doc.ref));
 
-      // Subtract payment from the participant
-      if (participantId) {
-        const participantRef = db.collection('participants').doc(participantId);
-        const programPaymentField = `pagosPorPrograma.${programaStr}`;
+        // --- 2. BORRAR NOVEDADES ASOCIADAS (CORREGIDO) ---
+        // Usamos 'anoEvento' y 'mesEvento' que son strings, como descubrimos.
+        const novedadesQuery = db.collection('novedades')
+            .where('programa', '==', programa)
+            .where('anoEvento', '==', anioStr)
+            .where('mesEvento', '==', String(mesNumero)); // Aseguramos que sea string
+        const novedadesSnapshot = await transaction.get(novedadesQuery);
+        revertedNovedades = novedadesSnapshot.size;
+        novedadesSnapshot.forEach(doc => transaction.delete(doc.ref));
         
-        // Calculate previous month
-        const currentMonth = parseInt(mes);
-        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-        const prevYear = currentMonth === 1 ? parseInt(anioStr) - 1 : parseInt(anioStr);
-
-        batch.update(participantRef, {
-            pagosAcumulados: FieldValue.increment(-1),
-            [programPaymentField]: FieldValue.increment(-1),
-            ultimoPago: `${prevMonth.toString()}/${prevYear.toString()}`, // Adjust this according to your logic
-            updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
+        // --- 3. BORRAR HISTORIAL DE CARGA (CORREGIDO) ---
+        // Buscamos el documento por sus campos en lugar de adivinar el ID.
+        const historyQuery = db.collection('paymentHistory')
+            .where('programa', '==', programa)
+            .where('anoLiquidacion', '==', anioStr)
+            .where('mesLiquidacion', '==', String(mesNumero)); // mesLiquidacion también es string
+        const historySnapshot = await transaction.get(historyQuery);
+        revertedHistory = historySnapshot.size;
+        historySnapshot.forEach(doc => transaction.delete(doc.ref));
     });
 
-    // 2. Delete the summary record from `paymentHistory`
-    const paymentHistoryQuery = db.collection('paymentHistory')
-      .where('programa', '==', programaStr)
-      .where('mesLiquidacion', '==', mes)
-      .where('anoLiquidacion', '==', anioStr);
-
-    const paymentHistorySnapshot = await paymentHistoryQuery.get();
-    
-    paymentHistorySnapshot.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // Execute all operations in the transaction
-    await batch.commit();
-
-    return NextResponse.json({ 
-        message: 'Reversión completada exitosamente.',
-        revertedPayments: paymentRecordsSnapshot.size,
-        revertedHistory: paymentHistorySnapshot.size,
+    return NextResponse.json({
+      message: 'Reversión completada exitosamente.',
+      revertedPayments,
+      revertedHistory,
+      revertedNovedades,
     });
 
   } catch (error) {
-    console.error('Error en la función de reversión de lote de pago:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido';
-    return NextResponse.json({ error: 'Error interno del servidor', details: errorMessage }, { status: 500 });
+    console.error('Error CRÍTICO en la función de reversión de lote:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Ocurrió un error desconocido en el servidor.';
+    return NextResponse.json(
+        { 
+            error: 'Error interno del servidor', 
+            details: errorMessage 
+        }, 
+        { status: 500 }
+    );
   }
 }
