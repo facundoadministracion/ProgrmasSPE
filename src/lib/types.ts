@@ -1,4 +1,4 @@
-export type UserRole = {
+'''export type UserRole = {
   uid: string;
   name: string;
   email: string;
@@ -29,6 +29,7 @@ export type Participant = {
   categoria?: string;
   email?: string;
   telefono?: string;
+  genero?: string; // <-- AÑADIDO
   esEquipoTecnico: boolean;
   pagosAcumulados?: number;
   pagosPorPrograma: { [key: string]: number };
@@ -126,4 +127,4 @@ export type PagoRegistrado = {
   fechaDeCarga: any;
 }
 
-export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
+export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;'''

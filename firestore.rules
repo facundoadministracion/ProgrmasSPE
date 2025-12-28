@@ -11,30 +11,32 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data.role;
     }
 
+    function isAdmin() {
+      return request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    }
+
     // Reglas para la colección 'users'
     match /users/{userId} {
       // Los usuarios pueden leer y actualizar su propio perfil
       allow read, update: if isUserAllowed(userId);
-      // Solo los administradores pueden crear o eliminar usuarios
-      allow create, delete: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-      // Solo los administradores pueden listar los usuarios.
-      allow list: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+      // Los administradores pueden crear, borrar y listar usuarios.
+      allow create, delete, list: if isAdmin();
     }
 
-    // Acceso a participantes y sus subcolecciones
-    match /participantes/{participantId} {
-      // Los administradores tienen acceso total a los participantes.
-      allow read, write, list: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-
-      // ... y a todas sus subcolecciones ...
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-      }
+    // Reglas para la colección 'configuracion'
+    match /configuracion/{docId} {
+        allow read: if isAdmin();
     }
 
-    // Permite a los administradores consultar el historial de pagos de todos los participantes a la vez.
-    match /{path=**}/paymentHistory/{docId} {
-      allow read: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    // Reglas para la colección 'participants' y sus subcolecciones
+    match /participants/{document=**} {
+      // Los administradores tienen acceso total a los participantes y todas sus subcolecciones.
+      allow read, write: if isAdmin();
+    }
+    
+    // Reglas para la colección raíz 'paymentHistory'
+    match /paymentHistory/{docId} {
+      allow read: if isAdmin();
     }
   }
 }

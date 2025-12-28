@@ -78,7 +78,8 @@ export function useCollection<T>(target: string | Target, options: UseCollection
         const path =
           typeof memoizedTargetRefOrQuery === 'string'
             ? memoizedTargetRefOrQuery
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+            // Corregido: Usar la propiedad correcta para obtener el path de la colección
+            : (memoizedTargetRefOrQuery as any)._query.path.segments.join('/');
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
@@ -96,20 +97,12 @@ export function useCollection<T>(target: string | Target, options: UseCollection
         'Cleaning up collection listener for ',
         typeof memoizedTargetRefOrQuery === 'string'
           ? memoizedTargetRefOrQuery
-          : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString(),
+          // Corregido: Usar la propiedad correcta para obtener el path de la colección
+          : (memoizedTargetRefOrQuery as any)._query.path.segments.join('/'),
       )
       unsubscribe()
     }
   }, [memoizedTargetRefOrQuery, options.transform]);
 
   return { data, isLoading, error };
-}
-
-// No he tocado este, pero lo dejo por si lo necesito
-interface InternalQuery {
-  _query: {
-    path: {
-      canonicalString: () => string;
-    }
-  }
 }

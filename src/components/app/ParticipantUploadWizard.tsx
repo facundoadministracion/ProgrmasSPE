@@ -28,14 +28,14 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
     }
 
     const convertToISODate = (dateStr: string): string => {
-      if (!dateStr || !dateStr.includes('/')) return dateStr; // Return original if empty or not slash-separated
+      if (!dateStr || !dateStr.includes('/')) return dateStr; 
       const parts = dateStr.split('/');
-      if (parts.length !== 3) return dateStr; // Return original if not 3 parts
+      if (parts.length !== 3) return dateStr; 
       const [day, month, year] = parts;
       if (year.length === 4) {
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
-      return dateStr; // Return original if year is not 4 digits
+      return dateStr; 
     };
     
     lines.forEach(line => {
@@ -54,13 +54,13 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
                 categoria: values[7] || 'N/A',
                 email: values[8] || '',
                 telefono: values[9] || '',
-                genero: values[10] || 'N/A',
+                genero: values[10] || 'N/A', // <-- RESTAURADO
                 pagosAcumulados: 0,
                 activo: true,
                 estado: 'Ingresado',
                 esEquipoTecnico: false,
                 fechaAlta: new Date().toISOString(),
-                ownerId: user?.uid,
+                ownerId: user?.uid || '',
             };
             if(participant.dni && participant.nombre) {
                 result.push(participant as any);
@@ -146,6 +146,7 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded text-sm text-blue-800">
             <p>Seleccione el archivo CSV para subir. El sistema detectará automáticamente el separador (`,` o `;`) y si tiene encabezado. Las columnas deben ser:</p>
+            {/* RESTAURADO */}
             <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria, email, telefono, genero</p>
           </div>
 
