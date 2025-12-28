@@ -28,7 +28,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { ArrowLeft, Loader2, LayoutDashboard, Users, Cog, LogOut, FileUp, FileClock, Clipboard } from 'lucide-react'; // <-- CORREGIDO
+import { ArrowLeft, Loader2, LayoutDashboard, Users, Cog, LogOut, FileUp, FileClock, Clipboard } from 'lucide-react';
 import type { Participant, ParticipantFilter, UserRole } from '@/lib/types';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
@@ -38,6 +38,7 @@ export default function Home() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { data: participants, isLoading: participantsLoading } = useCollection<Participant>('participants');
+    // NOTE: The useCollection hook automatically keeps this data in sync.
     const { data: userRoles, isLoading: usersLoading } = useCollection<UserRole>('users');
 
     const isAdmin = useMemo(() => {
@@ -129,10 +130,15 @@ export default function Home() {
             return <ParticipantDetail participant={participantData} onBack={handleBackToPadrón} />;
         }
 
+        const handleUserChange = () => {
+            // The useCollection hook provides real-time updates, so we don't need to do anything here.
+            // This function is just passed to satisfy the component's prop requirement and prevent crashes.
+        };
+
         switch (activeTab) {
             case 'resumen': return <Dashboard participants={participants || []} participantsLoading={participantsLoading} onSetFilter={handleSetFilter} onSelectParticipant={handleSelectParticipant} />;
             case 'participantes': return <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={handleSelectParticipant} onOpenParticipantWizard={handleOpenParticipantWizard} initialSearchTerm={initialSearchTerm} onSearchHandled={() => setInitialSearchTerm(undefined)} activeFilter={activeFilter} onClearFilter={() => setActiveFilter(null)} onBackToDashboard={() => setActiveTab('dashboard')} />;
-            case 'usuarios': return <UserManagement users={userRoles || []} currentUser={user} isLoading={usersLoading} />; 
+            case 'usuarios': return <UserManagement users={userRoles || []} currentUser={user} isLoading={usersLoading} onUsersChange={handleUserChange} />; 
             case 'asistencia': return <AttendanceSection participants={participants || []} />;
             case 'carga-pagos': return <PaymentUploadWizard participants={participants || []} onClose={() => setActiveTab('resumen')} />;
             case 'importar-historial': return <ParticipantUploadWizard allParticipants={participants || []} onClose={() => setActiveTab('resumen')} />;

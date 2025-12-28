@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { User } from 'firebase/auth';
 import type { UserRole } from '@/lib/types';
 import { useFirebase } from '@/firebase';
-import { doc, updateDoc, collection, getDocs, writeBatch, deleteDoc, query, where } from 'firebase/firestore';
+import { doc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -41,7 +41,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Loader2, Edit, Wrench, Trash2, PlusCircle, Calendar } from 'lucide-react'; // Icono Corregido
+import { Loader2, Edit, Wrench, Trash2, PlusCircle, Calendar } from 'lucide-react';
 import { ROLES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 
@@ -49,14 +49,16 @@ interface UserManagementProps {
   users: UserRole[];
   currentUser: User | null;
   isLoading: boolean;
+  // Function to refresh user list after changes
+  onUsersChange: () => void;
 }
 
-const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) => {
+const UserManagement = ({ users, currentUser, isLoading, onUsersChange }: UserManagementProps) => {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [isCreatingUser, setCreatingUser] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRole | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserRole | null>(null);
   
@@ -76,7 +78,7 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
       toast({ variant: "destructive", title: "Campos incompletos", description: "Por favor, complete todos los campos." });
       return;
     }
-    setCreatingUser(true);
+    setIsProcessing(true);
     try {
       const response = await fetch('/api/create-user', {
         method: 'POST',
@@ -91,42 +93,75 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
       }
 
       toast({ title: "Usuario Creado", description: `El usuario ${newUserData.name} ha sido creado.` });
+      onUsersChange(); // Refresh list
       setCreateDialogOpen(false);
       setNewUserData({ name: '', email: '', password: '', role: ROLES.DATA_ENTRY });
     } catch (error: any) {
       console.error("Error creating user:", error);
       toast({ variant: "destructive", title: "Error al Crear Usuario", description: error.message });
     } finally {
-      setCreatingUser(false);
+      setIsProcessing(false);
     }
   }
 
   const handleUpdateUser = async () => {
-    if (!firestore || !editingUser) return;
+    if (!editingUser) return;
+    setIsProcessing(true);
     try {
-      const userDocRef = doc(firestore, 'users', editingUser.uid);
-      await updateDoc(userDocRef, { name: updatedData.name, role: updatedData.role });
+      const response = await fetch('/api/update-user-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              uid: editingUser.uid, 
+              role: updatedData.role,
+              name: updatedData.name
+            }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+          throw new Error(data.error || 'Ocurrió un error desconocido.');
+      }
+
       toast({ title: "Usuario Actualizado", description: `Se han guardado los cambios para ${updatedData.name}.` });
+      onUsersChange(); // Refresh list
       setEditingUser(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user:", error);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el usuario." });
+      toast({ variant: "destructive", title: "Error", description: `No se pudo actualizar el usuario: ${error.message}` });
+    } finally {
+        setIsProcessing(false);
     }
   };
   
   const handleDeleteUser = async () => {
-    if (!firestore || !userToDelete) return;
+    if (!userToDelete) return;
+    setIsProcessing(true);
     try {
-      const userDocRef = doc(firestore, 'users', userToDelete.uid);
-      await deleteDoc(userDocRef);
+        const response = await fetch('/api/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: userToDelete.uid }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Ocurrió un error desconocido.');
+        }
+
       toast({ title: "Usuario Eliminado", description: `Se ha eliminado al usuario ${userToDelete.name}.` });
+      onUsersChange(); // Refresh list
       setUserToDelete(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar el usuario." });
+      toast({ variant: "destructive", title: "Error", description: `No se pudo eliminar el usuario: ${error.message}` });
+    } finally {
+        setIsProcessing(false);
     }
   };
 
+  // ... (Las funciones de mantenimiento como handleCorrectDates y handleFixPagosPorPrograma permanecen igual)
   const handleCorrectDates = async () => {
     if (!firestore) return;
     toast({ title: 'Iniciando corrección de fechas...', description: 'Buscando participantes de Tecnoempleo.' });
@@ -304,7 +339,10 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
             <div className="space-y-2"><label htmlFor="name">Nombre y Apellido</label><Input id="name" value={updatedData.name} onChange={(e) => setUpdatedData({ ...updatedData, name: e.target.value })}/></div>
             <div className="space-y-2"><label htmlFor="role">Rol del Sistema</label><Select value={updatedData.role} onValueChange={(newRole: UserRole['role']) => setUpdatedData({ ...updatedData, role: newRole })}><SelectTrigger id="role"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ROLES.ADMIN}>Admin</SelectItem><SelectItem value={ROLES.DATA_ENTRY}>Data Entry</SelectItem></SelectContent></Select></div>
           </div>
-          <DialogFooter><Button variant="ghost" onClick={() => setEditingUser(null)}>Cancelar</Button><Button onClick={handleUpdateUser}>Guardar Cambios</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingUser(null)}>Cancelar</Button>
+            <Button onClick={handleUpdateUser} disabled={isProcessing}>{isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar Cambios</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -319,8 +357,8 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateUser} disabled={isCreatingUser}>
-              {isCreatingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} 
+            <Button onClick={handleCreateUser} disabled={isProcessing}>
+              {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} 
               Crear Usuario
             </Button>
           </DialogFooter>
@@ -329,8 +367,11 @@ const UserManagement = ({ users, currentUser, isLoading }: UserManagementProps) 
 
       <AlertDialog open={!!userToDelete} onOpenChange={(isOpen) => !isOpen && setUserToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará el rol para <span className="font-bold">{userToDelete?.name}</span>, perdiendo sus permisos.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteUser}>Confirmar y Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. El usuario <span className="font-bold">{userToDelete?.name}</span> será eliminado permanentemente del sistema.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter>
+              <Button variant="ghost" onClick={() => setUserToDelete(null)} disabled={isProcessing}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleDeleteUser} disabled={isProcessing}>{isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmar y Eliminar</Button>
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

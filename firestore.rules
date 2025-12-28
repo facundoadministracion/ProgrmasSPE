@@ -15,12 +15,12 @@ service cloud.firestore {
       return request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
 
-    // Reglas para la colección 'users'
+    // Regla para la colección 'users'
     match /users/{userId} {
-      // Los usuarios pueden leer y actualizar su propio perfil
-      allow read, update: if isUserAllowed(userId);
-      // Los administradores pueden crear, borrar y listar usuarios.
-      allow create, delete, list: if isAdmin();
+      // Los administradores tienen acceso total de lectura y escritura.
+      // Las operaciones de escritura (crear, actualizar, eliminar) 
+      // se gestionan a través de APIs seguras del lado del servidor.
+      allow read, write: if isAdmin();
     }
 
     // Reglas para la colección 'configuracion'
@@ -30,13 +30,22 @@ service cloud.firestore {
 
     // Reglas para la colección 'participants' y sus subcolecciones
     match /participants/{document=**} {
-      // Los administradores tienen acceso total a los participantes y todas sus subcolecciones.
       allow read, write: if isAdmin();
     }
     
-    // Reglas para la colección raíz 'paymentHistory'
+    // Reglas para la colección 'paymentHistory'
     match /paymentHistory/{docId} {
       allow read: if isAdmin();
+    }
+
+    // Reglas para la colección 'novedades'
+    match /novedades/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Reglas para la colección 'pagosRegistrados'
+    match /pagosRegistrados/{document=**} {
+      allow read, write: if isAdmin();
     }
   }
 }
