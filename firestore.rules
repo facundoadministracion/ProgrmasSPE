@@ -3,59 +3,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function getUserRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role.lower();
-    }
-
     function isUserAllowed(userId) {
-        let userRole = getUserRole(userId);
-        return userRole in ['admin', 'data-entry'];
+      return request.auth != null && request.auth.uid == userId;
     }
 
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    // Reglas para la colección 'users'
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                   (request.auth.uid == userId || getUserRole(request.auth.uid) == 'admin');
+      // Los usuarios pueden leer y actualizar su propio perfil
+      allow read, update: if isUserAllowed(userId);
+      // Solo los administradores pueden crear o eliminar usuarios
+      allow create, delete: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+      // Solo los administradores pueden listar los usuarios.
+      allow list: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
 
-    match /participants/{participantId} {
-      allow read, create, update, delete: if request.auth != null && isUserAllowed(request.auth.uid);
-    }
-    
-    match /novedades/{novedadId} {
-      allow read, create: if request.auth != null && isUserAllowed(request.auth.uid);
-      allow update, delete: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    // Acceso a participantes y sus subcolecciones
+    match /participantes/{participantId} {
+      // Los administradores tienen acceso total a los participantes.
+      allow read, write, list: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+
+      // ... y a todas sus subcolecciones ...
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+      }
     }
 
-    match /asistencias/{asistenciaId} {
-        allow read, write: if request.auth != null && isUserAllowed(request.auth.uid);
-    }
-    
-    match /pagos/{pagoId} {
-        allow read, write: if request.auth != null && isUserAllowed(request.auth.uid);
-    }
-
-    match /paymentRecords/{recordId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-    }
-
-    match /configHistory/{configId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-    }
-    match /stats/{statId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-    }
-
-    match /configuracionMontos/{docId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-    }
-
-    match /pagosRegistrados/{docId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
-    }
-
-    match /paymentHistory/{docId} {
-      allow read, write: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    // Permite a los administradores consultar el historial de pagos de todos los participantes a la vez.
+    match /{path=**}/paymentHistory/{docId} {
+      allow read: if request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
   }
 }

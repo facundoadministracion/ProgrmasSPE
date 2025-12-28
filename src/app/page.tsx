@@ -25,7 +25,7 @@ import ParticipantDetail from '@/components/app/ParticipantDetail';
 import AttendanceSection from '@/components/app/AttendanceSection';
 import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 import ParticipantUploadWizard from '@/components/app/ParticipantUploadWizard';
-import PaymentHistory from '@/components/app/PaymentHistory';
+import { PaymentHistory } from '@/components/app/PaymentHistory';
 import UserManagement from '@/components/app/UserManagement';
 import ConfiguracionForm from '@/components/app/ConfiguracionForm';
 import ConfiguracionHistorial, { type Configuracion } from '@/components/app/ConfiguracionHistorial';

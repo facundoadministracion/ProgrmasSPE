@@ -1,0 +1,23 @@
+{"users": [
+{
+  "localId": "77jXjJeghERaK92SAPFnjZJr3Pq1",
+  "email": "santitutiantonella@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "RpcjUneU/waBrzr2GlPruTuxwCnJRWYDZPATjB+InbeN7LCZyDlJ+6aSuFZpjcW62fe1E9uH/207vI32KEg0Qw==",
+  "salt": "7yKzyUeNsgWm9g==",
+  "displayName": "Anto Santillan",
+  "lastSignedInAt": "1766753447423",
+  "createdAt": "1764682029820",
+  "providerUserInfo": []
+},
+{
+  "localId": "C946AWBG78PWvjvfyEFeGxDCRsa2",
+  "email": "crnunezfacundo@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "Oa8XBV4BAZEZxdZ0fSsSc3VMpDgzvndBTahVJb/qcxGcXNUw/spGS6kVPVAMAb5Di4pVlxicGG3OqRgMMSlXBw==",
+  "salt": "kCoSLhPKXga74g==",
+  "displayName": "Facundo",
+  "lastSignedInAt": "1766693250147",
+  "createdAt": "1764127324368",
+  "providerUserInfo": []
+}]}

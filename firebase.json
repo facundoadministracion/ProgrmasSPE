@@ -20,6 +20,11 @@
     ]
   },
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "runtime": "nodejs20",
+    "region": "southamerica-east1"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

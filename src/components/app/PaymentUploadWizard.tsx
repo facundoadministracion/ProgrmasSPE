@@ -131,6 +131,10 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
   const handleExecute = async () => {
     if (!analysis || !firestore || !user) return;
     setProcessing(true);
+
+    console.log('--- INICIANDO EJECUCIÓN DE PAGO ---');
+    console.log('Configuración seleccionada:', config);
+    console.log('Resultado del análisis:', analysis);
     
     const paymentMonthStr = `${MONTHS[config.mes]}/${config.anio}`;
 
@@ -139,6 +143,8 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
       const allPayments = [...analysis.regulars, ...analysis.newlyPaid];
 
       const totalAmount = allPayments.reduce((sum, item) => sum + item.monto, 0);
+      console.log('Monto total calculado:', totalAmount);
+
       const fullAltaResolution = altaResolution ? `Decreto N° ${altaResolution}` : null;
 
       allPayments.forEach((item) => {
@@ -193,8 +199,7 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         });
       });
 
-      const paymentHistoryRef = doc(collection(firestore, 'paymentHistory'));
-      batch.set(paymentHistoryRef, {
+      const paymentHistoryData = {
         uploadedAt: serverTimestamp(),
         uploadedBy: user.uid,
         mesLiquidacion: String(config.mes + 1),
@@ -202,19 +207,25 @@ const PaymentUploadWizard = ({ participants, onClose, onFindDni }: { participant
         programa: config.programa,
         dnisProcesados: allPayments.map(p => p.dni),
         cantidadPagos: allPayments.length,
-        montoTotalLiquidado: totalAmount, // <-- This is the new field
+        montoTotalLiquidado: totalAmount,
         cantidadAusentes: analysis.absent.length,
         cantidadRegulares: analysis.regulars.length,
         cantidadAltas: analysis.newlyPaid.length,
         cantidadDesconocidos: analysis.unknown.length,
-      });
+      };
+
+      console.log('Datos a guardar en paymentHistory:', paymentHistoryData);
+
+      const paymentHistoryRef = doc(collection(firestore, 'paymentHistory'));
+      batch.set(paymentHistoryRef, paymentHistoryData);
 
       await batch.commit();
 
       toast({ title: "¡Proceso de Pago Finalizado!", description: `Pagos registrados: ${allPayments.length}. Ausentes: ${analysis.absent.length}` });
+      console.log('--- EJECUCIÓN DE PAGO FINALIZADA CON ÉXITO ---');
       onClose();
     } catch (e) {
-      console.error(e);
+      console.error('Error al ejecutar el lote de pagos:', e);
       toast({ title: 'Error en la Ejecución', description: 'Error procesando. Verifique la consola.', variant: 'destructive' });
     } finally {
       setProcessing(false);
