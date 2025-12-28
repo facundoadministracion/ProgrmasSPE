@@ -20,13 +20,14 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
   const [formData, setFormData] = useState(participant);
   const [newRenovationActo, setNewRenovationActo] = useState('');
 
-  // Initialize state for month and year selectors
+  const isNewParticipant = !participant.id;
+
   const getInitialDateParts = () => {
     if (participant.fechaIngreso && participant.fechaIngreso.includes('-')) {
       const parts = participant.fechaIngreso.split('-');
       return {
         year: parts[0],
-        month: (parseInt(parts[1], 10) - 1).toString() // Month is 0-indexed for state
+        month: (parseInt(parts[1], 10) - 1).toString()
       };
     }
     const today = new Date();
@@ -37,10 +38,16 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
   const [ingresoMonth, setIngresoMonth] = useState(getInitialDateParts().month);
 
   const handleUpdate = useCallback((id: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [id]: value }));
+    if (id === 'dni') {
+      const numericValue = (value as string).replace(/\D/g, '');
+      if (numericValue.length <= 8) {
+        setFormData(prev => ({ ...prev, [id]: numericValue }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, [id]: value }));
+    }
   }, []);
 
-  // Update fechaIngreso in formData when month or year changes
   useEffect(() => {
     const monthNumber = parseInt(ingresoMonth, 10) + 1;
     const monthPadded = monthNumber.toString().padStart(2, '0');
@@ -104,7 +111,15 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
               </div>
             )}
             <MemoizedTextField id="nombre" label="Nombre Completo" value={formData.nombre || ''} onUpdate={handleUpdate} />
-            <MemoizedTextField id="dni" label="DNI" value={participant.dni || ''} onUpdate={() => {}} disabled />
+            <MemoizedTextField 
+              id="dni" 
+              label="DNI (solo 8 números)" 
+              value={formData.dni || ''} 
+              onUpdate={handleUpdate} 
+              disabled={!isNewParticipant} 
+              maxLength={8} 
+            />
+            <MemoizedTextField id="legajo" label="Legajo" value={formData.legajo || ''} onUpdate={handleUpdate} disabled={!isNewParticipant} />
             <MemoizedTextField id="fechaNacimiento" label="Fecha de Nacimiento" type="date" value={formData.fechaNacimiento || ''} onUpdate={handleUpdate} />
             
             <div className="grid grid-cols-2 gap-2">

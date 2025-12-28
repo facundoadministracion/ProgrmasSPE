@@ -17,15 +17,12 @@ service cloud.firestore {
 
     // Regla para la colección 'users'
     match /users/{userId} {
-      // Los administradores tienen acceso total de lectura y escritura.
-      // Las operaciones de escritura (crear, actualizar, eliminar) 
-      // se gestionan a través de APIs seguras del lado del servidor.
       allow read, write: if isAdmin();
     }
 
-    // Reglas para la colección 'configuracion'
-    match /configuracion/{docId} {
-        allow read: if isAdmin();
+    // Reglas para la colección 'configuracionMontos'
+    match /configuracionMontos/{docId} {
+      allow read, write: if isAdmin();
     }
 
     // Reglas para la colección 'participants' y sus subcolecciones
@@ -33,8 +30,8 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
     
-    // Reglas para la colección 'paymentHistory'
-    match /paymentHistory/{docId} {
+    // REGLA CORREGIDA: para la consulta collectionGroup de 'paymentHistory'
+    match /{path=**}/paymentHistory/{docId} {
       allow read: if isAdmin();
     }
 

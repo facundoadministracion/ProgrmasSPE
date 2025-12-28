@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { type Configuracion as ConfigType } from '@/hooks/useConfiguracion';
 import ConfiguracionForm from './ConfiguracionForm';
 import ConfiguracionHistorial from './ConfiguracionHistorial';
+import { PaymentHistory } from './PaymentHistory'; // Importamos el historial de pagos
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
@@ -25,36 +26,42 @@ export default function Configuracion() {
     const handleSuccess = () => {
         setEditingConfig(null);
         setIsFormOpen(false);
-        // Forzamos la actualización del historial para que muestre los nuevos datos
         setForceUpdateKey(prev => prev + 1);
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Gestión de Configuración</h1>
-                {!isFormOpen && (
-                    <Button onClick={() => setIsFormOpen(true)}>Nueva Configuración</Button>
+        <div className="space-y-8"> {/* Aumentamos el espacio entre tarjetas */}
+            {/* --- Sección de Configuración de Montos --- */}
+            <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-bold">Gestión de Configuración</h1>
+                    {!isFormOpen && (
+                        <Button onClick={() => setIsFormOpen(true)}>Nueva Configuración</Button>
+                    )}
+                </div>
+
+                {isFormOpen ? (
+                    <ConfiguracionForm 
+                        configuracionActual={editingConfig}
+                        onCancel={handleCancel}
+                        onSuccess={handleSuccess}
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Historial de Configuraciones</CardTitle>
+                            <CardDescription>Aquí puedes ver y editar las configuraciones de montos y programas.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ConfiguracionHistorial onEditConfig={handleEdit} forceUpdateKey={forceUpdateKey} />
+                        </CardContent>
+                    </Card>
                 )}
             </div>
 
-            {isFormOpen ? (
-                <ConfiguracionForm 
-                    configuracionActual={editingConfig}
-                    onCancel={handleCancel}
-                    onSuccess={handleSuccess}
-                />
-            ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Historial de Configuraciones</CardTitle>
-                        <CardDescription>Aquí puedes ver y editar las configuraciones de montos y programas.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ConfiguracionHistorial onEditConfig={handleEdit} forceUpdateKey={forceUpdateKey} />
-                    </CardContent>
-                </Card>
-            )}
+            {/* --- Sección de Historial de Liquidaciones --- */}
+            <PaymentHistory />
+            
         </div>
     );
 }

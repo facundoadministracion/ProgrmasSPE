@@ -55,9 +55,14 @@ const HistoricalProgramDetails = ({ participant, allPayments }: { participant: P
                 return acc;
             }, {} as { [year: string]: number[] });
 
-            const description = programDateData 
-                ? `Participó desde ${formatMonthYear(programDateData.fechaInicio)} hasta ${formatMonthYear(programDateData.fechaFin)}`
-                : `Se encontraron pagos en este programa, pero las fechas de participación no están registradas.`;
+            let description = 'Se encontraron pagos en este programa, pero las fechas de participación no están registradas.';
+            if (programDateData && programDateData.fechaInicio && programDateData.fechaFin) {
+                description = `Participó desde ${formatMonthYear(programDateData.fechaInicio)} hasta ${formatMonthYear(programDateData.fechaFin)}.`;
+                // Mostramos el acto de baja si existe
+                if (programDateData.actoAdministrativoBaja) {
+                    description += ` Finalizó con Acto: ${programDateData.actoAdministrativoBaja}.`;
+                }
+            }
 
             return {
                 programa,

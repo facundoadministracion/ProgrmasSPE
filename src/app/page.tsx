@@ -37,15 +37,16 @@ export default function Home() {
     const { user, isUserLoading, signOut } = useUser();
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const { data: participants, isLoading: participantsLoading } = useCollection<Participant>('participants');
-    // NOTE: The useCollection hook automatically keeps this data in sync.
-    const { data: userRoles, isLoading: usersLoading } = useCollection<UserRole>('users');
+    
+    const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(user ? 'participants' : null);
+    const { data: userRoles, isLoading: usersLoading } = useCollection<UserRole>(user ? 'users' : null);
 
-    const isAdmin = useMemo(() => {
-        if (!user || !userRoles) return false;
-        const currentUserRole = userRoles.find(role => role.uid === user.uid);
-        return currentUserRole?.role === 'admin';
+    const currentUserRole = useMemo(() => {
+        if (!user || !userRoles) return null;
+        return userRoles.find(role => role.uid === user.uid) || null;
     }, [user, userRoles]);
+
+    const isAdmin = currentUserRole?.role === 'admin';
 
     const [activeTab, setActiveTab] = useState('resumen');
     const [selectedParticipant, setSelectedParticipant] = useState<Participant | 'new' | null>(null);
@@ -79,7 +80,7 @@ export default function Home() {
         }
     };
 
-    if (isUserLoading) {
+    if (isUserLoading || (user && usersLoading)) { // Added usersLoading check
         return (
             <div className="flex h-screen w-full items-center justify-center bg-gray-100">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -130,10 +131,7 @@ export default function Home() {
             return <ParticipantDetail participant={participantData} onBack={handleBackToPadrón} />;
         }
 
-        const handleUserChange = () => {
-            // The useCollection hook provides real-time updates, so we don't need to do anything here.
-            // This function is just passed to satisfy the component's prop requirement and prevent crashes.
-        };
+        const handleUserChange = () => {};
 
         switch (activeTab) {
             case 'resumen': return <Dashboard participants={participants || []} participantsLoading={participantsLoading} onSetFilter={handleSetFilter} onSelectParticipant={handleSelectParticipant} />;
@@ -154,7 +152,7 @@ export default function Home() {
                     <Sidebar>
                         <SidebarHeader>
                            <div className="p-4 text-center">
-                                <h2 className="text-xl font-bold">Gestión LR</h2>
+                                <h2 className="text-xl font-bold">Hola, {currentUserRole?.name || 'Usuario'}</h2>
                            </div>
                         </SidebarHeader>
                         <SidebarContent>

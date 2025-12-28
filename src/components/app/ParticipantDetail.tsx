@@ -295,7 +295,8 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
     const historyEntry = {
         fechaInicio: participant.fechaIngreso, // Fecha en que ingresó al programa anterior.
         fechaFin: fechaFinAnterior,             // Fecha en que finaliza (inicio del traspaso).
-        totalPagos: paymentsInPreviousProgram   // Total de pagos acumulados.
+        totalPagos: paymentsInPreviousProgram,   // Total de pagos acumulados.
+        actoAdministrativoBaja: actoAdministrativoBaja || '' // ¡CORREGIDO! Se guarda el acto de baja.
     };
     
     // 3. Preparar todos los datos que se actualizarán en el legajo del participante.
