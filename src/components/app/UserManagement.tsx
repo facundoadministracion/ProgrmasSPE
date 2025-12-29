@@ -334,7 +334,10 @@ const UserManagement = ({ users, currentUser, isLoading, onUsersChange }: UserMa
       
       <Dialog open={!!editingUser} onOpenChange={(isOpen) => !isOpen && setEditingUser(null)}>
         <DialogContent> 
-          <DialogHeader><DialogTitle>Editar Usuario</DialogTitle><DialogDescription>Modifique los datos para: {editingUser?.email}</DialogDescription></DialogHeader>
+        <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogDescription>Modifique los datos para: {editingUser?.email}</DialogDescription>
+        </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2"><label htmlFor="name">Nombre y Apellido</label><Input id="name" value={updatedData.name} onChange={(e) => setUpdatedData({ ...updatedData, name: e.target.value })}/></div>
             <div className="space-y-2"><label htmlFor="role">Rol del Sistema</label><Select value={updatedData.role} onValueChange={(newRole: UserRole['role']) => setUpdatedData({ ...updatedData, role: newRole })}><SelectTrigger id="role"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ROLES.ADMIN}>Admin</SelectItem><SelectItem value={ROLES.DATA_ENTRY}>Data Entry</SelectItem></SelectContent></Select></div>
@@ -348,7 +351,10 @@ const UserManagement = ({ users, currentUser, isLoading, onUsersChange }: UserMa
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Crear Nuevo Usuario</DialogTitle><DialogDescription>Complete el formulario para registrar un nuevo usuario.</DialogDescription></DialogHeader>
+            <DialogHeader>
+                <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                <DialogDescription>Complete el formulario para registrar un nuevo usuario.</DialogDescription>
+            </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2"><label>Nombre y Apellido</label><Input placeholder="Juan Pérez" value={newUserData.name} onChange={(e) => setNewUserData({...newUserData, name: e.target.value})} /></div>
             <div className="space-y-2"><label>Email</label><Input type="email" placeholder="juan.perez@example.com" value={newUserData.email} onChange={(e) => setNewUserData({...newUserData, email: e.target.value})} /></div>
@@ -367,7 +373,10 @@ const UserManagement = ({ users, currentUser, isLoading, onUsersChange }: UserMa
 
       <AlertDialog open={!!userToDelete} onOpenChange={(isOpen) => !isOpen && setUserToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. El usuario <span className="font-bold">{userToDelete?.name}</span> será eliminado permanentemente del sistema.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>Esta acción no se puede deshacer. El usuario <span className="font-bold">{userToDelete?.name}</span> será eliminado permanentemente del sistema.</AlertDialogDescription>
+            </AlertDialogHeader>
           <AlertDialogFooter>
               <Button variant="ghost" onClick={() => setUserToDelete(null)} disabled={isProcessing}>Cancelar</Button>
               <Button variant="destructive" onClick={handleDeleteUser} disabled={isProcessing}>{isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmar y Eliminar</Button>

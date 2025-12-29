@@ -1,86 +1,98 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useFirebase } from '@/firebase';
-import { signOut } from 'firebase/auth';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { useUser } from '@/firebase';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-// --- Tiempos de espera (1 hora de inactividad, 1 minuto de advertencia) ---
-const INACTIVITY_LOGOUT_TIME = 60 * 60 * 1000; 
-const WARNING_TIME = 60 * 1000; 
+const SESSION_DURATION = 15 * 60 * 1000; // 15 minutos
+const WARNING_TIME = 2 * 60 * 1000; // 2 minutos
 
 const SessionManager = ({ children }: { children: React.ReactNode }) => {
-  const { auth } = useFirebase();
-  const [showWarning, setShowWarning] = useState(false);
+  const { user, signOut } = useUser();
+  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [countdown, setCountdown] = useState(WARNING_TIME / 1000);
 
-  // Función para cerrar la sesión
-  const handleSignOut = useCallback(() => {
-    if (auth) {
-      signOut(auth).catch((error) => {
-        console.error('Error al cerrar sesión automáticamente:', error);
-      });
-    }
-  }, [auth]);
+  const handleLogout = useCallback(() => {
+    signOut();
+    setDialogOpen(false);
+  }, [signOut]);
 
   useEffect(() => {
-    let activityTimeout: NodeJS.Timeout;
+    if (!user) return;
+
+    let sessionTimeout: NodeJS.Timeout;
     let warningTimeout: NodeJS.Timeout;
+    let countdownInterval: NodeJS.Timeout;
 
-    // Función que se activa cuando se cumple el tiempo de inactividad
-    const onIdle = () => {
-      setShowWarning(true);
-      // Si el usuario no hace nada en la advertencia, se cierra la sesión
-      warningTimeout = setTimeout(handleSignOut, WARNING_TIME);
+    const startTimers = () => {
+      sessionTimeout = setTimeout(handleLogout, SESSION_DURATION);
+      warningTimeout = setTimeout(() => {
+        setDialogOpen(true);
+        setCountdown(WARNING_TIME / 1000);
+        countdownInterval = setInterval(() => {
+          setCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }, SESSION_DURATION - WARNING_TIME);
     };
 
-    // Reinicia los contadores cada vez que hay actividad
     const resetTimers = () => {
-      clearTimeout(activityTimeout);
+      clearTimeout(sessionTimeout);
       clearTimeout(warningTimeout);
-      setShowWarning(false);
-      activityTimeout = setTimeout(onIdle, INACTIVITY_LOGOUT_TIME - WARNING_TIME);
+      clearInterval(countdownInterval);
+      startTimers();
     };
 
-    const events = ['mousemove', 'keydown', 'click', 'scroll'];
-    
-    // Añade los listeners para detectar actividad
+    const handleStayLoggedIn = () => {
+        resetTimers();
+        setDialogOpen(false);
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
     events.forEach(event => window.addEventListener(event, resetTimers));
-    
-    // Inicia el contador
-    resetTimers();
+    startTimers();
 
-    // Limpia los listeners y temporizadores cuando el componente se desmonta
+    // Exponer la función para que se pueda llamar desde el diálogo
+    (window as any).handleStayLoggedIn = handleStayLoggedIn;
+
     return () => {
-      clearTimeout(activityTimeout);
+      clearTimeout(sessionTimeout);
       clearTimeout(warningTimeout);
+      clearInterval(countdownInterval);
       events.forEach(event => window.removeEventListener(event, resetTimers));
+      delete (window as any).handleStayLoggedIn;
     };
-  }, [handleSignOut]);
+  }, [user, handleLogout]);
 
-  // Función para el botón "Permanecer"
-  const stayLoggedIn = () => {
-      setShowWarning(false);
-      // La actividad de hacer clic ya reinició el temporizador principal
-  };
+  const handleStayLoggedInGlobal = () => {
+      if((window as any).handleStayLoggedIn) {
+          (window as any).handleStayLoggedIn();
+      }
+  }
 
   return (
     <>
       {children}
-      <Dialog open={showWarning} onOpenChange={setShowWarning}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Sigues ahí?</DialogTitle>
-            <DialogDescription>
-              Tu sesión está a punto de cerrarse por inactividad. Se cerrará en 1 minuto.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className='gap-2 sm:justify-end'>
-            <Button variant="outline" onClick={handleSignOut}>Cerrar Sesión Ahora</Button>
-            <Button onClick={stayLoggedIn}>Permanecer Conectado</Button>
-          </DialogFooter>
+      <Dialog open={isDialogOpen}>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <DialogHeader>
+                <DialogTitle>Tu sesión está a punto de expirar</DialogTitle>
+                <DialogDescription>
+                    Por inactividad, tu sesión se cerrará automáticamente en {countdown} segundos.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="sm:justify-between">
+                <Button variant="outline" onClick={handleLogout}>Cerrar Sesión</Button>
+                <Button onClick={handleStayLoggedInGlobal}>Permanecer Conectado</Button>
+            </DialogFooter>
         </DialogContent>
-      </Dialog>
+    </Dialog>
     </>
   );
 };

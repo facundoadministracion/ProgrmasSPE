@@ -10,6 +10,7 @@ interface Props {
   onUpdate: (id: string, value: string) => void;
   type?: string;
   disabled?: boolean;
+  maxLength?: number;
 }
 
 const FieldWrapper = ({ children, label, id }: { children: React.ReactNode, label: string, id: string }) => (
@@ -19,14 +20,14 @@ const FieldWrapper = ({ children, label, id }: { children: React.ReactNode, labe
     </div>
 );
 
-const MemoizedTextField: React.FC<Props> = React.memo(({ id, label, value, onUpdate, type = 'text', disabled = false }) => {
+const MemoizedTextField: React.FC<Props> = React.memo(({ id, label, value, onUpdate, type = 'text', disabled = false, maxLength }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate(id, e.target.value);
   };
 
   return (
     <FieldWrapper label={label} id={id}>
-      <Input id={id} type={type} value={value} onChange={handleChange} disabled={disabled} />
+      <Input id={id} type={type} value={value} onChange={handleChange} disabled={disabled} maxLength={maxLength} />
     </FieldWrapper>
   );
 });

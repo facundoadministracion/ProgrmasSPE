@@ -1,4 +1,4 @@
-'''export type UserRole = {
+export type UserRole = {
   uid: string;
   name: string;
   email: string;
@@ -41,7 +41,7 @@ export type Participant = {
   mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
   historialPagos?: string[]; // Array of "YYYY-MM"
   renovaciones?: string[]; // Array de actos de renovación
-  historialProgramas?: { [key: string]: { fechaInicio: string; fechaFin: string; motivo?: string; } };
+  historialProgramas?: { [key: string]: { fechaInicio: string; fechaFin: string; motivo?: string; actoAdministrativoBaja?: string; } };
 };
 
 export type Payment = {
@@ -127,4 +127,4 @@ export type PagoRegistrado = {
   fechaDeCarga: any;
 }
 
-export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;'''
+export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;

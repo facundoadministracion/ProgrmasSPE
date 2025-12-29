@@ -15,7 +15,8 @@ import {
     SidebarMenu, 
     SidebarMenuItem, 
     SidebarMenuButton, 
-    SidebarFooter
+    SidebarFooter,
+    SidebarTrigger
 } from '@/components/ui/sidebar';
 import ParticipantsTab from '@/components/app/ParticipantsTab';
 import ParticipantDetail from '@/components/app/ParticipantDetail';
@@ -28,6 +29,13 @@ import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, LayoutDashboard, Users, Cog, LogOut, FileUp, FileClock, Clipboard } from 'lucide-react';
 import type { Participant, ParticipantFilter, UserRole } from '@/lib/types';
 import AttendanceSection from '@/components/app/AttendanceSection';
@@ -61,7 +69,7 @@ export default function Home() {
     const handleCloseParticipantWizard = () => setParticipantWizardOpen(false);
     const handleSetFilter = (filter: ParticipantFilter, searchTerm?: string) => {
         setActiveFilter(filter);
-        setActiveTab('participants');
+        setActiveTab('participantes');
         if (searchTerm) setInitialSearchTerm(searchTerm);
     };
 
@@ -80,7 +88,7 @@ export default function Home() {
         }
     };
 
-    if (isUserLoading || (user && usersLoading)) { // Added usersLoading check
+    if (isUserLoading || (user && usersLoading)) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-gray-100">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -104,7 +112,7 @@ export default function Home() {
 
     const renderMainContent = () => {
         if (selectedParticipant === 'new') {
-            const newParticipantTemplate: Participant = { id: '', nombre: '', dni: '', legajo: '', fechaNacimiento: '', fechaIngreso: new Date().toISOString().split('T')[0], actoAdministrativo: '', domicilio: '', departamento: '', programa: '', estado: 'Ingresado', categoria: '', lugarTrabajo: '', email: '', telefono: '', esEquipoTecnico: false, activo: true, ultimoPago: '', pagosAcumulados: 0, mesAusencia: '', renovaciones: [], pagosPorPrograma: {}, historialProgramas: {} };
+            const newParticipantTemplate: Participant = { id: '', nombre: '', dni: '', legajo: '', fechaNacimiento: '', fechaIngreso: new Date().toISOString().split('T')[0], actoAdministrativo: '', domicilio: '', departamento: '', programa: '', estado: 'Ingresado', categoria: '', lugarTrabajo: '', email: '', telefono: '', esEquipoTecnico: false, activo: true, ultimoPago: '', pagosAcumulados: 0, mesAusencia: '', renovaciones: [], pagosPorPrograma: {}, historialProgramas: {}, ownerId: '', fechaAlta: '' };
             return (
                 <Card>
                     <CardHeader>
@@ -138,7 +146,7 @@ export default function Home() {
             case 'participantes': return <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={handleSelectParticipant} onOpenParticipantWizard={handleOpenParticipantWizard} initialSearchTerm={initialSearchTerm} onSearchHandled={() => setInitialSearchTerm(undefined)} activeFilter={activeFilter} onClearFilter={() => setActiveFilter(null)} onBackToDashboard={() => setActiveTab('dashboard')} />;
             case 'usuarios': return <UserManagement users={userRoles || []} currentUser={user} isLoading={usersLoading} onUsersChange={handleUserChange} />; 
             case 'asistencia': return <AttendanceSection participants={participants || []} />;
-            case 'carga-pagos': return <PaymentUploadWizard participants={participants || []} onClose={() => setActiveTab('resumen')} />;
+            case 'carga-pagos': return <PaymentUploadWizard participants={participants || []} onClose={() => setActiveTab('resumen')} onFindDni={() => {}}/>;
             case 'importar-historial': return <ParticipantUploadWizard allParticipants={participants || []} onClose={() => setActiveTab('resumen')} />;
             case 'configuracion': return <Configuracion />;
             default: return <div>Pestaña no encontrada</div>;
@@ -148,7 +156,7 @@ export default function Home() {
     return (
         <SessionManager>
             <SidebarProvider>
-                <div className="flex min-h-screen bg-gray-50">
+                <div className="flex min-h-screen w-full bg-gray-50">
                     <Sidebar>
                         <SidebarHeader>
                            <div className="p-4 text-center">
@@ -219,9 +227,24 @@ export default function Home() {
                             </SidebarMenu>
                         </SidebarFooter>
                     </Sidebar>
-                    <main className="flex-1 p-8">{renderMainContent()}</main>
+                    <main className="flex-1 p-8">
+                        <div className="md:hidden mb-4">
+                            <SidebarTrigger />
+                        </div>
+                        {renderMainContent()}
+                    </main>
                     <Toaster />
-                    {isParticipantWizardOpen && <ParticipantUploadWizard allParticipants={participants || []} onClose={handleCloseParticipantWizard} />}
+                    <Dialog open={isParticipantWizardOpen} onOpenChange={setParticipantWizardOpen}>
+                        <DialogContent className="max-w-3xl">
+                            <DialogHeader>
+                                <DialogTitle>Asistente para Carga Masiva de Participantes</DialogTitle>
+                                <DialogDescription>
+                                    Sigue los pasos para importar, analizar y confirmar la carga de nuevos participantes desde un archivo CSV.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <ParticipantUploadWizard allParticipants={participants || []} onClose={handleCloseParticipantWizard} />
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </SidebarProvider>
         </SessionManager>

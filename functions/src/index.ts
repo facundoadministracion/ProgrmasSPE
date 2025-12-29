@@ -13,10 +13,12 @@
 import { deleteParticipant } from './deleteParticipant';
 import { revertPaymentBatch } from './revertPaymentBatch';
 import { processPaymentFile } from './processPaymentFile';
+import { backfillPaymentHistory } from './backfillPaymentHistory'; // <- Importa la nueva función
 
 // Exporta las funciones para que Firebase las detecte
 export {
   deleteParticipant,
   revertPaymentBatch,
   processPaymentFile,
+  backfillPaymentHistory, // <- Exporta la nueva función
 };

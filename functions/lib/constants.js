@@ -1,8 +1,8 @@
 'use strict';
-
-export const REGION = "us-central1";
-
-export const MONTHS_ES_TO_NUM: { [key: string]: string } = {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MONTHS_ES_TO_NUM = exports.REGION = void 0;
+exports.REGION = "us-central1";
+exports.MONTHS_ES_TO_NUM = {
     'Enero': '1',
     'Febrero': '2',
     'Marzo': '3',
@@ -16,3 +16,4 @@ export const MONTHS_ES_TO_NUM: { [key: string]: string } = {
     'Noviembre': '11',
     'Diciembre': '12'
 };
+//# sourceMappingURL=constants.js.map

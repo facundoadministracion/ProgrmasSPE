@@ -36,12 +36,15 @@ interface UseCollectionOptions<T> {
   isCollectionGroup?: boolean;
 }
 
-export function useCollection<T>(target: string | Target, options: UseCollectionOptions<T> = {}) {
+export function useCollection<T>(target: string | Target | null, options: UseCollectionOptions<T> = {}) {
   const [data, setData] = useState<T[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | FirestorePermissionError | null>(null);
 
   const memoizedTargetRefOrQuery = useMemo(() => {
+    if (!target) {
+      return null;
+    }
     if (typeof target === 'string') {
       const collectionFn = options.isCollectionGroup ? collectionGroup : collection;
       return query(collectionFn(db, target));

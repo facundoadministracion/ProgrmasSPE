@@ -20,7 +20,7 @@ import EditParticipantForm from './EditParticipantForm';
 import { FirebaseContext } from '@/firebase/provider';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface ParticipantsTableProps {
   participants: Participant[];
@@ -120,7 +120,10 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
       <Dialog open={!!editingParticipant} onOpenChange={(isOpen) => !isOpen && handleCancelEdit()}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Editar Legajo</DialogTitle>
+            <DialogTitle>Editar Legajo de {editingParticipant?.nombre}</DialogTitle>
+            <DialogDescription>
+                Modifica los datos del participante aquí. Haz clic en Guardar Cambios cuando hayas terminado.
+            </DialogDescription>
           </DialogHeader>
           {editingParticipant && (
             <EditParticipantForm

@@ -1,67 +1,64 @@
 'use client';
-
-import React, { useState } from 'react';
-import { type Configuracion as ConfigType } from '@/hooks/useConfiguracion';
-import ConfiguracionForm from './ConfiguracionForm';
+import React, { useState, useCallback } from 'react';
 import ConfiguracionHistorial from './ConfiguracionHistorial';
-import { PaymentHistory } from './PaymentHistory'; // Importamos el historial de pagos
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import ConfiguracionForm from './ConfiguracionForm';
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from 'lucide-react';
 
-export default function Configuracion() {
-    const [editingConfig, setEditingConfig] = useState<ConfigType | null>(null);
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [forceUpdateKey, setForceUpdateKey] = useState(0);
+const Configuracion = () => {
+    const [isFormOpen, setFormOpen] = useState(false);
+    const [editingConfig, setEditingConfig] = useState<any>(null);
+    const [refreshKey, setRefreshKey] = useState(0);
 
-    const handleEdit = (config: ConfigType) => {
+    const handleEdit = useCallback((config: any) => {
         setEditingConfig(config);
-        setIsFormOpen(true);
-    };
+        setFormOpen(true);
+    }, []);
 
     const handleCancel = () => {
+        setFormOpen(false);
         setEditingConfig(null);
-        setIsFormOpen(false);
     };
 
     const handleSuccess = () => {
+        setFormOpen(false);
         setEditingConfig(null);
-        setIsFormOpen(false);
-        setForceUpdateKey(prev => prev + 1);
+        setRefreshKey(prev => prev + 1);
+    };
+
+    const handleAddNew = () => {
+        setEditingConfig(null);
+        setFormOpen(true);
     };
 
     return (
-        <div className="space-y-8"> {/* Aumentamos el espacio entre tarjetas */}
-            {/* --- Sección de Configuración de Montos --- */}
-            <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <h1 className="text-2xl font-bold">Gestión de Configuración</h1>
-                    {!isFormOpen && (
-                        <Button onClick={() => setIsFormOpen(true)}>Nueva Configuración</Button>
-                    )}
+        <div className="space-y-8">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold">Configuración de Montos</h1>
+                    <p className="text-gray-500">Gestión de las configuraciones de montos para los programas.</p>
                 </div>
-
-                {isFormOpen ? (
-                    <ConfiguracionForm 
-                        configuracionActual={editingConfig}
-                        onCancel={handleCancel}
-                        onSuccess={handleSuccess}
-                    />
-                ) : (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Historial de Configuraciones</CardTitle>
-                            <CardDescription>Aquí puedes ver y editar las configuraciones de montos y programas.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <ConfiguracionHistorial onEditConfig={handleEdit} forceUpdateKey={forceUpdateKey} />
-                        </CardContent>
-                    </Card>
+                {!isFormOpen && (
+                    <Button onClick={handleAddNew}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Añadir Nueva Configuración
+                    </Button>
                 )}
             </div>
-
-            {/* --- Sección de Historial de Liquidaciones --- */}
-            <PaymentHistory />
             
+            <div className="border-t pt-6">
+                {isFormOpen ? (
+                    <ConfiguracionForm 
+                        configToEdit={editingConfig}
+                        onConfigSave={handleSuccess} 
+                        onFinishEditing={handleCancel} 
+                    />
+                ) : (
+                    <ConfiguracionHistorial onEditConfig={handleEdit} forceUpdateKey={refreshKey} />
+                )}
+            </div>
         </div>
     );
-}
+};
+
+export default Configuracion;

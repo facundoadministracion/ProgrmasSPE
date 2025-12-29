@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/firebase';
+import { useUser } from '@/firebase';
 import { useFirestore } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { useState } from 'react';
 
 export default function SetAdminRolePage() {
-    const { user, loading } = useAuth();
+    const { user, isUserLoading: loading } = useUser();
     const firestore = useFirestore();
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
@@ -26,7 +26,7 @@ export default function SetAdminRolePage() {
             const userRef = doc(firestore, 'users', user.uid);
             // Usamos setDoc con merge:true para actualizar o crear el campo 'role'
             // sin sobreescribir el documento entero.
-            await setDoc(userRef, { role: 'admin' }, { merge: true });
+            await setDoc(userRef, { role: 'admin', name: user.displayName || user.email || 'Admin' }, { merge: true });
             setMessage('¡Listo! Ahora tienes permisos de administrador. Por favor, refresca la página principal.');
         } catch (e: any) {
             console.error(e);
