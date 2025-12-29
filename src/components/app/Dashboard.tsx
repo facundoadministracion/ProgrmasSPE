@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs } from 'firebase/firestore';
 import { Users, DollarSign, AlertTriangle, Briefcase, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant } from '@/lib/types';
@@ -55,51 +55,75 @@ const Dashboard = ({
 
         const fetchProgramData = async () => {
             setIsProgramDataLoading(true);
-            const data: { [key: string]: ProgramData } = {};
+            try {
+                // 1. Fetch all history records in one query.
+                const historyQuery = query(collection(firestore, 'paymentHistory'));
+                const historySnapshot = await getDocs(historyQuery);
+                const allHistoryData = historySnapshot.docs.map(doc => doc.data());
 
-            for (const prog of Object.values(PROGRAMAS)) {
-                // CORRECTED QUERY: Order by settlement year and month instead of upload date.
-                const recordsQuery = query(
-                    collection(firestore, 'paymentHistory'),
-                    where('programa', '==', prog),
-                    orderBy('anoLiquidacion', 'desc'),
-                    orderBy('mesLiquidacion', 'desc'),
-                    limit(1)
-                );
+                // 2. Group records by program.
+                const historyByProgram = allHistoryData.reduce((acc, record) => {
+                    const programName = record.programa;
+                    if (programName) {
+                        if (!acc[programName]) {
+                            acc[programName] = [];
+                        }
+                        acc[programName].push(record);
+                    }
+                    return acc;
+                }, {} as { [key: string]: any[] });
 
-                const recordSnapshot = await getDocs(recordsQuery);
+                const data: { [key: string]: ProgramData } = {};
 
-                if (recordSnapshot.empty) {
-                    data[prog] = { count: 0, amount: 0, date: 'N/A' };
-                    continue;
+                // 3. Process each program to find the latest record.
+                for (const prog of Object.values(PROGRAMAS)) {
+                    const programHistory = historyByProgram[prog];
+
+                    if (!programHistory || programHistory.length === 0) {
+                        data[prog] = { count: 0, amount: 0, date: 'N/A' };
+                        continue;
+                    }
+
+                    // 4. Sort the records for the current program to find the most recent one.
+                    programHistory.sort((a, b) => {
+                        const yearA = parseInt(a.anoLiquidacion, 10);
+                        const monthA = parseInt(a.mesLiquidacion, 10);
+                        const yearB = parseInt(b.anoLiquidacion, 10);
+                        const monthB = parseInt(b.mesLiquidacion, 10);
+
+                        if (yearB !== yearA) return yearB - yearA;
+                        return monthB - monthA;
+                    });
+
+                    const latestRecord = programHistory[0];
+                    
+                    const settlementAmount = latestRecord.montoTotalLiquidado || 0;
+                    const latestMes = latestRecord.mesLiquidacion;
+                    const latestAnio = latestRecord.anoLiquidacion;
+                    
+                    const monthIndex = parseInt(latestMes, 10) - 1;
+                    let dateString;
+
+                    if (monthIndex >= 0 && monthIndex < 12) {
+                        const monthName = MESES[monthIndex];
+                        dateString = `${monthName} de ${latestAnio}`;
+                    } else {
+                        dateString = `${String(latestMes).padStart(2, '0')}/${latestAnio}`;
+                    }
+
+                    data[prog] = { count: latestRecord.cantidadPagos, amount: settlementAmount, date: dateString };
                 }
 
-                const latestRecord = recordSnapshot.docs[0].data();
-                const settlementAmount = latestRecord.montoTotalLiquidado || 0;
-                const latestMes = latestRecord.mesLiquidacion;
-                const latestAnio = latestRecord.anoLiquidacion;
-                
-                const monthIndex = typeof latestMes === 'string' ? parseInt(latestMes, 10) - 1 : latestMes - 1;
-                let dateString;
-                if (monthIndex >= 0 && monthIndex < 12) {
-                    const monthName = MESES[monthIndex];
-                    dateString = `${monthName} de ${latestAnio}`;
-                } else {
-                    dateString = `${String(latestMes).padStart(2, '0')}/${latestAnio}`;
-                }
+                setProgramData(data);
 
-                data[prog] = { count: latestRecord.cantidadPagos, amount: settlementAmount, date: dateString };
+            } catch (error) {
+                console.error("Error fetching dashboard program data:", error);
+            } finally {
+                setIsProgramDataLoading(false);
             }
-            setProgramData(data);
-            setIsProgramDataLoading(false);
         };
 
-        fetchProgramData().catch(error => {
-            console.error("Error fetching dashboard program data:", error);
-            // This error might indicate a missing Firestore index. 
-            // The console will have a link to create it.
-            setIsProgramDataLoading(false);
-        });
+        fetchProgramData();
 
     }, [firestore]);
 
