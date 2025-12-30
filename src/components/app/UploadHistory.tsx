@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { MONTHS } from '@/lib/constants';
+import { useForceRefreshStore } from '@/store/force-refresh-store'; // Importar el store
 
 interface UploadHistoryRecord {
   id: string;
@@ -31,6 +32,7 @@ const ITEMS_PER_PAGE = 5;
 const SimplifiedUploadHistory = () => {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const { triggerRefresh } = useForceRefreshStore(); // Obtener la función para disparar la actualización
   const [history, setHistory] = useState<UploadHistoryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,6 +104,8 @@ const SimplifiedUploadHistory = () => {
             setCurrentPage(currentPage - 1);
           }
           
+          triggerRefresh(); // ¡NOTIFICACIÓN ENVIADA!
+
       } catch (error: any) {
           toast({ variant: "destructive", title: "Error de Eliminación", description: error.message });
       } finally {
@@ -182,17 +186,22 @@ const SimplifiedUploadHistory = () => {
                 <DialogHeader>
                     <DialogTitle>¿Estás realmente seguro?</DialogTitle>
                     <DialogDescription>
-                        Esta acción es irreversible y tendrá consecuencias importantes. Se revertirán todos los pagos y los cambios asociados a la siguiente carga:
-                        {selectedRecord && (
-                            <div className="mt-4 text-sm rounded-md bg-yellow-50 border border-yellow-200 p-3 text-yellow-900">
-                                <p><strong>Período:</strong> {MONTHS[parseInt(selectedRecord.mesLiquidacion, 10) - 1]} {selectedRecord.anoLiquidacion}</p>
-                                <p><strong>Programa:</strong> {selectedRecord.programa}</p>
-                                <p><strong>Pagos a revertir:</strong> {selectedRecord.cantidadPagos}</p>
-                            </div>
-                        )}
-                         <p className="mt-2">Los legajos de los participantes serán ajustados a su estado anterior.</p>
+                        Esta acción es irreversible. Se revertirán todos los pagos y cambios asociados a la carga seleccionada.
                     </DialogDescription>
                 </DialogHeader>
+                
+                {selectedRecord && (
+                    <div className="mt-4 text-sm rounded-md bg-yellow-50 border border-yellow-200 p-3 text-yellow-900">
+                        <p><strong>Período:</strong> {MONTHS[parseInt(selectedRecord.mesLiquidacion, 10) - 1]} {selectedRecord.anoLiquidacion}</p>
+                        <p><strong>Programa:</strong> {selectedRecord.programa}</p>
+                        <p><strong>Pagos a revertir:</strong> {selectedRecord.cantidadPagos}</p>
+                    </div>
+                )}
+                
+                <p className="text-sm text-muted-foreground">
+                    Los legajos de los participantes serán ajustados a su estado anterior.
+                </p>
+
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setShowConfirmDialog(false)} disabled={isDeleting}>Cancelar</Button>
                     <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting}>

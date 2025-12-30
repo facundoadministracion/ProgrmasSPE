@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useConfiguracion } from '@/hooks/useConfiguracion';
+import { useForceRefreshStore } from '@/store/force-refresh-store'; // Importar el store
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
@@ -38,6 +39,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const { firestore } = useFirebase();
   const { findConfigForDate, isLoading: configLoading } = useConfiguracion();
+  const { refreshId } = useForceRefreshStore(); // Obtener el ID de actualización
 
   const [paymentData, setPaymentData] = useState<ProcessedPaymentData | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(true);
@@ -80,7 +82,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
     };
 
     fetchLatestLiquidation();
-  }, [firestore, programName]);
+  }, [firestore, programName, refreshId]); // Añadir refreshId como dependencia
 
   useEffect(() => {
     const fetchPaymentData = async () => {
@@ -141,7 +143,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
 
     fetchPaymentData();
 
-  }, [firestore, programName, month, year]);
+  }, [firestore, programName, month, year, refreshId]); // Añadir refreshId como dependencia
 
   const novedadesRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -150,7 +152,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
         where('mesEvento', '==', String(parseInt(month) + 1)), 
         where('anoEvento', '==', year)
     );
-  }, [firestore, year, month]);
+  }, [firestore, year, month, refreshId]); // Añadir refreshId como dependencia
 
   const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
 

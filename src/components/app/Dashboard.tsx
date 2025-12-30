@@ -12,12 +12,22 @@ import { getAlertStatus } from '@/lib/logic';
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 
+// Tipos
 type ParticipantFilter = 'requiresAttention' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'finalized';
 
 interface ProgramData {
     count: number;
     amount: number; 
     date: string;
+}
+
+// FIX: Definir un tipo para los registros del historial para evitar el error de 'any' implícito.
+interface PaymentHistoryRecord {
+    anoLiquidacion: string;
+    mesLiquidacion: string;
+    programa: string;
+    montoTotalLiquidado?: number;
+    cantidadPagos: number;
 }
 
 const MESES = [
@@ -59,9 +69,11 @@ const Dashboard = ({
                 // 1. Fetch all history records in one query.
                 const historyQuery = query(collection(firestore, 'paymentHistory'));
                 const historySnapshot = await getDocs(historyQuery);
-                const allHistoryData = historySnapshot.docs.map(doc => doc.data());
+                // FIX: Asignar el tipo PaymentHistoryRecord a los datos recuperados.
+                const allHistoryData = historySnapshot.docs.map(doc => doc.data() as PaymentHistoryRecord);
 
                 // 2. Group records by program.
+                // FIX: Usar el tipo PaymentHistoryRecord en el acumulador para mantener el tipado.
                 const historyByProgram = allHistoryData.reduce((acc, record) => {
                     const programName = record.programa;
                     if (programName) {
@@ -71,7 +83,7 @@ const Dashboard = ({
                         acc[programName].push(record);
                     }
                     return acc;
-                }, {} as { [key: string]: any[] });
+                }, {} as { [key: string]: PaymentHistoryRecord[] });
 
                 const data: { [key: string]: ProgramData } = {};
 
@@ -85,6 +97,7 @@ const Dashboard = ({
                     }
 
                     // 4. Sort the records for the current program to find the most recent one.
+                    // El error de tipado se resuelve aquí gracias a las correcciones anteriores.
                     programHistory.sort((a, b) => {
                         const yearA = parseInt(a.anoLiquidacion, 10);
                         const monthA = parseInt(a.mesLiquidacion, 10);
