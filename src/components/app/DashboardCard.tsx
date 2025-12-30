@@ -1,18 +1,19 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
+import Image, { StaticImageData } from 'next/image'; // 1. Importa StaticImageData
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 
+// 2. Actualiza el tipo para la prop del logo
 type DashboardCardProps = {
   title: string;
   value: string | number;
   secondaryValue?: string;
   icon?: React.ElementType;
-  logoSrc?: string;
+  logoSrc?: string | StaticImageData; // Permite tanto string como la imagen importada
   subtitle?: string;
   onClick?: () => void;
   actionText?: string;
@@ -56,6 +57,7 @@ export const DashboardCard = ({
                     fill 
                     sizes="80px" 
                     style={{ objectFit: 'contain' }} 
+                    unoptimized // Añadido para evitar problemas con imágenes estáticas locales en algunos entornos
                 />
             </div>
         ) : (

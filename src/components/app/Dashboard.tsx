@@ -6,11 +6,23 @@ import { collection, query, getDocs } from 'firebase/firestore';
 import { Users, DollarSign, AlertTriangle, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS, PROGRAM_LOGOS, ALERT_MESSAGES } from '@/lib/constants';
+import { PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
+
+// 1. Importa las imágenes directamente
+import logoTutorias from '../../../public/logos/tutorias.png';
+import logoEmpleoJoven from '../../../public/logos/empleo joven.png';
+import logoTecnoempleo from '../../../public/logos/tecnoempleo.png';
+
+// 2. Crea un mapa que asocia el nombre del programa con la imagen importada
+const programLogos = {
+    [PROGRAMAS.TUTORIAS]: logoTutorias,
+    [PROGRAMAS.EMPLEO_JOVEN]: logoEmpleoJoven,
+    [PROGRAMAS.TECNOEMPLEO]: logoTecnoempleo,
+};
 
 // Tipos
 type ParticipantFilter = 'requiresAttention' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'finalized';
@@ -21,7 +33,6 @@ interface ProgramData {
     date: string;
 }
 
-// FIX: Definir un tipo para los registros del historial para evitar el error de 'any' implícito.
 interface PaymentHistoryRecord {
     anoLiquidacion: string;
     mesLiquidacion: string;
@@ -66,14 +77,10 @@ const Dashboard = ({
         const fetchProgramData = async () => {
             setIsProgramDataLoading(true);
             try {
-                // 1. Fetch all history records in one query.
                 const historyQuery = query(collection(firestore, 'paymentHistory'));
                 const historySnapshot = await getDocs(historyQuery);
-                // FIX: Asignar el tipo PaymentHistoryRecord a los datos recuperados.
                 const allHistoryData = historySnapshot.docs.map(doc => doc.data() as PaymentHistoryRecord);
 
-                // 2. Group records by program.
-                // FIX: Usar el tipo PaymentHistoryRecord en el acumulador para mantener el tipado.
                 const historyByProgram = allHistoryData.reduce((acc, record) => {
                     const programName = record.programa;
                     if (programName) {
@@ -87,7 +94,6 @@ const Dashboard = ({
 
                 const data: { [key: string]: ProgramData } = {};
 
-                // 3. Process each program to find the latest record.
                 for (const prog of Object.values(PROGRAMAS)) {
                     const programHistory = historyByProgram[prog];
 
@@ -96,8 +102,6 @@ const Dashboard = ({
                         continue;
                     }
 
-                    // 4. Sort the records for the current program to find the most recent one.
-                    // El error de tipado se resuelve aquí gracias a las correcciones anteriores.
                     programHistory.sort((a, b) => {
                         const yearA = parseInt(a.anoLiquidacion, 10);
                         const monthA = parseInt(a.mesLiquidacion, 10);
@@ -204,7 +208,7 @@ const Dashboard = ({
                             title={prog} 
                             value={data?.count ?? 0} 
                             secondaryValue={data ? formatCurrency(data.amount) : undefined}
-                            logoSrc={PROGRAM_LOGOS[prog]}
+                            logoSrc={programLogos[prog]} // 3. Pasa el objeto de imagen importado
                             subtitle={subtitle}
                             onClick={() => setSelectedProgramDetail(prog)}
                             actionText="Ver Análisis Mensual" 
