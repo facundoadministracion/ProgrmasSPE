@@ -5,8 +5,7 @@ import { redirect } from 'next/navigation';
 
 async function getSession() {
   try {
-    // FIX: cookies() is async and must be awaited.
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('session')?.value;
     if (!sessionCookie) return null;
     
@@ -14,7 +13,6 @@ async function getSession() {
     const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
     return decodedClaims;
   } catch (error) {
-    // This is expected during logout or session expiry.
     return null;
   }
 }
