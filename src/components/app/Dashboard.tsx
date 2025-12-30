@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, query, getDocs } from 'firebase/firestore';
-import { Users, DollarSign, AlertTriangle, Briefcase, UserCheck, UserPlus, UserX } from 'lucide-react';
+import { Users, DollarSign, AlertTriangle, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
+import { PROGRAMAS, PROGRAM_LOGOS, ALERT_MESSAGES } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
@@ -204,7 +204,7 @@ const Dashboard = ({
                             title={prog} 
                             value={data?.count ?? 0} 
                             secondaryValue={data ? formatCurrency(data.amount) : undefined}
-                            icon={Briefcase} 
+                            logoSrc={PROGRAM_LOGOS[prog]}
                             subtitle={subtitle}
                             onClick={() => setSelectedProgramDetail(prog)}
                             actionText="Ver Análisis Mensual" 

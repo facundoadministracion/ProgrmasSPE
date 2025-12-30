@@ -25,6 +25,12 @@ export const PROGRAMAS = {
   TECNO: 'Tecnoempleo'
 } as const;
 
+export const PROGRAM_LOGOS: { [key: string]: string } = {
+  [PROGRAMAS.TUTORIAS]: '/logos/tutorias.png',
+  [PROGRAMAS.JOVEN]: '/logos/empleo joven.png',
+  [PROGRAMAS.TECNO]: '/logos/tecnoempleo.png',
+};
+
 export const CATEGORIAS_TUTORIAS = ['Senior', 'Estandar', 'Junior'];
 
 export const ESTADOS_PARTICIPANTE = ['Activo', 'Ingresado', 'Baja', 'Requiere Atención'] as const;

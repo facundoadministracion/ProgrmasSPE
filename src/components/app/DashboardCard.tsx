@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,7 +11,8 @@ type DashboardCardProps = {
   title: string;
   value: string | number;
   secondaryValue?: string;
-  icon: React.ElementType;
+  icon?: React.ElementType;
+  logoSrc?: string;
   subtitle?: string;
   onClick?: () => void;
   actionText?: string;
@@ -18,7 +20,18 @@ type DashboardCardProps = {
   isLoading?: boolean;
 };
 
-export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtitle, onClick, actionText, color = 'gray', isLoading = false }: DashboardCardProps) => {
+export const DashboardCard = ({ 
+    title, 
+    value, 
+    secondaryValue, 
+    icon: Icon, 
+    logoSrc,
+    subtitle, 
+    onClick, 
+    actionText, 
+    color = 'gray', 
+    isLoading = false 
+}: DashboardCardProps) => {
   const colorStyles: { [key: string]: { border: string; icon: string } } = {
     red:    { border: 'border-brand-red',    icon: 'text-brand-red' },
     green:  { border: 'border-brand-green',  icon: 'text-brand-green' },
@@ -33,12 +46,18 @@ export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtit
   const selectedStyle = colorStyles[color] || colorStyles.gray;
 
   return (
-    <Card className={`overflow-hidden ${selectedStyle.border} border-l-4`}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className={`overflow-hidden ${selectedStyle.border} border-l-4 flex flex-col`}>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {Icon && <Icon className={`h-4 w-4 ${selectedStyle.icon}`} />}
+        {logoSrc ? (
+            <div className="relative h-10 w-20">
+                <Image src={logoSrc} alt={`${title} logo`} layout="fill" objectFit="contain" />
+            </div>
+        ) : (
+          Icon && <Icon className={`h-4 w-4 ${selectedStyle.icon}`} />
+        )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-grow">
         {isLoading ? (
           <>
             <Skeleton className="h-7 w-1/2 mb-2" />
@@ -65,7 +84,7 @@ export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtit
         {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
       </CardContent>
       {onClick && (
-        <CardFooter className="pt-0">
+        <CardFooter className="pt-0 mt-auto">
           <Button onClick={onClick} variant="outline" className="w-full" disabled={isLoading}>{actionText || "Ver Detalles"}</Button>
         </CardFooter>
       )}
