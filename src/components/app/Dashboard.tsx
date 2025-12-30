@@ -6,23 +6,11 @@ import { collection, query, getDocs } from 'firebase/firestore';
 import { Users, DollarSign, AlertTriangle, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
+import { PROGRAMAS, ALERT_MESSAGES, PROGRAM_LOGOS } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
-
-// 1. Importa las imágenes directamente
-import logoTutorias from '../../../public/logos/tutorias.png';
-import logoEmpleoJoven from '../../../public/logos/empleo joven.png';
-import logoTecnoempleo from '../../../public/logos/tecnoempleo.png';
-
-// 2. Crea un mapa que asocia el nombre del programa con la imagen importada
-const programLogos = {
-    [PROGRAMAS.TUTORIAS]: logoTutorias,
-    [PROGRAMAS.EMPLEO_JOVEN]: logoEmpleoJoven,
-    [PROGRAMAS.TECNOEMPLEO]: logoTecnoempleo,
-};
 
 // Tipos
 type ParticipantFilter = 'requiresAttention' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'finalized';
@@ -208,7 +196,7 @@ const Dashboard = ({
                             title={prog} 
                             value={data?.count ?? 0} 
                             secondaryValue={data ? formatCurrency(data.amount) : undefined}
-                            logoSrc={programLogos[prog]} // 3. Pasa el objeto de imagen importado
+                            logoSrc={PROGRAM_LOGOS[prog]}
                             subtitle={subtitle}
                             onClick={() => setSelectedProgramDetail(prog)}
                             actionText="Ver Análisis Mensual" 

@@ -26,9 +26,9 @@ export const PROGRAMAS = {
 } as const;
 
 export const PROGRAM_LOGOS: { [key: string]: string } = {
-  [PROGRAMAS.TUTORIAS]: '/logos/tutorias.png',
-  [PROGRAMAS.JOVEN]: '/logos/empleo joven.png',
-  [PROGRAMAS.TECNO]: '/logos/tecnoempleo.png',
+  [PROGRAMAS.TUTORIAS]: '/logos/tutorias.png?v=2',
+  [PROGRAMAS.JOVEN]: '/logos/empleo-joven.png?v=2',
+  [PROGRAMAS.TECNO]: '/logos/tecnoempleo.png?v=2',
 };
 
 export const CATEGORIAS_TUTORIAS = ['Senior', 'Estandar', 'Junior'];
