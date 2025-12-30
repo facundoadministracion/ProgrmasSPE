@@ -37,7 +37,6 @@ export const DashboardCard = ({
     green:  { border: 'border-brand-green',  icon: 'text-brand-green' },
     yellow: { border: 'border-brand-yellow', icon: 'text-brand-yellow' },
     gray:   { border: 'border-brand-gray',   icon: 'text-brand-gray' },
-    // --- Legacy color mappings for backwards compatibility ---
     blue:   { border: 'border-brand-gray',   icon: 'text-brand-gray' },
     orange: { border: 'border-brand-yellow', icon: 'text-brand-yellow' },
     indigo: { border: 'border-brand-gray',   icon: 'text-brand-gray' },
@@ -51,7 +50,13 @@ export const DashboardCard = ({
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {logoSrc ? (
             <div className="relative h-10 w-20">
-                <Image src={logoSrc} alt={`${title} logo`} layout="fill" objectFit="contain" />
+                <Image 
+                    src={logoSrc} 
+                    alt={`${title} logo`} 
+                    fill 
+                    sizes="80px" 
+                    style={{ objectFit: 'contain' }} 
+                />
             </div>
         ) : (
           Icon && <Icon className={`h-4 w-4 ${selectedStyle.icon}`} />

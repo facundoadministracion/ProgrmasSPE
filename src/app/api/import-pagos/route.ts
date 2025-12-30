@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Timestamp } from 'firebase-admin/firestore';
-import { getFirebaseAdmin } from '@/firebase-admin'; // CORRECTED: Import the lazy initializer
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirebaseAdmin } from '@/firebase-admin';
 import { PROGRAMAS } from '@/lib/constants';
 
 // --- Helper Functions ---
@@ -18,6 +18,7 @@ function parseCSV(csvString: string): Record<string, string>[] {
     if (lines.length < 2) return [];
     const headers = lines[0].split(';').map((h, i) => {
         const header = h.trim();
+        // Remove BOM from the first header
         return i === 0 ? header.replace(/^\uFEFF/, '') : header;
     });
     const records = [];
@@ -45,139 +46,176 @@ function getOfficialProgramName(name: string): string {
 // --- Main POST Handler ---
 
 export async function POST(request: Request) {
-  const { db } = getFirebaseAdmin(); // CORRECTED: Get DB instance at runtime
+    const { db } = getFirebaseAdmin();
 
-  try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-
-    if (!file || file.type !== 'text/csv') {
-      return NextResponse.json({ success: false, message: 'Archivo no válido. Debe ser CSV.' }, { status: 400 });
-    }
-
-    const fileContent = await file.text();
-    const records = parseCSV(fileContent);
-
-    const requiredHeaders = ['dni', 'programa', 'mes', 'anio', 'monto'];
-    if (records.length === 0 || !requiredHeaders.every(h => Object.keys(records[0]).includes(h))) {
-        return NextResponse.json({ success: false, message: `El CSV debe contener las columnas: ${requiredHeaders.join(', ')}.` }, { status: 400 });
-    }
-    
-    const dnisInCsv = [...new Set(records.map(r => r.dni).filter(Boolean))];
-    const participantDocsMap = new Map<string, {id: string, ref: FirebaseFirestore.DocumentReference}>();
-
-    for (const chunk of chunkArray(dnisInCsv, 30)) {
-        const snapshot = await db.collection('participants').where('dni', 'in', chunk).get();
-        snapshot.forEach(doc => participantDocsMap.set(doc.data().dni, { id: doc.id, ref: doc.ref }));
-    }
-
-    const participantIds = Array.from(participantDocsMap.values()).map(p => p.id);
-    const existingPayments = new Set<string>();
-    
-    if (participantIds.length > 0) {
-        for (const chunk of chunkArray(participantIds, 30)) {
-            const paymentsSnapshot = await db.collection('pagosRegistrados').where('participantId', 'in', chunk).get();
-            paymentsSnapshot.forEach(doc => {
-                const { participantId, anio, mes } = doc.data();
-                existingPayments.add(`${participantId}-${anio}-${mes.toString().padStart(2, '0')}`);
-            });
-        }
-    }
-    
-    const processingErrors: string[] = [];
-    const newPaymentDocs: any[] = [];
-    const affectedParticipants = new Set<string>();
-
-    for (let i = 0; i < records.length; i++) {
-        const record = records[i];
-        const { dni, programa, mes, anio, monto } = record;
-
-        if (!dni || !programa || !mes || !anio || !monto) {
-            processingErrors.push(`Línea ${i + 2}: Fila incompleta. Se requieren dni, programa, mes, anio y monto.`);
-            continue;
-        }
-
-        const participantData = participantDocsMap.get(dni);
-        if (!participantData) {
-            processingErrors.push(`Línea ${i + 2}: No se encontró participante con DNI ${dni}.`);
-            continue;
-        }
-
-        const paymentKey = `${participantData.id}-${anio}-${mes.toString().padStart(2, '0')}`;
-        if (existingPayments.has(paymentKey)) continue;
-        
-        existingPayments.add(paymentKey);
-        affectedParticipants.add(participantData.id);
-
-        const parsedMonto = parseFloat(monto.replace(/[^0-9,-]+/g, '').replace(',', '.'));
-        if (isNaN(parsedMonto)) {
-            processingErrors.push(`Línea ${i + 2}: Monto inválido para el DNI ${dni}.`);
-            continue;
-        }
-
-        newPaymentDocs.push({
-            participantId: participantData.id,
-            dni,
-            programa: getOfficialProgramName(programa),
-            mes: mes.toString().padStart(2, '0'),
-            anio,
-            monto: parsedMonto,
-            fechaDeCarga: Timestamp.now(),
-        });
-    }
-
-    if (newPaymentDocs.length > 0) {
-        for (const chunk of chunkArray(newPaymentDocs, 499)) {
-            const batch = db.batch();
-            chunk.forEach(docData => {
-                const newDocRef = db.collection('pagosRegistrados').doc();
-                batch.create(newDocRef, docData);
-            });
-            await batch.commit();
-        }
-    }
-    
-    if (affectedParticipants.size > 0) {
-        const affectedParticipantIds = Array.from(affectedParticipants);
-        for (const chunk of chunkArray(affectedParticipantIds, 499)) {
-            const batch = db.batch();
-            const paymentsSnapshot = await db.collection('pagosRegistrados').where('participantId', 'in', chunk).get();
-            
-            const paymentsByParticipant = new Map<string, any[]>();
-            paymentsSnapshot.forEach(doc => {
-                const payment = doc.data();
-                if (!paymentsByParticipant.has(payment.participantId)) {
-                    paymentsByParticipant.set(payment.participantId, []);
-                }
-                paymentsByParticipant.get(payment.participantId)!.push(payment);
-            });
-            
-            for (const participantId of chunk) {
-                const participantRef = db.collection('participants').doc(participantId);
-                const allPayments = paymentsByParticipant.get(participantId) || [];
-                
-                const newPagosPorPrograma = allPayments.reduce((acc, payment) => {
-                    const officialProgram = getOfficialProgramName(payment.programa);
-                    acc[officialProgram] = (acc[officialProgram] || 0) + 1;
-                    return acc;
-                }, {} as Record<string, number>);
-
-                batch.update(participantRef, { pagosPorPrograma: newPagosPorPrograma });
+    try {
+        const transactionResult = await db.runTransaction(async (transaction) => {
+            // 1. Get and validate file from request
+            const formData = await request.formData();
+            const file = formData.get('file') as File | null;
+            if (!file || file.type !== 'text/csv') {
+                return { success: false, status: 400, message: 'Archivo no válido. Debe ser CSV.' };
             }
-            await batch.commit();
-        }
+
+            const fileContent = await file.text();
+            const records = parseCSV(fileContent);
+
+            // 2. Atomic Batch Validation
+            const requiredHeaders = ['dni', 'programa', 'mes', 'anio', 'monto'];
+            if (records.length === 0 || !requiredHeaders.every(h => Object.keys(records[0]).includes(h))) {
+                return { success: false, status: 400, message: `El CSV debe contener las columnas: ${requiredHeaders.join(', ')}.` };
+            }
+            
+            const firstRecord = records[0];
+            const officialProgramName = getOfficialProgramName(firstRecord.programa);
+            const settlementMonth = firstRecord.mes.toString().padStart(2, '0');
+            const settlementYear = firstRecord.anio;
+
+            if (!OFFICIAL_PROGRAM_NAMES.includes(officialProgramName)) {
+                return { success: false, status: 400, message: `El programa '${firstRecord.programa}' no es un programa válido.` };
+            }
+
+            for (let i = 1; i < records.length; i++) {
+                const record = records[i];
+                if (getOfficialProgramName(record.programa) !== officialProgramName || 
+                    record.mes.toString().padStart(2, '0') !== settlementMonth || 
+                    record.anio !== settlementYear) {
+                    return { success: false, status: 400, message: `El archivo CSV debe contener registros para un único programa, mes y año. Inconsistencia en la línea ${i + 2}.` };
+                }
+            }
+
+            // 3. DNI Validation (All or Nothing)
+            const dnisInCsv = [...new Set(records.map(r => r.dni).filter(Boolean))];
+            const participantRefsMap = new Map<string, FirebaseFirestore.DocumentReference>();
+            const participantDocsMap = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+
+            for (const chunk of chunkArray(dnisInCsv, 30)) {
+                const q = db.collection('participants').where('dni', 'in', chunk);
+                const snapshot = await transaction.get(q);
+                snapshot.forEach(doc => {
+                    participantDocsMap.set(doc.data().dni, doc);
+                    participantRefsMap.set(doc.data().dni, doc.ref);
+                });
+            }
+
+            if (participantRefsMap.size !== dnisInCsv.length) {
+                const foundDnis = new Set(participantRefsMap.keys());
+                const unknownDnis = dnisInCsv.filter(dni => !foundDnis.has(dni));
+                return { success: false, status: 400, message: 'DNI no encontrados en la base de datos de participantes.', details: { desconocidos: unknownDnis } };
+            }
+            
+            // 4. Check for existing payment batch
+            const newPaymentBatchId = `${officialProgramName}-${settlementYear}-${settlementMonth}`;
+            const newPaymentBatchRef = db.collection('paymentHistory').doc(newPaymentBatchId);
+            const newPaymentBatchDoc = await transaction.get(newPaymentBatchRef);
+
+            if (newPaymentBatchDoc.exists) {
+                return { success: false, status: 409, message: `Ya existe una liquidación para ${officialProgramName} en ${settlementMonth}/${settlementYear}. Primero debe revertir el lote anterior.` };
+            }
+
+            // 5. Find Previous Payment Batch
+            const historyQuery = db.collection('paymentHistory')
+                .where('programa', '==', officialProgramName)
+                .orderBy('anoLiquidacion', 'desc')
+                .orderBy('mesLiquidacion', 'desc')
+                .limit(1);
+                
+            const previousHistorySnapshot = await transaction.get(historyQuery);
+            const previousDniSet = new Set<string>(previousHistorySnapshot.empty ? [] : previousHistorySnapshot.docs[0].data().dnis);
+
+            // 6. Calculate Deltas
+            const newDniSet = new Set(dnisInCsv);
+            const altasDnis = [...newDniSet].filter(dni => !previousDniSet.has(dni));
+            const bajasDnis = [...previousDniSet].filter(dni => !newDniSet.has(dni));
+
+            // 7. Execute DB Updates
+
+            //  7a. Update Bajas (participants who left)
+            for (const dni of bajasDnis) {
+                const q = db.collection('participants').where('dni', '==', dni).limit(1);
+                const snapshot = await transaction.get(q);
+                if (!snapshot.empty) {
+                    const participantRef = snapshot.docs[0].ref;
+                    transaction.update(participantRef, {
+                        estado: 'Baja',
+                        motivoBaja: `No incluido en liquidación ${settlementMonth}/${settlementYear}`,
+                        fechaBaja: Timestamp.now(),
+                    });
+                }
+            }
+
+            // 7b. Update Altas, Activos & create new payments
+            let totalAmount = 0;
+            for (const record of records) {
+                const { dni, monto } = record;
+                const participantRef = participantRefsMap.get(dni)!;
+                const parsedMonto = parseFloat(monto.replace(/[^0-9,-]+/g, '').replace(',', '.'));
+                if (!isNaN(parsedMonto)) totalAmount += parsedMonto;
+
+                const newPaymentRef = db.collection('pagosRegistrados').doc();
+                transaction.create(newPaymentRef, {
+                    participantId: participantRef.id,
+                    dni,
+                    programa: officialProgramName,
+                    mes: settlementMonth,
+                    anio: settlementYear,
+                    monto: parsedMonto,
+                    fechaDeCarga: Timestamp.now(),
+                    batchId: newPaymentBatchId,
+                });
+
+                const participantDoc = participantDocsMap.get(dni);
+                const updateData: any = {};
+
+                if (altasDnis.includes(dni)) {
+                    updateData.estado = 'Ingresado';
+                    updateData.activo = true;
+                    updateData.motivoBaja = FieldValue.delete();
+                    updateData.fechaBaja = FieldValue.delete();
+                } else if (participantDoc?.data()?.estado !== 'Activo') {
+                    updateData.estado = 'Activo';
+                    updateData.activo = true;
+                    updateData.motivoBaja = FieldValue.delete();
+                    updateData.fechaBaja = FieldValue.delete();
+                }
+                
+                const currentPagos = participantDoc?.data()?.pagosPorPrograma || {};
+                const newPagosCount = (currentPagos[officialProgramName] || 0) + 1;
+                updateData[`pagosPorPrograma.${officialProgramName}`] = newPagosCount;
+                
+                transaction.update(participantRef, updateData);
+            }
+
+            // 7c. Create new paymentHistory document
+            transaction.create(newPaymentBatchRef, {
+                programa: officialProgramName,
+                mesLiquidacion: settlementMonth,
+                anoLiquidacion: settlementYear,
+                dnis: dnisInCsv,
+                cantidadPagos: dnisInCsv.length,
+                montoTotalLiquidado: totalAmount,
+                fechaDeCarga: Timestamp.now(),
+                altas,
+                bajas,
+            });
+
+            return { 
+                success: true, 
+                status: 200, 
+                message: 'Importación completada con éxito.', 
+                details: { 
+                    procesados: dnisInCsv.length, 
+                    altas: altasDnis.length, 
+                    bajas: bajasDnis.length 
+                } 
+            };
+        });
+
+        // Handle the result of the transaction
+        return NextResponse.json(transactionResult, { status: transactionResult.status });
+
+    } catch (error: any) {
+        console.error('Error en la importación de pagos:', error);
+        return NextResponse.json({ success: false, message: 'Error interno del servidor.', details: error.message || error.stack }, { status: 500 });
     }
-    
-    const successMessage = `Importación finalizada. Se crearon ${newPaymentDocs.length} nuevos registros de pago.`;
-
-    return NextResponse.json({ 
-        success: true, 
-        message: successMessage + (processingErrors.length > 0 ? ' Algunos registros tuvieron errores.' : ''),
-        details: { errores: processingErrors }
-    });
-
-  } catch (error: any) {
-    console.error('Error en la importación de pagos:', error);
-    return NextResponse.json({ success: false, message: 'Error interno del servidor.', details: error.stack }, { status: 500 });
-  }
 }
