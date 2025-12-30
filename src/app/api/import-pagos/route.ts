@@ -71,7 +71,7 @@ export async function POST(request: Request) {
             const settlementMonth = firstRecord.mes.toString().padStart(2, '0');
             const settlementYear = firstRecord.anio;
 
-            if (!OFFICIAL_PROGRAM_NAMES.includes(officialProgramName)) {
+            if (!(OFFICIAL_PROGRAM_NAMES as string[]).includes(officialProgramName)) {
                 return { success: false, status: 400, message: `El programa '${firstRecord.programa}' no es un programa válido.` };
             }
 
@@ -195,8 +195,8 @@ export async function POST(request: Request) {
                 cantidadPagos: dnisInCsv.length,
                 montoTotalLiquidado: totalAmount,
                 fechaDeCarga: Timestamp.now(),
-                altas,
-                bajas,
+                altas: altasDnis,
+                bajas: bajasDnis,
             });
 
             return { 
