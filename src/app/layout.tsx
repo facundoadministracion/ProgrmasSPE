@@ -8,8 +8,8 @@ import SessionManager from '@/components/app/SessionManager';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Mi Nueva App',
-  description: 'Creada con Firebase Studio',
+  title: 'Gestion de Programa LR',
+  description: 'Gestión de programas y participantes',
 };
 
 export default function RootLayout({

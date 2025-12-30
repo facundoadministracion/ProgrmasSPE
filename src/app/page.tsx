@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import Link from 'next/link';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUser, useCollection, useFirebase } from '@/firebase';
 import { writeBatch, doc, collection, serverTimestamp } from 'firebase/firestore';
 
@@ -43,6 +43,7 @@ import PaymentUploadWizard from '@/components/app/PaymentUploadWizard';
 
 export default function Home() {
     const { user, isUserLoading, signOut } = useUser();
+    const router = useRouter();
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
@@ -62,6 +63,12 @@ export default function Home() {
     const [activeFilter, setActiveFilter] = useState<ParticipantFilter | null>(null);
     const [initialSearchTerm, setInitialSearchTerm] = useState<string | undefined>(undefined);
     const [formId] = useState('participant-form');
+
+    useEffect(() => {
+        if (!isUserLoading && !user) {
+            router.push('/login');
+        }
+    }, [isUserLoading, user, router]);
 
     const handleBackToPadrón = () => setSelectedParticipant(null);
     const handleSelectParticipant = (participant: Participant | 'new' | null) => setSelectedParticipant(participant);
@@ -88,24 +95,11 @@ export default function Home() {
         }
     };
 
-    if (isUserLoading || (user && usersLoading)) {
+    if (isUserLoading || !user || (user && usersLoading)) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-gray-100">
                 <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
                 <p className="ml-4 text-gray-700">Cargando...</p>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center bg-gray-100">
-                <div className="text-center">
-                    <p className="text-lg text-gray-700 mb-4">Por favor, inicia sesión para continuar.</p>
-                    <Link href="/login" passHref>
-                        <Button>Iniciar Sesión</Button>
-                    </Link>
-                </div>
             </div>
         );
     }
