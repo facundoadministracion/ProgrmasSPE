@@ -183,11 +183,11 @@ const Dashboard = ({
               value={totalParticipants} 
               secondaryValue={formatCurrency(totalSettledAmount)}
               icon={Users} 
-              color="blue" 
+              color="gray" 
               isLoading={isProgramDataLoading} 
             />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
-            <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="orange" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
+            <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="yellow" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
             <DashboardCard title="Próximos a Vencer" value={aVencerCount} icon={DollarSign} color="yellow" subtitle="A 1 pago de necesitar renovación" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
             <DashboardCard title="Requieren Continuidad" value={renewalRequiredCount} icon={UserPlus} color="green" subtitle="Necesitan acto de renovación" isLoading={participantsLoading} onClick={() => onSetFilter('renewalRequired')} actionText="Ver Lista" />
             <DashboardCard title="Finalizados" value={finalizedCount} icon={UserX} color="gray" subtitle="Completaron 12 pagos o más" isLoading={participantsLoading} onClick={() => onSetFilter('finalized')} actionText="Ver Lista" />
@@ -208,7 +208,7 @@ const Dashboard = ({
                             subtitle={subtitle}
                             onClick={() => setSelectedProgramDetail(prog)}
                             actionText="Ver Análisis Mensual" 
-                            color="indigo" 
+                            color="gray" 
                             isLoading={isProgramDataLoading}
                         />
                     );

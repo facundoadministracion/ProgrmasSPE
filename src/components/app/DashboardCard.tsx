@@ -11,29 +11,32 @@ type DashboardCardProps = {
   value: string | number;
   secondaryValue?: string;
   icon: React.ElementType;
-  subtitle?: string; // Make subtitle optional
+  subtitle?: string;
   onClick?: () => void;
   actionText?: string;
   color?: string;
   isLoading?: boolean;
 };
 
-export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtitle, onClick, actionText, color = 'blue', isLoading = false }: DashboardCardProps) => {
-  const colorClasses = {
-    blue: { icon: 'text-blue-500' },
-    red: { icon: 'text-red-500' },
-    green: { icon: 'text-green-500' },
-    indigo: { icon: 'text-indigo-500' },
-    orange: { icon: 'text-orange-500' }
+export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtitle, onClick, actionText, color = 'gray', isLoading = false }: DashboardCardProps) => {
+  const colorStyles: { [key: string]: { border: string; icon: string } } = {
+    red:    { border: 'border-brand-red',    icon: 'text-brand-red' },
+    green:  { border: 'border-brand-green',  icon: 'text-brand-green' },
+    yellow: { border: 'border-brand-yellow', icon: 'text-brand-yellow' },
+    gray:   { border: 'border-brand-gray',   icon: 'text-brand-gray' },
+    // --- Legacy color mappings for backwards compatibility ---
+    blue:   { border: 'border-brand-gray',   icon: 'text-brand-gray' },
+    orange: { border: 'border-brand-yellow', icon: 'text-brand-yellow' },
+    indigo: { border: 'border-brand-gray',   icon: 'text-brand-gray' },
   };
 
-  const selectedColor = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
+  const selectedStyle = colorStyles[color] || colorStyles.gray;
 
   return (
-    <Card>
+    <Card className={`overflow-hidden ${selectedStyle.border} border-l-4`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {Icon && <Icon className={`h-4 w-4 text-muted-foreground ${selectedColor.icon}`} />}
+        {Icon && <Icon className={`h-4 w-4 ${selectedStyle.icon}`} />}
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -59,7 +62,6 @@ export const DashboardCard = ({ title, value, secondaryValue, icon: Icon, subtit
             )}
           </>
         )}
-        {/* Only render subtitle if it exists */}
         {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
       </CardContent>
       {onClick && (
