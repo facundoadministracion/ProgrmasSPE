@@ -1,5 +1,5 @@
 import { getFirebaseAdmin } from '@/firebase-admin';
-import { Dashboard } from '@/components/app/Dashboard';
+import Dashboard from '@/components/app/Dashboard'; // FIX: Corrected import statement
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -12,7 +12,9 @@ async function getSession() {
     const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
     return decodedClaims;
   } catch (error) {
-    console.error('Error verifying session cookie:', error);
+    // Session cookie is invalid or expired. 
+    // This is an expected condition during logout or session expiry.
+    // console.error('Error verifying session cookie:', error);
     return null;
   }
 }
@@ -24,9 +26,7 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Aquí, en el futuro, podrías cargar los datos iniciales del dashboard 
-  // del lado del servidor si es necesario. Por ahora, el componente Dashboard
-  // los carga del lado del cliente.
-
+  // The Dashboard component is a client component and will fetch its own data.
+  // The server-side part here is primarily for protecting the route.
   return <Dashboard />;
 }
