@@ -1,124 +1,104 @@
 
 import { NextResponse } from 'next/server';
-import { getFirebaseAdmin } from '@/firebase/admin';
+import { getFirebaseAdmin } from '@/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// --- Endpoint POST para revertir un lote de pagos con lógica mejorada ---
+// NOTE: Esta es la nueva versión compatible con PaymentUploadWizard.
+
 export async function POST(request: Request) {
+    const { historyId } = await request.json();
+    if (!historyId) {
+        return NextResponse.json({ success: false, message: 'El ID del historial es obligatorio.' }, { status: 400 });
+    }
+
+    const { db } = getFirebaseAdmin();
+
     try {
-        const { batchId } = await request.json();
-        if (!batchId) {
-            return NextResponse.json({ message: 'El ID del lote es obligatorio.' }, { status: 400 });
-        }
+        const result = await db.runTransaction(async (transaction) => {
+            // 1. OBTENER Y VALIDAR EL DOCUMENTO DE HISTORIAL
+            const historyRef = db.collection('paymentHistory').doc(historyId);
+            const historyDoc = await transaction.get(historyRef);
 
-        const { firestore } = getFirebaseAdmin();
-        const batch = firestore.batch();
+            if (!historyDoc.exists) {
+                return { success: false, status: 404, message: 'No se encontró el registro de historial de carga.' };
+            }
 
-        // 1. OBTENER DATOS DEL LOTE A REVERTIR
-        const historyRef = firestore.collection('paymentHistory').doc(batchId);
-        const historyDoc = await historyRef.get();
+            const historyData = historyDoc.data()!;
+            const { 
+                programa, 
+                mesLiquidacion, 
+                anoLiquidacion, 
+                dnisProcesados = [], 
+                cantidadAusentes = 0 
+            } = historyData;
 
-        if (!historyDoc.exists) {
-            throw new Error('El lote de pago no fue encontrado.');
-        }
-
-        const { 
-            mesLiquidacion, 
-            anoLiquidacion, 
-            programa, 
-            dnisProcesados, 
-            cantidadAusentes 
-        } = historyDoc.data()!;
-
-        // FASE 1: ELIMINAR REGISTROS DE PAGO
-        // ------------------------------------
-
-        // Eliminar el historial principal
-        batch.delete(historyRef);
-
-        // Query para borrar los pagos en la colección central 'pagosRegistrados'
-        const paymentsQuery = firestore.collection('pagosRegistrados')
-            .where('mes', '==', mesLiquidacion)
-            .where('anio', '==', anoLiquidacion)
-            .where('programa', '==', programa);
-        
-        const paymentsSnapshot = await paymentsQuery.get();
-        paymentsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-
-        // FASE 2: REVERTIR ESTADO DE PARTICIPANTES
-        // ----------------------------------------
-
-        // Revertir a los que SÍ pagaron en este lote
-        if (dnisProcesados && dnisProcesados.length > 0) {
-            for (const dni of dnisProcesados) {
-                const participantQuery = firestore.collection('participants').where('dni', '==', dni);
-                const participantSnapshot = await participantQuery.get();
-                
-                if (!participantSnapshot.empty) {
-                    const participantDoc = participantSnapshot.docs[0];
-                    const participantRef = participantDoc.ref;
-
-                    // Para encontrar el nuevo "último pago", buscamos todos los pagos menos el que estamos borrando
-                    const allPaymentsQuery = firestore.collection('pagosRegistrados')
-                        .where('dni', '==', dni)
-                        .orderBy('anio', 'desc')
-                        .orderBy('mes', 'desc');
-
-                    const allPaymentsSnapshot = await allPaymentsQuery.get();
-                    
-                    // Filtramos el pago que se está revirtiendo
-                    const previousPayments = allPaymentsSnapshot.docs.filter(doc => {
-                        const data = doc.data();
-                        return !(data.mes === mesLiquidacion && data.anio === anoLiquidacion && data.programa === programa);
-                    });
-
-                    const newUltimoPago = previousPayments.length > 0 ? `${previousPayments[0].data().mes}/${previousPayments[0].data().anio}` : null;
-                    
-                    batch.update(participantRef, {
-                        pagosAcumulados: FieldValue.increment(-1),
-                        ultimoPago: newUltimoPago,
-                        estado: 'Activo', // Se asume que vuelve a estar activo
-                        mesAusencia: null
-                    });
+            // 2. ELIMINAR LOS REGISTROS DE PAGO INDIVIDUALES
+            const paymentsQuery = db.collection('pagosRegistrados')
+                .where('programa', '==', programa)
+                .where('mes', '==', mesLiquidacion)
+                .where('anio', '==', anoLiquidacion);
+            
+            const paymentsSnapshot = await transaction.get(paymentsQuery);
+            if (!paymentsSnapshot.empty) {
+                paymentsSnapshot.docs.forEach(doc => transaction.delete(doc.ref));
+            }
+            
+            // 3. REVERTIR EL ESTADO DE LOS PARTICIPANTES PAGADOS
+            // Para cada DNI en el lote, decrementamos su contador de pagos.
+            // No podemos saber con certeza su estado anterior, así que lo dejamos como está pero quitamos el pago.
+            if (dnisProcesados.length > 0) {
+                for (const dni of dnisProcesados) {
+                    const partQuery = db.collection('participants').where('dni', '==', dni).limit(1);
+                    const partSnapshot = await transaction.get(partQuery);
+                    if (!partSnapshot.empty) {
+                        const participantRef = partSnapshot.docs[0].ref;
+                        // Decrementa el contador de pagos del programa específico.
+                        transaction.update(participantRef, { 
+                            [`pagosPorPrograma.${programa}`]: FieldValue.increment(-1),
+                            // Opcional: Revertir 'ultimoPago' si es este el que se está borrando.
+                            // Esta lógica puede ser compleja si se cargan lotes fuera de orden.
+                            // Por ahora, solo decrementamos el contador, que es lo más seguro.
+                        });
+                    }
                 }
             }
-        }
 
-        // Revertir a los que quedaron como AUSENTES en este lote
-        if (cantidadAusentes > 0) {
-            const ausentesQuery = firestore.collection('participants')
-                .where('programa', '==', programa)
-                .where('estado', '==', 'Requiere Atención')
-                .where('mesAusencia', '==', `${require('@/lib/constants').MONTHS[parseInt(mesLiquidacion, 10) - 1]}/${anoLiquidacion}`);
+            // 4. REVERTIR EL ESTADO DE LOS PARTICIPANTES MARCADOS COMO AUSENTES
+            // Buscamos las novedades de POSIBLE_BAJA y revertimos el estado del participante.
+            if (cantidadAusentes > 0) {
+                const novedadesQuery = db.collection('novedades')
+                    .where('type', '==', 'POSIBLE_BAJA')
+                    .where('programa', '==', programa)
+                    .where('mesEvento', '==', mesLiquidacion)
+                    .where('anoEvento', '==', anoLiquidacion);
 
-            const ausentesSnapshot = await ausentesQuery.get();
-            ausentesSnapshot.forEach(doc => {
-                batch.update(doc.ref, {
-                    estado: 'Activo',
-                    mesAusencia: null
-                });
-            });
-        }
-        
-        // FASE 3: ELIMINAR NOVEDADES DE POSIBLE BAJA
-        // ------------------------------------------
+                const novedadesSnapshot = await transaction.get(novedadesQuery);
+                for (const doc of novedadesSnapshot.docs) {
+                    const novedadData = doc.data();
+                    const participantId = novedadData.participantId;
+                    if (participantId) {
+                        const participantRef = db.collection('participants').doc(participantId);
+                        // Lo volvemos a marcar como Activo y limpiamos el mes de ausencia.
+                        transaction.update(participantRef, { 
+                            estado: 'Activo',
+                            mesAusencia: FieldValue.delete()
+                        });
+                    }
+                    // Borramos la novedad de "posible baja".
+                    transaction.delete(doc.ref);
+                }
+            }
 
-        const novedadesQuery = firestore.collection('novedades')
-            .where('type', '==', 'POSIBLE_BAJA')
-            .where('mesEvento', '==', mesLiquidacion)
-            .where('anoEvento', '==', anoLiquidacion)
-            .where('programa', '==', programa);
-            
-        const novedadesSnapshot = await novedadesQuery.get();
-        novedadesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+            // 5. FINALMENTE, ELIMINAR EL DOCUMENTO DE HISTORIAL
+            transaction.delete(historyRef);
 
-        // EJECUTAR EL BATCH
-        await batch.commit();
+            return { success: true, status: 200, message: `Reversión completada. Se eliminaron ${paymentsSnapshot.size} pagos y se revirtieron ${cantidadAusentes} ausentes.` };
+        });
 
-        return NextResponse.json({ message: 'El lote de pago ha sido revertido con éxito, incluyendo estados de participantes y novedades.' });
+        return NextResponse.json(result, { status: result.status });
 
     } catch (error: any) {
-        console.error('[ERROR REVERT PAYMENT BATCH]', error);
-        return NextResponse.json({ message: `Error en el servidor: ${error.message}` }, { status: 500 });
+        console.error('Error al revertir el lote de pagos:', error);
+        return NextResponse.json({ success: false, message: `Error interno del servidor: ${error.message}` }, { status: 500 });
     }
 }

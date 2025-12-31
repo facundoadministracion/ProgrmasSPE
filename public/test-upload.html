@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Prueba de Subida de Archivo</title>
+  <script src="/__/firebase/9.6.1/firebase-app-compat.js"></script>
+  <script src="/__/firebase/9.6.1/firebase-storage-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+</head>
+<body>
+
+  <h2>Subir archivo de prueba a /uploads/</h2>
+  <input type="file" id="fileInput">
+  <button onclick="uploadFile()">Subir Archivo</button>
+  <p id="status"></p>
+
+  <script>
+    function uploadFile() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) {
+        document.getElementById('status').innerText = 'Por favor, selecciona un archivo.';
+        return;
+      }
+
+      // IMPORTANTE: El archivo se sube a la carpeta 'uploads' para activar la función.
+      const storageRef = firebase.storage().ref('uploads/' + file.name);
+      const task = storageRef.put(file);
+
+      task.on('state_changed',
+        function progress(snapshot) {
+          const percentage = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          document.getElementById('status').innerText = 'Subiendo: ' + percentage.toFixed(2) + '%';
+        },
+        function error(err) {
+          document.getElementById('status').innerText = 'Error al subir: ' + err.message;
+          console.error(err);
+        },
+        function complete() {
+          document.getElementById('status').innerText = '¡Archivo subido con éxito! Revisando registros de la función...';
+        }
+      );
+    }
+  </script>
+
+</body>
+</html>

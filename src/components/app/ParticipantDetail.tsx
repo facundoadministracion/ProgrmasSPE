@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import type { Participant, Novedad, PagoRegistrado } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
-import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, deleteDoc, deleteField } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Edit, Ban, CheckCircle, XCircle, History, FileText, Check, AlertTriangle, Pencil, FilePlus, Wallet, ArrowRightLeft, Trash2 } from 'lucide-react';
@@ -253,23 +253,59 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
   
   const handleReactivate = async () => {
     if (!firestore || !user || !reactivationData.month || !reactivationData.year) return;
-    const updatedParticipant: Partial<Participant> = { activo: true, estado: 'Activo', actoAdministrativo: reactivationData.decree || participant.actoAdministrativo };
     
     const partRef = doc(firestore, 'participants', participant.id);
-    await updateDoc(partRef, updatedParticipant);
+
+    // 1. Prepara la actualización para Firestore, eliminando los campos de la baja anterior.
+    const firestoreUpdate: { [key: string]: any } = {
+      activo: true,
+      estado: 'Activo',
+      motivoBaja: deleteField(),
+      fechaBaja: deleteField()
+    };
+
+    // Si se proporciona un decreto, lo añade. Si no, se asegura de que el campo se elimine.
+    if (reactivationData.decree) {
+      firestoreUpdate.actoAdministrativo = reactivationData.decree;
+    } else {
+      firestoreUpdate.actoAdministrativo = deleteField();
+    }
     
+    // 2. Ejecuta la actualización en la base de datos.
+    await updateDoc(partRef, firestoreUpdate);
+    
+    // 3. Crea la Novedad para el historial.
     const monthName = MONTHS[parseInt(reactivationData.month, 10) - 1];
     let descripcion = `Reactivación registrada para ${monthName} de ${reactivationData.year}.`;
     if(reactivationData.decree) descripcion += ` Decreto N°: ${reactivationData.decree}.`;
 
     const newNovedad: Omit<Novedad, 'id'> = {
-        participantId: participant.id, descripcion, type: 'REACTIVACION', mesEvento: reactivationData.month, anoEvento: reactivationData.year, 
-        actoAdministrativo: reactivationData.decree, fechaRealCarga: serverTimestamp(), ownerId: user.uid
+        participantId: participant.id,
+        descripcion,
+        type: 'REACTIVACION',
+        mesEvento: reactivationData.month,
+        anoEvento: reactivationData.year, 
+        actoAdministrativo: reactivationData.decree,
+        fechaRealCarga: serverTimestamp(),
+        ownerId: user.uid
     };
     
     const docRef = await addDoc(collection(firestore, 'novedades'), newNovedad);
     setHistory(prev => [{...newNovedad, id: docRef.id, fechaRealCarga: {seconds: Date.now()/1000}} as Novedad, ...prev]);
-    setParticipant(prev => ({...prev, ...updatedParticipant}));
+
+    // 4. Actualiza el estado local del participante para reflejar los cambios en la UI.
+    const updatedParticipantState = { ...participant };
+    updatedParticipantState.activo = true;
+    updatedParticipantState.estado = 'Activo';
+    delete updatedParticipantState.motivoBaja;
+    delete updatedParticipantState.fechaBaja;
+    if (reactivationData.decree) {
+      updatedParticipantState.actoAdministrativo = reactivationData.decree;
+    } else {
+      delete updatedParticipantState.actoAdministrativo;
+    }
+    setParticipant(updatedParticipantState as Participant);
+
     toast({ title: "Participante Reactivado" });
     setIsReactivateDialogOpen(false);
   }

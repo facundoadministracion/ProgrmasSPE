@@ -3,12 +3,12 @@
 import { onObjectFinalized, StorageEvent } from "firebase-functions/v2/storage";
 import { logger } from "firebase-functions";
 const csv = require('csv-parser');
-import { storage } from "./firebaseAdmin";
+import { storage, firestore } from "./firebaseAdmin"; // <-- MODIFICACIÓN
 
 /**
  * Procesa archivos CSV de pagos subidos a Cloud Storage.
  */
-export const processPaymentFile = onObjectFinalized({ region: "southamerica-east1", bucket: "gestion-de-programas-lr.firebasestorage.app" }, async (event: StorageEvent) => {
+export const processPaymentFile = onObjectFinalized({ region: "southamerica-east1", bucket: "gestion-de-programas-lr.appspot.com" }, async (event: StorageEvent) => {
   const { bucket: fileBucket, name: filePath, contentType } = event.data;
 
   // 1. Validar que sea un archivo CSV en la carpeta correcta
@@ -32,10 +32,48 @@ export const processPaymentFile = onObjectFinalized({ region: "southamerica-east
         logger.info("Fila de CSV leída:", data);
         results.push(data);
       })
-      .on('end', () => {
+      .on('end', async () => { // <-- MODIFICACIÓN: async
         logger.log(`Procesamiento de ${filePath} completado. ${results.length} filas leídas.`);
-        // Aquí iría la lógica para guardar los `results` en Firestore.
-        resolve();
+        
+        // --- INICIO DE LA LÓGICA AÑADIDA ---
+        if (results.length === 0) {
+          logger.log("El archivo CSV está vacío, no hay nada que guardar.");
+          resolve();
+          return;
+        }
+
+        const batch = firestore.batch();
+
+        results.forEach((row) => {
+          // Asumimos que estas son las columnas. Ajusta si es necesario.
+          const { participanteId, monto, fechaPago, programa, nroComprobante } = row;
+          
+          if (!participanteId || !monto || !fechaPago) {
+            logger.warn("Fila ignorada por tener datos faltantes:", row);
+            return; // Saltar esta fila
+          }
+
+          // Referencia al historial de pagos del participante
+          const paymentRef = firestore.collection('participants').doc(participanteId).collection('paymentHistory').doc();
+          
+          batch.set(paymentRef, {
+            amount: parseFloat(monto), // Convertir a número
+            paymentDate: new Date(fechaPago), // Convertir a fecha
+            program: programa || null,
+            receiptNumber: nroComprobante || null,
+            uploadTimestamp: new Date() // Añadir marca de tiempo de la subida
+          });
+        });
+        
+        try {
+          await batch.commit();
+          logger.log(`${results.length} registros de pago guardados en Firestore correctamente.`);
+          resolve();
+        } catch (error) {
+          logger.error("Error al ejecutar el lote de pagos:", error);
+          reject(error);
+        }
+        // --- FIN DE LA LÓGICA AÑADIDA ---
       })
       .on('error', (error: Error) => {
         logger.error(`Error al procesar el archivo ${filePath}:`, error);
