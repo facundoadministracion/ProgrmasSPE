@@ -42,6 +42,8 @@ export type Participant = {
   historialPagos?: string[]; // Array of "YYYY-MM"
   renovaciones?: string[]; // Array de actos de renovación
   historialProgramas?: { [key: string]: { fechaInicio: string; fechaFin: string; motivo?: string; actoAdministrativoBaja?: string; } };
+  motivoBaja?: string;
+  fechaBaja?: string;
 };
 
 export type Payment = {
