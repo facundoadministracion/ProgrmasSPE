@@ -19,6 +19,11 @@ const SessionManager = ({ children }: { children: React.ReactNode }) => {
   }, [signOut]);
 
   useEffect(() => {
+    // PREVENT this from running on the server
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     if (!user) return;
 
     let sessionTimeout: NodeJS.Timeout;
@@ -58,7 +63,7 @@ const SessionManager = ({ children }: { children: React.ReactNode }) => {
     events.forEach(event => window.addEventListener(event, resetTimers));
     startTimers();
 
-    // Exponer la función para que se pueda llamar desde el diálogo
+    // Expose the function for that it can be called from the dialog
     (window as any).handleStayLoggedIn = handleStayLoggedIn;
 
     return () => {

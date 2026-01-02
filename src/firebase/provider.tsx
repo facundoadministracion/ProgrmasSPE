@@ -60,6 +60,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   const servicesAvailable = !!(firebaseApp && firestore && auth);
 
   useEffect(() => {
+    // PREVENT onSnapshot from running on the server
+    if (typeof window === 'undefined') {
+      setUserAuthState({ user: null, isUserLoading: false, userError: null });
+      return;
+    }
+
     if (!auth || !servicesAvailable) {
       setUserAuthState({ user: null, isUserLoading: false, userError: new Error("Auth service not available.") });
       return;

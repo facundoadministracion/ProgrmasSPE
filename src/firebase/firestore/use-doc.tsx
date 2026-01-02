@@ -48,6 +48,12 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
+    // PREVENT onSnapshot from running on the server
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
+    
     if (!memoizedDocRef) {
       setData(null);
       setIsLoading(false);

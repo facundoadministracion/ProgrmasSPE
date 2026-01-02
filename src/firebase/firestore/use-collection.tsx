@@ -53,6 +53,12 @@ export function useCollection<T>(target: string | Target | null, options: UseCol
   }, [target, options.isCollectionGroup]);
 
   useEffect(() => {
+    // PREVENT onSnapshot from running on the server
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
+
     if (!memoizedTargetRefOrQuery) {
       setData([]);
       setIsLoading(false);

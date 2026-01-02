@@ -1,11 +1,10 @@
 // Importa las funciones que necesitas de los SDKs que necesitas
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import { getFunctions } from "firebase/functions";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { getFirestore, Firestore } from "firebase/firestore";
+import { getStorage, FirebaseStorage } from "firebase/storage";
+import { getFunctions, Functions } from "firebase/functions";
 
-// La configuración de tu proyecto Firebase
-// (Es seguro tenerla en el cliente, Firebase está diseñado para esto)
+// La configuracion de tu proyecto Firebase
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -15,14 +14,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Inicializa Firebase
-// Comprobamos si ya existe una app inicializada para evitar errores
+// Inicializa Firebase de forma segura para SSR
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Inicializa y exporta los servicios de Firebase que necesitas
-const db = getFirestore(app);
-const storage = getStorage(app);
-const functions = getFunctions(app, 'southamerica-east1');
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
+let functions: Functions | null = null;
 
-// Exporta las instancias para que puedan ser usadas en otras partes de tu aplicación
+// Solo inicializa los servicios del lado del cliente
+if (typeof window !== 'undefined') {
+  db = getFirestore(app);
+  storage = getStorage(app);
+  functions = getFunctions(app, 'southamerica-east1');
+}
+
+// Exporta las instancias para que puedan ser usadas en otras partes de tu aplicacion
+// En el servidor, db, storage, y functions seran null, lo cual es manejado
+// por los hooks que ya hemos corregido.
 export { app, db, storage, functions, firebaseConfig };

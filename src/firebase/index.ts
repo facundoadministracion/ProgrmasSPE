@@ -5,18 +5,25 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
+// IMPORTANTE: NO MODIFICAR ESTA FUNCIÓN
 export function initializeFirebase() {
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   return getSdks(app);
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  // Conecta a la base de datos por defecto (default)
+  const auth = getAuth(firebaseApp);
+  let firestore = null;
+
+  // Solo inicializa Firestore en el lado del cliente
+  if (typeof window !== 'undefined') {
+    firestore = getFirestore(firebaseApp);
+  }
+
   return {
     firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
+    auth,
+    firestore,
   };
 }
 
