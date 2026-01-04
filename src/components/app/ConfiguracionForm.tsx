@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,13 +35,13 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
     const db = useFirestore();
     const { toast } = useToast();
     
-    const getInitialMontos = () => {
+    const getInitialMontos = useCallback(() => {
         const initialState: MontosState = {};
         CATEGORIAS_TUTORIAS.forEach(cat => initialState[cat] = '');
         initialState[PROGRAMAS.JOVEN] = '';
         initialState[PROGRAMAS.TECNO] = '';
         return initialState;
-    }
+    }, []);
 
     const [montos, setMontos] = useState<MontosState>(getInitialMontos());
     const [mesVigencia, setMesVigencia] = useState<string>(String(new Date().getMonth() + 1));
@@ -50,6 +50,13 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
     const [isSaving, setIsSaving] = useState(false);
 
     const isEditMode = !!configToEdit;
+
+    const resetForm = useCallback(() => {
+        setMontos(getInitialMontos());
+        setActoAdministrativo('');
+        setMesVigencia(String(new Date().getMonth() + 1));
+        setAnoVigencia(String(currentYear));
+    }, [getInitialMontos]);
 
     useEffect(() => {
         if (configToEdit) {
@@ -67,7 +74,7 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
         } else {
             resetForm();
         }
-    }, [configToEdit]);
+    }, [configToEdit, getInitialMontos, resetForm]);
 
     const handleMontoChange = (name: string, value: string) => {
         const numericValue = value.replace(/[^0-9]/g, '');
@@ -133,13 +140,6 @@ const ConfiguracionForm: React.FC<ConfiguracionFormProps> = ({ onConfigSave, con
             setIsSaving(false);
         }
     };
-
-    const resetForm = () => {
-        setMontos(getInitialMontos());
-        setActoAdministrativo('');
-        setMesVigencia(String(new Date().getMonth() + 1));
-        setAnoVigencia(String(currentYear));
-    }
 
     const handleCancelEdit = () => {
         onFinishEditing();

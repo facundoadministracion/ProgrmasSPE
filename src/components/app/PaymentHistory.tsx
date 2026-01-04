@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { collectionGroup, getDocs, orderBy, query } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { useFirebase } from '@/firebase/provider'; // Correct hook for safe DB access
 import { es } from 'date-fns/locale';
 import { format } from 'date-fns';
 
@@ -26,6 +26,7 @@ const monthNames: { [key: string]: string } = {
 };
 
 export function PaymentHistory() {
+    const { firestore: db } = useFirebase(); // Get DB instance from context
     const [history, setHistory] = useState<PaymentHistoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,15 @@ export function PaymentHistory() {
     const fetchHistory = useCallback(async () => {
         setLoading(true);
         setError(null);
+
+        if (!db) {
+            // This check is now robust, as it waits for the provider.
+            const dbError = "La conexión con la base de datos no está disponible.";
+            setError(dbError);
+            setLoading(false); // Stop loading if db is not available
+            return;
+        }
+
         try {
             const q = query(collectionGroup(db, 'paymentHistory'), orderBy('fechaCarga', 'desc'));
             const querySnapshot = await getDocs(q);
@@ -57,7 +67,7 @@ export function PaymentHistory() {
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [db, toast]); // Added db to the dependency array
 
     useEffect(() => {
         fetchHistory();

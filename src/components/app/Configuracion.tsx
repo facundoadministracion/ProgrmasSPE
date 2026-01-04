@@ -1,10 +1,20 @@
 'use client';
 import React, { useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import ConfiguracionHistorial from './ConfiguracionHistorial';
-import ConfiguracionForm from './ConfiguracionForm';
-import UploadHistory from './UploadHistory'; // Changed to UploadHistory
+import UploadHistory from './UploadHistory';
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
+
+// Aplicamos la carga dinámica directamente al componente problemático.
+const ConfiguracionForm = dynamic(() => import('./ConfiguracionForm'), {
+    ssr: false, // La clave para evitar el error de compilación en el servidor.
+    loading: () => (
+        <div className="flex justify-center items-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    )
+});
 
 const Configuracion = () => {
     const [isFormOpen, setFormOpen] = useState(false);

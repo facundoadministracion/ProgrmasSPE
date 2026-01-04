@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Participant } from '@/lib/types';
 import { MONTHS, PROGRAMAS } from '@/lib/constants';
 import { getPaymentStatus } from '@/lib/logic';
@@ -48,14 +48,8 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
           (p.nombre.toLowerCase().includes(lower) || p.dni.includes(lower))
       );
   }, [searchTerm, participants]);
-
-  useEffect(() => {
-    if (selectedPerson) {
-        handleSelectPerson(selectedPerson, true);
-    }
-  }, [selectedMonth, selectedYear]);
-
-  const handleSelectPerson = async (p: Participant, isRecheck = false) => {
+  
+  const handleSelectPerson = useCallback(async (p: Participant, isRecheck = false) => {
       if (!firestore) return;
       
       if (!isRecheck) {
@@ -87,7 +81,13 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
           const rec = snapshot.docs[0].data();
           setDuplicateWarning(`¡Atención! Ya existe una planilla cargada para ${p.nombre} en ${MONTHS[selectedMonth]} ${selectedYear} por método: ${rec.metodo}.`);
       }
-  };
+  }, [firestore, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    if (selectedPerson) {
+        handleSelectPerson(selectedPerson, true);
+    }
+  }, [selectedMonth, selectedYear, handleSelectPerson, selectedPerson]);
 
   const handleSave = async () => {
       if(!selectedPerson || !firestore) return;

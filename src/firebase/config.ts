@@ -1,11 +1,9 @@
-// Importa las funciones que necesitas de los SDKs que necesitas
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore, Firestore } from "firebase/firestore";
-import { getStorage, FirebaseStorage } from "firebase/storage";
-import { getFunctions, Functions } from "firebase/functions";
+// /src/firebase/config.ts
 
-// La configuracion de tu proyecto Firebase
-const firebaseConfig = {
+// Este archivo ahora solo es responsable de construir y exportar el objeto de configuración de Firebase.
+// No se realiza ninguna inicialización aquí. Esto elimina los efectos secundarios globales y los conflictos de inicialización.
+
+export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -13,22 +11,3 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
-
-// Inicializa Firebase de forma segura para SSR
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
-let functions: Functions | null = null;
-
-// Solo inicializa los servicios del lado del cliente
-if (typeof window !== 'undefined') {
-  db = getFirestore(app);
-  storage = getStorage(app);
-  functions = getFunctions(app, 'southamerica-east1');
-}
-
-// Exporta las instancias para que puedan ser usadas en otras partes de tu aplicacion
-// En el servidor, db, storage, y functions seran null, lo cual es manejado
-// por los hooks que ya hemos corregido.
-export { app, db, storage, functions, firebaseConfig };

@@ -13,12 +13,10 @@ export function initializeFirebase() {
 
 export function getSdks(firebaseApp: FirebaseApp) {
   const auth = getAuth(firebaseApp);
-  let firestore = null;
-
-  // Solo inicializa Firestore en el lado del cliente
-  if (typeof window !== 'undefined') {
-    firestore = getFirestore(firebaseApp);
-  }
+  // Se elimina la comprobación `typeof window`.
+  // La inicialización ya está protegida para que solo se ejecute en el cliente
+  // por el hook `useMemo` en `FirebaseClientProvider`.
+  const firestore = getFirestore(firebaseApp);
 
   return {
     firebaseApp,

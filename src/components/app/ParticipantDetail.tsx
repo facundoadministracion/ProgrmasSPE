@@ -12,7 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import EditParticipantForm from './EditParticipantForm';
+import dynamic from 'next/dynamic';
+const EditParticipantForm = dynamic(() => import('./EditParticipantForm'), {
+    ssr: false,
+    loading: () => <div className="p-8 text-center">Cargando formulario...</div>
+});
 import BajaForm from './BajaForm';
 import { getAlertStatus } from '@/lib/logic';
 import { MONTHS, PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
@@ -662,7 +666,7 @@ const ParticipantDetail = ({ participant: initialParticipant, onBack }: { partic
         <DialogHeader>
             <DialogTitle>Traspaso de Programa</DialogTitle>
             <DialogDescription>
-                Mover a {participant.nombre} a un nuevo programa. El programa actual es "{participant.programa}".
+            Mover a {participant.nombre} a un nuevo programa. El programa actual es &quot;{participant.programa}&quot;.
                 Esta acción reactivará al participante si se encuentra de baja.
             </DialogDescription>
         </DialogHeader>

@@ -55,7 +55,7 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
     if (newDate !== formData.fechaIngreso) {
         handleUpdate('fechaIngreso', newDate);
     }
-  }, [ingresoMonth, ingresoYear, handleUpdate]);
+  }, [ingresoMonth, ingresoYear, handleUpdate, formData.fechaIngreso]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -14,6 +14,11 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     return initializeFirebase();
   }, []); // Empty dependency array ensures this runs only once on mount
 
+  // The check for services is removed. 
+  // The main FirebaseProvider is already designed to handle null services during SSR
+  // and wait for the client-side initialization.
+  // This resolves the infinite loading screen.
+
   return (
     <FirebaseProvider
       firebaseApp={firebaseServices.firebaseApp}

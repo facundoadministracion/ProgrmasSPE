@@ -84,7 +84,7 @@ export default function ImportarPagosPage() {
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Importar Pagos Históricos</CardTitle>
           <CardDescription>
-            Sube un archivo CSV para registrar pagos de forma masiva. Asegúrate que el archivo tenga las columnas: 'dni', 'programa', 'mes', 'anio'.
+            Sube un archivo CSV para registrar pagos de forma masiva. Asegúrate que el archivo tenga las columnas: &apos;dni&apos;, &apos;programa&apos;, &apos;mes&apos;, &apos;anio&apos;.
           </CardDescription>
         </CardHeader>
         <CardContent>
