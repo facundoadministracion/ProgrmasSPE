@@ -8,7 +8,7 @@ import { storage, firestore } from "./firebaseAdmin"; // <-- MODIFICACIÓN
 /**
  * Procesa archivos CSV de pagos subidos a Cloud Storage.
  */
-export const processPaymentFile = onObjectFinalized({ region: "southamerica-east1", bucket: "gestion-de-programas-lr.appspot.com" }, async (event: StorageEvent) => {
+export const processPaymentFile = onObjectFinalized(async (event: StorageEvent) => {
   const { bucket: fileBucket, name: filePath, contentType } = event.data;
 
   // 1. Validar que sea un archivo CSV en la carpeta correcta

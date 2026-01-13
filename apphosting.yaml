@@ -1,10 +1,5 @@
 run:
   build: npm run build
   start: npm start
-env:
-  - variable: FIREBASE_API_KEY
-    value: "AIzaSyAIAoyr8-zy0_TpU3jvXZ52e3Rfza_ViCc"
-  - variable: FIREBASE_AUTH_DOMAIN
-    value: "programas-de-empleo-lr.firebaseapp.com"
-  - variable: FIREBASE_PROJECT_ID
-    value: "programas-de-empleo-lr"
+backend:
+  serviceAccount: firebase-adminsdk-fbsvc@programas-de-empleo-lr.iam.gserviceaccount.com

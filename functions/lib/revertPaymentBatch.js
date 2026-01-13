@@ -8,8 +8,7 @@ const monthMapping = {
     "enero": "1", "febrero": "2", "marzo": "3", "abril": "4", "mayo": "5", "junio": "6",
     "julio": "7", "agosto": "8", "septiembre": "9", "octubre": "10", "noviembre": "11", "diciembre": "12"
 };
-exports.revertPaymentBatch = (0, https_1.onCall)({ region: "southamerica-east1", timeoutSeconds: 540 }, async (request) => {
-    firebase_functions_1.logger.log("Iniciando la reversión de lote con los siguientes datos:", request.data);
+exports.revertPaymentBatch = (0, https_1.onCall)({ timeoutSeconds: 540 }, async (request) => {    firebase_functions_1.logger.log("Iniciando la reversión de lote con los siguientes datos:", request.data);
     const { programa, mes, anio } = request.data;
     if (!programa || !mes || !anio) {
         firebase_functions_1.logger.error("Datos de entrada inválidos.", { programa, mes, anio });

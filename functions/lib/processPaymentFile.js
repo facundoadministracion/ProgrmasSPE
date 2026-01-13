@@ -8,8 +8,7 @@ const firebaseAdmin_1 = require("./firebaseAdmin"); // <-- MODIFICACIÓN
 /**
  * Procesa archivos CSV de pagos subidos a Cloud Storage.
  */
-exports.processPaymentFile = (0, storage_1.onObjectFinalized)({ region: "southamerica-east1", bucket: "gestion-de-programas-lr.appspot.com" }, async (event) => {
-    const { bucket: fileBucket, name: filePath, contentType } = event.data;
+exports.processPaymentFile = (0, storage_1.onObjectFinalized)(async (event) => {    const { bucket: fileBucket, name: filePath, contentType } = event.data;
     // 1. Validar que sea un archivo CSV en la carpeta correcta
     if (!contentType || !contentType.startsWith('text/csv') || !filePath || !filePath.startsWith('uploads/')) {
         firebase_functions_1.logger.log('El archivo no es un CSV o no está en /uploads. Se ignora.', { filePath, contentType });
