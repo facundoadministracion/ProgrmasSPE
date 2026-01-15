@@ -89,7 +89,7 @@ const SimplifiedUploadHistory = () => {
           const res = await fetch('/api/revert-payment-batch', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ batchId: selectedRecord.id }),
+              body: JSON.stringify({ historyId: selectedRecord.id }),
           });
 
           const data = await res.json();
