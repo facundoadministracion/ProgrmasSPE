@@ -5,7 +5,7 @@ import { Search, Upload, PlusCircle, AlertTriangle, XCircle, Loader2, ChevronLef
 
 import type { Participant, ParticipantFilter } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { PROGRAMAS } from '@/lib/constants';
+import { PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -47,25 +47,42 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     const paginatedParticipants = useMemo(() => {
         if (!participants) return { paginated: [], totalPages: 0, filteredCount: 0 };
 
-        let filtered = participants.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
+        // **MODIFICACIÓN:** Calcular pagos y alertas de antemano para un filtrado consistente.
+        const getParticipantPayments = (p: Participant) => {
+            if (!p.programa || !p.pagosPorPrograma) return 0;
+            return p.pagosPorPrograma[p.programa] || 0;
+        };
+        
+        const participantsWithDetails = participants.map(p => ({
+            ...p,
+            payments: getParticipantPayments(p),
+            alert: getAlertStatus(p),
+        }));
+
+        let filtered = participantsWithDetails.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
 
         if (activeFilter) {
-             const baseFilter = (p: Participant) => p.activo && (p.programa === PROGRAMAS.JOVEN || p.programa === PROGRAMAS.TECNO);
+             const relevantPrograms = [PROGRAMAS.EMPLEO_JOVEN, PROGRAMAS.TECNOEMPLEO];
+             const baseProgramFilter = (p: Participant) => p.programa && relevantPrograms.includes(p.programa);
+
              switch (activeFilter) {
                 case 'requiresAttention':
                     filtered = filtered.filter(p => p.estado === 'Requiere Atención');
                     break;
                 case 'ageAlert':
-                    filtered = filtered.filter(p => baseFilter(p) && getAlertStatus(p).msg.includes('Límite de Edad'));
+                    filtered = filtered.filter(p => p.alert.msg.includes('Límite de Edad'));
                     break;
+                // **MODIFICACIÓN:** Usar la lógica de alertas, más robusta.
                 case 'paymentDue':
-                    filtered = filtered.filter(p => baseFilter(p) && (p.pagosAcumulados === 5 || p.pagosAcumulados === 11));
+                    filtered = filtered.filter(p => baseProgramFilter(p) && p.alert.msg === ALERT_MESSAGES.PROXIMO_VENCIMIENTO);
                     break;
-                case 'payment6':
-                    filtered = filtered.filter(p => baseFilter(p) && p.pagosAcumulados === 6);
+                // **MODIFICACIÓN:** Implementar filtro para 'renewalRequired'.
+                case 'renewalRequired':
+                    filtered = filtered.filter(p => baseProgramFilter(p) && p.alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION && p.payments < 12);
                     break;
-                case 'payment12':
-                    filtered = filtered.filter(p => baseFilter(p) && p.pagosAcumulados === 12);
+                // **MODIFICACIÓN:** Implementar filtro para 'equipoTecnico'.
+                case 'equipoTecnico':
+                    filtered = filtered.filter(p => baseProgramFilter(p) && p.estado === 'Activo' && p.payments >= 12);
                     break;
             }
         }
@@ -80,13 +97,13 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
 
     const { paginated, totalPages, filteredCount } = paginatedParticipants;
 
-    const filterDescriptions: { [key in NonNullable<ParticipantFilter>]: string } = {
+    // **MODIFICACIÓN:** Añadir descripciones para los nuevos filtros.
+    const filterDescriptions: { [key: string]: string } = {
         requiresAttention: 'Requieren Atención',
         ageAlert: 'con Alerta de Edad',
-        paymentDue: 'Próximos a Vencer (5 o 11 pagos)',
-        payment6: 'con 6 Pagos (Continuidad)',
-        payment12: 'con 12 Pagos (Finalizados)',
-        paymentAlert: 'con Alerta de Pagos',
+        paymentDue: 'Próximos a Vencer',
+        renewalRequired: 'Requieren Continuidad',
+        equipoTecnico: 'Equipo Técnico (Activos con 12+ pagos)',
     };
 
     return (
@@ -119,7 +136,8 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={onBackToDashboard} className="text-yellow-800 hover:bg-yellow-200"><ArrowLeft className="mr-2 h-4 w-4"/> Volver al Resumen</Button>
+                        {/* **MODIFICACIÓN:** El botón ahora limpia el filtro, evitando el error de navegación. */}
+                        <Button variant="ghost" size="sm" onClick={onClearFilter} className="text-yellow-800 hover:bg-yellow-200"><ArrowLeft className="mr-2 h-4 w-4"/> Volver al Resumen</Button>
                         <Button variant="outline" size="sm" onClick={onClearFilter} className="bg-yellow-200 text-yellow-900 border-yellow-300 hover:bg-yellow-300"><XCircle className="mr-2 h-4 w-4"/> Quitar Filtro</Button>
                     </div>
                 </div>
@@ -137,7 +155,8 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                         </TableHeader>
                         <TableBody>
                             {paginated.map(p => {
-                                const alert = getAlertStatus(p);
+                                // La alerta ya está pre-calculada en `participantsWithDetails`
+                                const alert = p.alert;
                                 return (
                                     <TableRow key={p.id}>
                                         <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
