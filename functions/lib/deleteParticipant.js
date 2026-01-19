@@ -8,7 +8,7 @@ const firebaseAdmin_1 = require("./firebaseAdmin"); // Importa la instancia de D
  * Elimina un participante y todos sus datos asociados (pagos, novedades)
  * de forma atómica y segura.
  */
-exports.deleteParticipant = (0, https_1.onCall)(async (request) => {
+exports.deleteParticipant = (0, https_1.onCall)({ region: "southamerica-east1" }, async (request) => {
     // 1. Verificación de Autenticación y Rol
     if (!request.auth) {
         throw new https_1.HttpsError("unauthenticated", "La función solo puede ser utilizada por un usuario autenticado.");

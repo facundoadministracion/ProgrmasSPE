@@ -4,6 +4,7 @@ import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions'; // <-- AÑADIDO
 
 // IMPORTANTE: NO MODIFICAR ESTA FUNCIÓN
 export function initializeFirebase() {
@@ -13,15 +14,14 @@ export function initializeFirebase() {
 
 export function getSdks(firebaseApp: FirebaseApp) {
   const auth = getAuth(firebaseApp);
-  // Se elimina la comprobación `typeof window`.
-  // La inicialización ya está protegida para que solo se ejecute en el cliente
-  // por el hook `useMemo` en `FirebaseClientProvider`.
   const firestore = getFirestore(firebaseApp);
+  const functions = getFunctions(firebaseApp, 'southamerica-east1'); // <-- AÑADIDO
 
   return {
     firebaseApp,
     auth,
     firestore,
+    functions, // <-- AÑADIDO
   };
 }
 

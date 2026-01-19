@@ -1,20 +1,18 @@
-'use strict';
+import * as admin from 'firebase-admin';
 
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
+// SOLUCIÓN DEFINITIVA: Se incrusta el nombre del bucket directamente.
+// Esto elimina cualquier ambigüedad durante el proceso de despliegue.
+const BUCKET_NAME = "gestion-de-programas-lr.appspot.com";
 
-// Comprueba si la app de Admin ya está inicializada para evitar errores.
-if (getApps().length === 0) {
-  // Apunta al bucket de almacenamiento correcto y autogenerado por Firebase.
-  initializeApp({
-    storageBucket: 'gestion-de-programas-lr.firebasestorage.app'
+if (admin.apps.length === 0) {
+  admin.initializeApp({
+    // Pasamos el nombre del bucket explícitamente.
+    storageBucket: BUCKET_NAME,
   });
 }
 
-// Exporta los servicios de Firestore y Storage ya inicializados.
-const firestoreInstance = getFirestore();
+const db = admin.firestore();
+const storage = admin.storage();
 
-export const firestore = firestoreInstance;
-export const db = firestoreInstance; // Alias para compatibilidad hacia atrás
-export const storage = getStorage();
+// Exportar tanto el objeto admin completo como los servicios individuales
+export { admin, db, storage };

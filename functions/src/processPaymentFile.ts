@@ -3,12 +3,12 @@
 import { onObjectFinalized, StorageEvent } from "firebase-functions/v2/storage";
 import { logger } from "firebase-functions";
 const csv = require('csv-parser');
-import { storage, firestore } from "./firebaseAdmin"; // <-- MODIFICACIÓN
+import { storage, db as firestore } from "./firebaseAdmin";
 
 /**
  * Procesa archivos CSV de pagos subidos a Cloud Storage.
  */
-export const processPaymentFile = onObjectFinalized(async (event: StorageEvent) => {
+export const processPaymentFile = onObjectFinalized({ region: "southamerica-east1" }, async (event: StorageEvent) => {
   const { bucket: fileBucket, name: filePath, contentType } = event.data;
 
   // 1. Validar que sea un archivo CSV en la carpeta correcta

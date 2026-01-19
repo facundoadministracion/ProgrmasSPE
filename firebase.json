@@ -1,5 +1,4 @@
 {
-  "location": "southamerica-east1",
   "firestore": {
     "rules": "firestore.rules"
   },
@@ -10,12 +9,15 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "frameworksBackend": {
+      "region": "southamerica-east1"
+    },
     "rewrites": [
       {
         "source": "**",
         "function": {
           "functionId": "ssrgestiondeprogramaslr",
-          "region": "us-central1"
+          "region": "southamerica-east1"
         }
       }
     ]

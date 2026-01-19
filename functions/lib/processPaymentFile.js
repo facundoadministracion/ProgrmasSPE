@@ -4,11 +4,12 @@ exports.processPaymentFile = void 0;
 const storage_1 = require("firebase-functions/v2/storage");
 const firebase_functions_1 = require("firebase-functions");
 const csv = require('csv-parser');
-const firebaseAdmin_1 = require("./firebaseAdmin"); // <-- MODIFICACIÓN
+const firebaseAdmin_1 = require("./firebaseAdmin");
 /**
  * Procesa archivos CSV de pagos subidos a Cloud Storage.
  */
-exports.processPaymentFile = (0, storage_1.onObjectFinalized)(async (event) => {    const { bucket: fileBucket, name: filePath, contentType } = event.data;
+exports.processPaymentFile = (0, storage_1.onObjectFinalized)({ region: "southamerica-east1" }, async (event) => {
+    const { bucket: fileBucket, name: filePath, contentType } = event.data;
     // 1. Validar que sea un archivo CSV en la carpeta correcta
     if (!contentType || !contentType.startsWith('text/csv') || !filePath || !filePath.startsWith('uploads/')) {
         firebase_functions_1.logger.log('El archivo no es un CSV o no está en /uploads. Se ignora.', { filePath, contentType });
@@ -34,7 +35,7 @@ exports.processPaymentFile = (0, storage_1.onObjectFinalized)(async (event) => {
                 resolve();
                 return;
             }
-            const batch = firebaseAdmin_1.firestore.batch();
+            const batch = firebaseAdmin_1.db.batch();
             results.forEach((row) => {
                 // Asumimos que estas son las columnas. Ajusta si es necesario.
                 const { participanteId, monto, fechaPago, programa, nroComprobante } = row;
@@ -43,7 +44,7 @@ exports.processPaymentFile = (0, storage_1.onObjectFinalized)(async (event) => {
                     return; // Saltar esta fila
                 }
                 // Referencia al historial de pagos del participante
-                const paymentRef = firebaseAdmin_1.firestore.collection('participants').doc(participanteId).collection('paymentHistory').doc();
+                const paymentRef = firebaseAdmin_1.db.collection('participants').doc(participanteId).collection('paymentHistory').doc();
                 batch.set(paymentRef, {
                     amount: parseFloat(monto), // Convertir a número
                     paymentDate: new Date(fechaPago), // Convertir a fecha

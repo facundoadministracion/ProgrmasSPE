@@ -1,41 +1,39 @@
 import * as admin from 'firebase-admin';
-import { App, getApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
 
-// A function to lazily initialize Firebase Admin SDK.
-function getFirebaseAdmin() {
-  let app: App;
-
-  // Check if the app is already initialized to avoid re-initializing.
-  if (getApps().length === 0) {
-    // In a cloud environment (like App Hosting), service account credentials
-    // are automatically discovered. For local development, we load them from a file.
+// Función para inicializar la app de Firebase Admin. Es "lazy", solo se ejecuta si no hay apps inicializadas.
+const initializeAdmin = () => {
+  if (!admin.apps.length) {
     try {
-      // This will succeed in local dev if the serviceAccountKey.json file exists.
-      // Using eval('require') prevents the bundler from trying to package this sensitive file.
-      const serviceAccount = eval('require')('../serviceAccountKey.json');
-      app = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        // CORRECCIÓN: Se añade el bucket de almacenamiento para que App Hosting funcione.
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       });
-    } catch (e) {
-      // This branch is taken in the cloud environment (and during the build process).
-      // It initializes the app using the default credentials provided by the environment.
-      console.log('Initializing admin app with default Google Application Credentials');
-      app = admin.initializeApp();
+      console.log('Firebase Admin SDK inicializado correctamente.');
+    } catch (error: any) {
+      console.error('Error al inicializar Firebase Admin SDK:', error);
+      // Si el error es por duplicación de app (algo común en entornos de desarrollo), no relanzamos la excepción.
+      if (error.code !== 'app/duplicate-app') {
+        throw error;
+      }
     }
-  } else {
-    // If already initialized, get the existing app instance.
-    app = getApp();
   }
+};
 
-  // Return the initialized Firestore and Auth services.
+// Se llama a la inicialización al cargar el módulo.
+initializeAdmin();
+
+// FUNCIÓN RESTAURADA: Esta es la función que las rutas de la API esperan encontrar.
+export const getFirebaseAdmin = () => {
+  // La inicialización ya se ha hecho, así que solo devolvemos los servicios.
   return {
-    db: getFirestore(app),
-    auth: getAuth(app),
-    app: app
+    auth: admin.auth(),
+    db: admin.firestore(),
+    storage: admin.storage(),
   };
-}
+};
 
-// Export the lazy initialization function.
-export { getFirebaseAdmin };
+// EXPORTS RESTAURADOS: También exportamos las instancias directamente por si alguna parte del código las usa.
+export const adminAuth = admin.auth();
+export const adminDb = admin.firestore();
+export const adminStorage = admin.storage();
