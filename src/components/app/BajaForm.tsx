@@ -99,9 +99,9 @@ const BajaForm = ({
     <Dialog open={true} onOpenChange={onCancel}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Baja de Participante' : 'Registrar Baja de Participante'}</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar Baja de' : 'Registrar Baja para'} {participantName}</DialogTitle>
           <DialogDescription>
-            Estás gestionando la baja de <strong>{participantName}</strong>.
+            Completa el formulario para registrar el evento. Asegúrate de que el motivo y el período sean correctos.
           </DialogDescription>
         </DialogHeader>
 
