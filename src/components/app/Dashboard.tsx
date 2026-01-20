@@ -5,15 +5,12 @@ import { useFirestore } from '@/firebase';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { Users, DollarSign, AlertTriangle, UserCheck, UserPlus, UserX, Briefcase } from 'lucide-react';
 
-import type { Participant } from '@/lib/types';
+import type { Participant, ParticipantFilter } from '@/lib/types';
 import { PROGRAMAS, ALERT_MESSAGES, PROGRAM_LOGOS } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
-
-// Tipos
-type ParticipantFilter = 'requiresAttention' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'equipoTecnico';
 
 interface ProgramData {
     count: number;
@@ -51,7 +48,7 @@ const Dashboard = ({
 } : {
     participants: Participant[];
     participantsLoading: boolean;
-    onSetFilter: (filter: any) => void;
+    onSetFilter: (filter: ParticipantFilter | null) => void;
     onSelectParticipant: (participant: Participant) => void;
 }) => {
     const firestore = useFirestore();
@@ -135,35 +132,53 @@ const Dashboard = ({
     const { 
         attentionRequiredCount, 
         ageAlertCount, 
-        aVencerCount, 
+        paymentDueCount,
         renewalRequiredCount,
-        equipoTecnicoCount
+        finalizationCount
     } = useMemo(() => {
+        const allParticipants = participants || [];
+        const relevantPrograms: string[] = [PROGRAMAS.TECNO, PROGRAMAS.JOVEN];
+
         const getParticipantPayments = (p: Participant) => {
             if (!p.programa || !p.pagosPorPrograma) return 0;
             return p.pagosPorPrograma[p.programa] || 0;
         };
 
-        const allParticipantsWithDetails = (participants || []).map(p => ({ 
-            ...p, 
-            alert: getAlertStatus(p),
-            payments: getParticipantPayments(p)
-        }));
+        const activeRelevantParticipants = allParticipants.filter(p => 
+            p.activo && p.programa && relevantPrograms.includes(p.programa)
+        );
 
-        // **MODIFICACIÓN:** Filtrar participantes solo de los programas relevantes.
-        const relevantPrograms = [PROGRAMAS.TECNOEMPLEO, PROGRAMAS.EMPLEO_JOVEN];
-        const relevantParticipants = allParticipantsWithDetails.filter(p => p.programa && relevantPrograms.includes(p.programa));
+        const paymentDueCount = activeRelevantParticipants.filter(p => {
+            const payments = getParticipantPayments(p);
+            return payments === 5 || payments === 11;
+        }).length;
 
-        return {
-            attentionRequiredCount: allParticipantsWithDetails.filter(p => p.estado === 'Requiere Atención').length,
-            ageAlertCount: allParticipantsWithDetails.filter(p => p.alert.msg.includes('Límite de Edad')).length,
-            
-            // **MODIFICACIÓN:** Lógica aplicada sobre la lista filtrada.
-            aVencerCount: relevantParticipants.filter(p => p.alert.msg === ALERT_MESSAGES.PROXIMO_VENCIMIENTO).length,
-            renewalRequiredCount: relevantParticipants.filter(p => p.alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION && p.payments < 12).length,
-            
-            // **MODIFICACIÓN:** Nueva lógica para Equipo Técnico.
-            equipoTecnicoCount: relevantParticipants.filter(p => p.estado === 'Activo' && p.payments >= 12).length,
+        const renewalRequiredCount = allParticipants.filter(p => {
+            const payments = getParticipantPayments(p);
+            const isInRelevantProgram = p.programa && relevantPrograms.includes(p.programa);
+            const requiresRenewal = payments === 6 || payments === 12;
+            return isInRelevantProgram && requiresRenewal && p.estado !== 'Baja';
+        }).length;
+        
+        const finalizationCount = activeRelevantParticipants.filter(p => {
+            const payments = getParticipantPayments(p);
+            return payments > 12;
+        }).length;
+
+        const attentionRequiredCount = allParticipants.filter(p => p.estado === 'Requiere Atención').length;
+
+        const ageAlertCount = allParticipants.filter(p => {
+            if (!p.activo) return false;
+            const alert = getAlertStatus(p);
+            return alert.msg.includes('Límite de Edad');
+        }).length;
+
+        return { 
+            attentionRequiredCount, 
+            ageAlertCount, 
+            paymentDueCount, 
+            renewalRequiredCount, 
+            finalizationCount 
         };
     }, [participants]);
 
@@ -187,17 +202,16 @@ const Dashboard = ({
             />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="yellow" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
-            <DashboardCard title="Próximos a Vencer" value={aVencerCount} icon={DollarSign} color="yellow" subtitle="A 1 pago de necesitar renovación" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
-            <DashboardCard title="Requieren Continuidad" value={renewalRequiredCount} icon={UserPlus} color="green" subtitle="Necesitan acto de renovación" isLoading={participantsLoading} onClick={() => onSetFilter('renewalRequired')} actionText="Ver Lista" />
-            {/* **MODIFICACIÓN:** Tarjeta renombrada y con nueva lógica */}
+            <DashboardCard title="Próximos a Vencer" value={paymentDueCount} icon={DollarSign} color="yellow" subtitle="5 u 11 pagos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
+            <DashboardCard title="Requieren Continuidad" value={renewalRequiredCount} icon={UserPlus} color="green" subtitle="6 o 12 pagos" isLoading={participantsLoading} onClick={() => onSetFilter('renewalRequired')} actionText="Ver Lista" />
             <DashboardCard 
-                title="Equipo Técnico" 
-                value={equipoTecnicoCount} 
-                icon={Briefcase} 
+                title="A Finalizar" 
+                value={finalizationCount} 
+                icon={UserX}
                 color="blue" 
-                subtitle="Activos con 12 pagos o más" 
+                subtitle="Más de 12 pagos"
                 isLoading={participantsLoading} 
-                onClick={() => onSetFilter('equipoTecnico')} 
+                onClick={() => onSetFilter('finalization')} 
                 actionText="Ver Lista" 
             />
         </div>

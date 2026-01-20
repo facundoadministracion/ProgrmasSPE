@@ -4,7 +4,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import dynamicImport from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useUser, useCollection, useFirebase } from '@/firebase';
-import { writeBatch, doc, collection, serverTimestamp } from 'firebase/firestore';
+import { writeBatch, doc, collection, serverTimestamp, query } from 'firebase/firestore';
+import { useForceRefreshStore } from '@/store/force-refresh-store';
 
 // --- PROVEEDOR ESTÁTICO (CORRECCIÓN DEL ERROR DE CARGA INFINITA) ---
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -48,8 +49,14 @@ function AppContent() {
     const router = useRouter();
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const { refreshId } = useForceRefreshStore();
     
-    const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(user ? 'participants' : null);
+    const participantsQuery = useMemo(() => {
+        if (!user || !firestore) return null;
+        return query(collection(firestore, 'participants'));
+    }, [user, firestore, refreshId]);
+
+    const { data: participants, isLoading: participantsLoading } = useCollection<Participant>(participantsQuery);
     const { data: userRoles, isLoading: usersLoading } = useCollection<UserRole>(user ? 'users' : null);
 
     useEffect(() => {
@@ -80,7 +87,7 @@ function AppContent() {
     const handleSelectParticipant = (participant: Participant | 'new' | null) => setSelectedParticipant(participant);
     const handleOpenParticipantWizard = () => setParticipantWizardOpen(true);
     const handleCloseParticipantWizard = () => setParticipantWizardOpen(false);
-    const handleSetFilter = (filter: ParticipantFilter, searchTerm?: string) => {
+    const handleSetFilter = (filter: ParticipantFilter | null, searchTerm?: string) => {
         setActiveFilter(filter);
         setActiveTab('participantes');
         if (searchTerm) setInitialSearchTerm(searchTerm);

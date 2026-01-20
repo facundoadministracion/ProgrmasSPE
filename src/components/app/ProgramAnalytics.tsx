@@ -12,11 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useConfiguracion } from '@/hooks/useConfiguracion';
-import { useForceRefreshStore } from '@/store/force-refresh-store'; // Importar el store
+import { useForceRefreshStore } from '@/store/force-refresh-store';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
-const Card = ({ title, value, icon: Icon, subtitle, isLoading }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean }) => (
-    <UICard>
+const Card = ({ title, value, icon: Icon, subtitle, isLoading, onClick }: { title: string, value: string | number, icon: React.ElementType, subtitle: string, isLoading?: boolean, onClick?: () => void }) => (
+    <UICard onClick={onClick} className={onClick ? 'cursor-pointer hover:bg-gray-50' : ''}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="h-4 w-4 text-muted-foreground" />
@@ -39,7 +39,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const { firestore } = useFirebase();
   const { findConfigForDate, isLoading: configLoading } = useConfiguracion();
-  const { refreshId } = useForceRefreshStore(); // Obtener el ID de actualización
+  const { refreshId } = useForceRefreshStore();
 
   const [paymentData, setPaymentData] = useState<ProcessedPaymentData | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(true);
@@ -82,7 +82,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
     };
 
     fetchLatestLiquidation();
-  }, [firestore, programName, refreshId]); // Añadir refreshId como dependencia
+  }, [firestore, programName, refreshId]);
 
   useEffect(() => {
     const fetchPaymentData = async () => {
@@ -143,7 +143,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
 
     fetchPaymentData();
 
-  }, [firestore, programName, month, year, refreshId]); // Añadir refreshId como dependencia
+  }, [firestore, programName, month, year, refreshId]);
 
   const novedadesRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -152,7 +152,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
         where('mesEvento', '==', String(parseInt(month) + 1)), 
         where('anoEvento', '==', year)
     );
-  }, [firestore, year, month, refreshId]); // Añadir refreshId como dependencia
+  }, [firestore, year, month, refreshId]);
 
   const { data: allNovedades, isLoading: novedadesLoading } = useCollection<Novedad>(novedadesRef);
 
@@ -160,25 +160,30 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
     const programParticipants = participants.filter(p => p.programa === programName);
     const m = parseInt(month);
     const y = parseInt(year);
+
     const getRefDate = (p: Participant): Date | null => {
         if (p.fechaIngreso) return new Date(p.fechaIngreso + 'T00:00:00');
         if (typeof p.fechaAlta === 'string') return new Date(p.fechaAlta);
         if (p.fechaAlta && 'seconds' in p.fechaAlta) return new Date((p.fechaAlta as any).seconds * 1000);
         return null; 
     };
+
     const altas = programParticipants.filter(p => {
         const d = getRefDate(p);
         if(!d) return false;
         return d.getMonth() === m && d.getFullYear() === y;
     });
+
     const bajasNovedades = (allNovedades || []).filter(n => {
         const isThisProgram = programParticipants.some(p => p.id === n.participantId);
         const isBaja = n.descripcion.toLowerCase().includes('baja');
         return isThisProgram && isBaja;
     });
+
     const equipoTecnico = programParticipants.filter(p => p.esEquipoTecnico).length;
+
     return { altas, bajasNovedades, equipoTecnico };
-  }, [programName, participants, allNovedades, month, year]);
+  }, [programName, participants, allNovedades, month, year, refreshId]);
 
   const handleParticipantSelect = (dni: string) => {
     const participant = participants.find(p => p.dni === dni);
@@ -202,13 +207,13 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
                   </Select>
                   <Select value={year} onValueChange={setYear}>
                       <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                      <SelectContent>{[2023, 2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                   </Select>
               </div>
           </div>
           <h2 className="text-2xl font-bold text-gray-800">Análisis: {programName}</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card 
                   title="Liquidado en Mes Seleccionado"
                   value={(paymentData?.totalMonto || 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
@@ -218,6 +223,7 @@ const ProgramAnalytics = ({ programName, participants, onBack, onSelectParticipa
               />
               <Card title="Altas del Mes" value={analytics.altas.length} icon={UserPlus} subtitle={`En ${selectedMonthName}`} />
               <Card title="Bajas del Mes" value={analytics.bajasNovedades.length} icon={UserMinus} subtitle="Registradas en novedades" isLoading={novedadesLoading}/>
+              <Card title="Integrantes del Equipo Técnico" value={analytics.equipoTecnico} icon={Users} subtitle="Rol específico en el programa" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

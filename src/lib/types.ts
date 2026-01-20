@@ -129,4 +129,4 @@ export type PagoRegistrado = {
   fechaDeCarga: any;
 }
 
-export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'payment6' | 'payment12' | null;
+export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'finalization' | null;

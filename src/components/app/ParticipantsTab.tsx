@@ -5,7 +5,7 @@ import { Search, Upload, PlusCircle, AlertTriangle, XCircle, Loader2, ChevronLef
 
 import type { Participant, ParticipantFilter } from '@/lib/types';
 import { getAlertStatus } from '@/lib/logic';
-import { PROGRAMAS, ALERT_MESSAGES } from '@/lib/constants';
+import { PROGRAMAS } from '@/lib/constants';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -20,7 +20,7 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     onOpenParticipantWizard: () => void,
     initialSearchTerm?: string,
     onSearchHandled?: () => void,
-    activeFilter: ParticipantFilter,
+    activeFilter: ParticipantFilter | null,
     onClearFilter: () => void,
     onBackToDashboard: () => void,
 }) => {
@@ -47,7 +47,6 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
     const paginatedParticipants = useMemo(() => {
         if (!participants) return { paginated: [], totalPages: 0, filteredCount: 0 };
 
-        // **MODIFICACIÓN:** Calcular pagos y alertas de antemano para un filtrado consistente.
         const getParticipantPayments = (p: Participant) => {
             if (!p.programa || !p.pagosPorPrograma) return 0;
             return p.pagosPorPrograma[p.programa] || 0;
@@ -62,27 +61,24 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
         let filtered = participantsWithDetails.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
 
         if (activeFilter) {
-             const relevantPrograms = [PROGRAMAS.EMPLEO_JOVEN, PROGRAMAS.TECNOEMPLEO];
-             const baseProgramFilter = (p: Participant) => p.programa && relevantPrograms.includes(p.programa);
+             const relevantPrograms: string[] = [PROGRAMAS.TECNO, PROGRAMAS.JOVEN];
+             const baseProgramFilter = (p: any) => p.programa && relevantPrograms.includes(p.programa);
 
              switch (activeFilter) {
                 case 'requiresAttention':
                     filtered = filtered.filter(p => p.estado === 'Requiere Atención');
                     break;
                 case 'ageAlert':
-                    filtered = filtered.filter(p => p.alert.msg.includes('Límite de Edad'));
+                    filtered = filtered.filter(p => p.activo && p.alert.msg.includes('Límite de Edad'));
                     break;
-                // **MODIFICACIÓN:** Usar la lógica de alertas, más robusta.
                 case 'paymentDue':
-                    filtered = filtered.filter(p => baseProgramFilter(p) && p.alert.msg === ALERT_MESSAGES.PROXIMO_VENCIMIENTO);
+                    filtered = filtered.filter(p => p.activo && baseProgramFilter(p) && (p.payments === 5 || p.payments === 11));
                     break;
-                // **MODIFICACIÓN:** Implementar filtro para 'renewalRequired'.
                 case 'renewalRequired':
-                    filtered = filtered.filter(p => baseProgramFilter(p) && p.alert.msg === ALERT_MESSAGES.REQUIERE_AUTORIZACION && p.payments < 12);
+                    filtered = filtered.filter(p => baseProgramFilter(p) && (p.payments === 6 || p.payments === 12) && p.estado !== 'Baja');
                     break;
-                // **MODIFICACIÓN:** Implementar filtro para 'equipoTecnico'.
-                case 'equipoTecnico':
-                    filtered = filtered.filter(p => baseProgramFilter(p) && p.estado === 'Activo' && p.payments >= 12);
+                case 'finalization':
+                    filtered = filtered.filter(p => p.activo && baseProgramFilter(p) && p.payments > 12);
                     break;
             }
         }
@@ -97,13 +93,12 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
 
     const { paginated, totalPages, filteredCount } = paginatedParticipants;
 
-    // **MODIFICACIÓN:** Añadir descripciones para los nuevos filtros.
     const filterDescriptions: { [key: string]: string } = {
         requiresAttention: 'Requieren Atención',
         ageAlert: 'con Alerta de Edad',
-        paymentDue: 'Próximos a Vencer',
-        renewalRequired: 'Requieren Continuidad',
-        equipoTecnico: 'Equipo Técnico (Activos con 12+ pagos)',
+        paymentDue: 'Próximos a Vencer (5 u 11 pagos)',
+        renewalRequired: 'Requieren Continuidad (6 o 12 pagos)',
+        finalization: 'A Finalizar (más de 12 pagos)',
     };
 
     return (
@@ -136,7 +131,6 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* **MODIFICACIÓN:** El botón ahora limpia el filtro, evitando el error de navegación. */}
                         <Button variant="ghost" size="sm" onClick={onClearFilter} className="text-yellow-800 hover:bg-yellow-200"><ArrowLeft className="mr-2 h-4 w-4"/> Volver al Resumen</Button>
                         <Button variant="outline" size="sm" onClick={onClearFilter} className="bg-yellow-200 text-yellow-900 border-yellow-300 hover:bg-yellow-300"><XCircle className="mr-2 h-4 w-4"/> Quitar Filtro</Button>
                     </div>
@@ -150,31 +144,23 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead>Programa</TableHead>
-                                <TableHead>Estado</TableHead><TableHead>Mes Ausencia</TableHead><TableHead>Acciones</TableHead>
+                                <TableHead>Estado</TableHead><TableHead className="text-center">Pagos</TableHead><TableHead>Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {paginated.map(p => {
-                                // La alerta ya está pre-calculada en `participantsWithDetails`
                                 const alert = p.alert;
                                 return (
                                     <TableRow key={p.id}>
                                         <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
-                                        <TableCell>
-                                            <span className="block text-sm">{p.programa}</span>
-                                            {p.esEquipoTecnico ? (
-                                                <Badge variant="indigo">Equipo Técnico</Badge>
-                                            ) : p.programa === PROGRAMAS.TUTORIAS ? (
-                                                <span className="text-xs text-gray-400">{p.categoria}</span>
-                                            ) : null}
-                                        </TableCell>
+                                        <TableCell><Badge variant="outline">{p.programa}</Badge></TableCell>
                                         <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
-                                        <TableCell className="text-sm">{p.estado === 'Requiere Atención' ? p.mesAusencia || 'N/A' : '-'}</TableCell>
+                                        <TableCell className="text-center"><Badge>{p.payments}</Badge></TableCell>
                                         <TableCell><Button variant="link" size="sm" onClick={() => onSelect(p)}>Ver Legajo</Button></TableCell>
                                     </TableRow>
                                 )
                             })}
-                            {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados.</TableCell></TableRow>}
+                            {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados para el filtro actual.</TableCell></TableRow>}
                         </TableBody>
                     </Table>
                     {totalPages > 1 && (
