@@ -1,0 +1,32 @@
+# Descripción General del Proyecto
+
+Esta aplicación es una herramienta interna de gestión diseñada para administrar y monitorear a los participantes de diversos programas sociales y de empleo. Permite a los administradores tener una visión clara y actualizada del estado de los participantes, sus pagos y su ciclo de vida dentro de los programas.
+
+## Componentes Principales
+
+### 1. Dashboard Principal (`Dashboard.tsx`)
+
+El Dashboard es la vista central de la aplicación y proporciona una visión de alto nivel del estado de los programas a través de varias tarjetas interactivas:
+
+- **Total Padrón Liquidado**: Muestra el número total de participantes liquidados y el monto total correspondiente.
+- **Requiere Atención**: Participantes que tienen alguna alerta o inconsistencia en sus datos.
+- **Alerta de Edad**: Participantes que han alcanzado el límite de edad para el programa en el que se encuentran.
+- **Próximos a Vencer**: Participantes que han recibido 5 u 11 pagos y están cerca de un punto de renovación o finalización.
+- **A Finalizar**: Participantes que han superado los 12 pagos y cuyo ciclo en el programa debe concluir.
+- **Liquidación Mensual**: Tarjetas individuales por programa que muestran el último recuento y monto liquidado, con la opción de ver un análisis detallado.
+
+### 2. Análisis de Continuidad (`ContinuityView.tsx`)
+
+Esta es una vista especializada que se activa al hacer clic en la tarjeta **"Requieren Continuidad"** del dashboard. Su objetivo es proporcionar herramientas específicas para gestionar a los participantes que han completado 6 o 12 pagos y son elegibles para una renovación.
+
+#### Características Clave:
+
+- **Tarjetas de Resumen**: Cuatro tarjetas que desglosan el número de participantes por programa (Empleo Joven, Tecnoempleo) y por cantidad de pagos (6 o 12).
+- **Exportación a CSV**: Cada tarjeta de resumen tiene un botón para exportar la lista filtrada de participantes a un archivo CSV. El archivo incluye detalles como Nombre, DNI, Programa, Departamento y Edad.
+- **Vista Previa Detallada**: Permite abrir una nueva pestaña con una vista previa limpia y formateada de la lista de participantes. Esta vista previa incluye:
+    - Una tabla con los detalles de los participantes (incluida la edad).
+    - Un cuadro de resumen que agrupa a los participantes por departamento, ordenado de mayor a menor para una fácil priorización.
+    - La vista previa adapta su apariencia (tema claro u oscuro) para coincidir con el tema actual de la aplicación.
+- **Navegación Fluida**: Un botón para "Volver al Resumen" permite al usuario regresar fácilmente al dashboard principal.
+
+Este flujo de trabajo permite a los administradores identificar rápidamente a los participantes que necesitan una acción de continuidad, analizar los datos y exportarlos para su procesamiento externo de una manera eficiente y amigable.
