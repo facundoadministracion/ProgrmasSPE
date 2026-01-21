@@ -145,38 +145,38 @@ const PreviewLayout = ({ title, participants, departmentSummary, themeClassName 
     </html>
 );
 
-const ContinuityView = ({ participants, onBack, onSelectParticipant }: { participants: Participant[], onBack: () => void, onSelectParticipant: (participantId: string) => void }) => {
+const UpcomingRenewalView = ({ participants, onBack, onSelectParticipant }: { participants: Participant[], onBack: () => void, onSelectParticipant: (participantId: string) => void }) => {
 
-    const continuityParticipants = useMemo(() => {
+    const upcomingRenewalParticipants = useMemo(() => {
         const relevantPrograms: string[] = [PROGRAMAS.TECNO, PROGRAMAS.JOVEN];
         return participants.filter(p => {
             const payments = getParticipantPayments(p);
             const isInRelevantProgram = p.programa && relevantPrograms.includes(p.programa);
-            const requiresRenewal = payments === 6 || payments === 12;
-            return isInRelevantProgram && requiresRenewal && p.estado !== 'Baja';
+            const isUpcomingRenewal = payments === 5 || payments === 11;
+            return isInRelevantProgram && isUpcomingRenewal && p.estado !== 'Baja';
         }).sort((a, b) => a.nombre.localeCompare(b.nombre));
     }, [participants]);
 
     const summary = useMemo(() => {
         const data = {
-            joven6: { count: 0, participants: [] as Participant[] },
-            joven12: { count: 0, participants: [] as Participant[] },
-            tecno6: { count: 0, participants: [] as Participant[] },
-            tecno12: { count: 0, participants: [] as Participant[] },
+            joven5: { count: 0, participants: [] as Participant[] },
+            joven11: { count: 0, participants: [] as Participant[] },
+            tecno5: { count: 0, participants: [] as Participant[] },
+            tecno11: { count: 0, participants: [] as Participant[] },
         };
 
-        continuityParticipants.forEach(p => {
+        upcomingRenewalParticipants.forEach(p => {
             const payments = getParticipantPayments(p);
             if (p.programa === PROGRAMAS.JOVEN) {
-                if (payments === 6) { data.joven6.participants.push(p); data.joven6.count++; }
-                else if (payments === 12) { data.joven12.participants.push(p); data.joven12.count++; }
+                if (payments === 5) { data.joven5.participants.push(p); data.joven5.count++; }
+                else if (payments === 11) { data.joven11.participants.push(p); data.joven11.count++; }
             } else if (p.programa === PROGRAMAS.TECNO) {
-                if (payments === 6) { data.tecno6.participants.push(p); data.tecno6.count++; }
-                else if (payments === 12) { data.tecno12.participants.push(p); data.tecno12.count++; }
+                if (payments === 5) { data.tecno5.participants.push(p); data.tecno5.count++; }
+                else if (payments === 11) { data.tecno11.participants.push(p); data.tecno11.count++; }
             }
         });
         return data;
-    }, [continuityParticipants]);
+    }, [upcomingRenewalParticipants]);
 
     const triggerPreview = (title: string, participants: Participant[]) => {
         const departmentSummary = participants.reduce((acc, p) => {
@@ -202,16 +202,16 @@ const ContinuityView = ({ participants, onBack, onSelectParticipant }: { partici
     };
 
     const SummaryCard = ({ title, count, onExport, onPreview, disabled }: { title: string, count: number, onExport: () => void, onPreview: () => void, disabled: boolean }) => (
-        <Card className="p-4 flex flex-col justify-between border-l-4 border-green-500">
+        <Card className="p-4 flex flex-col justify-between border-l-4 border-yellow-500">
             <div>
                 <h3 className="text-lg font-semibold text-gray-700">{title}</h3>
                 <p className="text-3xl font-bold text-gray-800">{count}</p>
             </div>
             <div className="flex items-center gap-2 mt-4">
-                 <Button variant="outline" size="sm" onClick={onExport} disabled={disabled} className="w-full text-gray-700 border-gray-300 hover:bg-green-500 hover:text-white">
+                 <Button variant="outline" size="sm" onClick={onExport} disabled={disabled} className="w-full text-gray-700 border-gray-300 hover:bg-yellow-500 hover:text-white">
                     <Download className="mr-2 h-4 w-4" />Exportar
                 </Button>
-                <Button variant="outline" size="sm" onClick={onPreview} disabled={disabled} className="w-full text-gray-700 border-gray-300 hover:bg-green-500 hover:text-white">
+                <Button variant="outline" size="sm" onClick={onPreview} disabled={disabled} className="w-full text-gray-700 border-gray-300 hover:bg-yellow-500 hover:text-white">
                     <Eye className="mr-2 h-4 w-4" />Vista Previa
                 </Button>
             </div>
@@ -221,38 +221,38 @@ const ContinuityView = ({ participants, onBack, onSelectParticipant }: { partici
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Análisis de Continuidad</h2>
+                <h2 className="text-2xl font-bold text-gray-800">Análisis de Próximos a Vencer</h2>
                 <Button variant="ghost" onClick={onBack}><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Resumen</Button>
             </div>
             
             <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6")}>
                 <SummaryCard 
-                    title={`${PROGRAMAS.JOVEN} - 6 Pagos`} 
-                    count={summary.joven6.count} 
-                    onExport={() => exportToCSV(summary.joven6.participants, 'empleo_joven_6_pagos.csv')} 
-                    onPreview={() => triggerPreview(`${PROGRAMAS.JOVEN} - 6 Pagos`, summary.joven6.participants)}
-                    disabled={summary.joven6.count === 0} 
+                    title={`${PROGRAMAS.JOVEN} - 5 Pagos`} 
+                    count={summary.joven5.count} 
+                    onExport={() => exportToCSV(summary.joven5.participants, 'empleo_joven_5_pagos.csv')} 
+                    onPreview={() => triggerPreview(`${PROGRAMAS.JOVEN} - 5 Pagos`, summary.joven5.participants)}
+                    disabled={summary.joven5.count === 0} 
                 />
                 <SummaryCard 
-                    title={`${PROGRAMAS.JOVEN} - 12 Pagos`} 
-                    count={summary.joven12.count} 
-                    onExport={() => exportToCSV(summary.joven12.participants, 'empleo_joven_12_pagos.csv')} 
-                    onPreview={() => triggerPreview(`${PROGRAMAS.JOVEN} - 12 Pagos`, summary.joven12.participants)}
-                    disabled={summary.joven12.count === 0} 
+                    title={`${PROGRAMAS.JOVEN} - 11 Pagos`} 
+                    count={summary.joven11.count} 
+                    onExport={() => exportToCSV(summary.joven11.participants, 'empleo_joven_11_pagos.csv')} 
+                    onPreview={() => triggerPreview(`${PROGRAMAS.JOVEN} - 11 Pagos`, summary.joven11.participants)}
+                    disabled={summary.joven11.count === 0} 
                 />
                 <SummaryCard 
-                    title={`${PROGRAMAS.TECNO} - 6 Pagos`} 
-                    count={summary.tecno6.count} 
-                    onExport={() => exportToCSV(summary.tecno6.participants, 'tecnoempleo_6_pagos.csv')} 
-                    onPreview={() => triggerPreview(`${PROGRAMAS.TECNO} - 6 Pagos`, summary.tecno6.participants)}
-                    disabled={summary.tecno6.count === 0} 
+                    title={`${PROGRAMAS.TECNO} - 5 Pagos`} 
+                    count={summary.tecno5.count} 
+                    onExport={() => exportToCSV(summary.tecno5.participants, 'tecnoempleo_5_pagos.csv')} 
+                    onPreview={() => triggerPreview(`${PROGRAMAS.TECNO} - 5 Pagos`, summary.tecno5.participants)}
+                    disabled={summary.tecno5.count === 0} 
                 />
                 <SummaryCard 
-                    title={`${PROGRAMAS.TECNO} - 12 Pagos`} 
-                    count={summary.tecno12.count} 
-                    onExport={() => exportToCSV(summary.tecno12.participants, 'tecnoempleo_12_pagos.csv')} 
-                    onPreview={() => triggerPreview(`${PROGRAMAS.TECNO} - 12 Pagos`, summary.tecno12.participants)}
-                    disabled={summary.tecno12.count === 0} 
+                    title={`${PROGRAMAS.TECNO} - 11 Pagos`} 
+                    count={summary.tecno11.count} 
+                    onExport={() => exportToCSV(summary.tecno11.participants, 'tecnoempleo_11_pagos.csv')} 
+                    onPreview={() => triggerPreview(`${PROGRAMAS.TECNO} - 11 Pagos`, summary.tecno11.participants)}
+                    disabled={summary.tecno11.count === 0} 
                 />
             </div>
 
@@ -268,7 +268,7 @@ const ContinuityView = ({ participants, onBack, onSelectParticipant }: { partici
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {continuityParticipants.map(p => (
+                        {upcomingRenewalParticipants.map(p => (
                             <TableRow key={p.id}>
                                 <TableCell className="font-medium">{p.nombre}</TableCell>
                                 <TableCell>{p.dni}</TableCell>
@@ -281,10 +281,10 @@ const ContinuityView = ({ participants, onBack, onSelectParticipant }: { partici
                                 </TableCell>
                             </TableRow>
                         ))}
-                        {continuityParticipants.length === 0 && (
+                        {upcomingRenewalParticipants.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={5} className="h-24 text-center">
-                                    No hay participantes que requieran continuidad en este momento.
+                                    No hay participantes próximos a vencer en este momento.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -296,4 +296,4 @@ const ContinuityView = ({ participants, onBack, onSelectParticipant }: { partici
     );
 };
 
-export default ContinuityView;
+export default UpcomingRenewalView;

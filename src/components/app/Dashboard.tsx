@@ -11,6 +11,8 @@ import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
+import ContinuityView from './ContinuityView';
+import UpcomingRenewalView from './UpcomingRenewalView'; // 1. Importar el nuevo componente
 
 interface ProgramData {
     count: number;
@@ -53,6 +55,8 @@ const Dashboard = ({
 }) => {
     const firestore = useFirestore();
     const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
+    const [showContinuityView, setShowContinuityView] = useState(false);
+    const [showUpcomingRenewalView, setShowUpcomingRenewalView] = useState(false); // 2. Añadir nuevo estado
     const [programData, setProgramData] = useState<{ [key: string]: ProgramData }>({});
     const [isProgramDataLoading, setIsProgramDataLoading] = useState(true);
 
@@ -182,8 +186,32 @@ const Dashboard = ({
         };
     }, [participants]);
 
+    const handleSelectParticipant = (participantId: string) => {
+        const participant = (participants || []).find(p => p.id === participantId);
+        if (participant) {
+            onSelectParticipant(participant);
+        }
+    };
+
     if (selectedProgramDetail) {
         return <ProgramAnalytics programName={selectedProgramDetail} participants={participants || []} onBack={() => setSelectedProgramDetail(null)} onSelectParticipant={onSelectParticipant}/>
+    }
+
+    if (showContinuityView) {
+        return <ContinuityView 
+                   participants={participants || []} 
+                   onBack={() => setShowContinuityView(false)} 
+                   onSelectParticipant={handleSelectParticipant} 
+               />;
+    }
+
+    // 4. Renderizar la nueva vista condicionalmente
+    if (showUpcomingRenewalView) {
+        return <UpcomingRenewalView 
+                   participants={participants || []} 
+                   onBack={() => setShowUpcomingRenewalView(false)} 
+                   onSelectParticipant={handleSelectParticipant} 
+               />;
     }
     
     const totalParticipants = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
@@ -202,10 +230,32 @@ const Dashboard = ({
             />
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="yellow" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
-            <DashboardCard title="Próximos a Vencer" value={paymentDueCount} icon={DollarSign} color="yellow" subtitle="5 u 11 pagos" isLoading={participantsLoading} onClick={() => onSetFilter('paymentDue')} actionText="Ver Lista" />
-            <DashboardCard title="Requieren Continuidad" value={renewalRequiredCount} icon={UserPlus} color="green" subtitle="6 o 12 pagos" isLoading={participantsLoading} onClick={() => onSetFilter('renewalRequired')} actionText="Ver Lista" />
+            
+            {/* 3. Actualizar el onClick de la tarjeta */}
             <DashboardCard 
-                title="A Finalizar" 
+                title="Próximos a Vencer" 
+                value={paymentDueCount} 
+                icon={DollarSign} 
+                color="yellow" 
+                subtitle="5 u 11 pagos" 
+                isLoading={participantsLoading} 
+                onClick={() => setShowUpcomingRenewalView(true)} 
+                actionText="Ver Detalle" 
+            />
+            
+            <DashboardCard 
+                title="Requieren Continuidad" 
+                value={renewalRequiredCount} 
+                icon={UserPlus} 
+                color="green" 
+                subtitle="6 o 12 pagos" 
+                isLoading={participantsLoading} 
+                onClick={() => setShowContinuityView(true)} 
+                actionText="Ver Detalle" 
+            />
+            
+            <DashboardCard 
+                title="Equipo Técnico" 
                 value={finalizationCount} 
                 icon={UserX}
                 color="blue" 
