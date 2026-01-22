@@ -144,6 +144,25 @@ export async function POST(request: Request) {
                     });
                 }
             }
+            
+            // Recalculate payments for a participant
+            const recalculateAndUpdatePayments = async (dni: string, program: string, participantRef: FirebaseFirestore.DocumentReference) => {
+                const paymentsSnapshot = await db.collection('pagosRegistrados')
+                    .where('dni', '==', dni)
+                    .where('programa', '==', program)
+                    .get();
+
+                const paymentCount = paymentsSnapshot.size;
+
+                transaction.update(participantRef, {
+                    [`pagosPorPrograma.${program}`]: paymentCount,
+                    estado: 'Activo',
+                    activo: true,
+                    motivoBaja: FieldValue.delete(),
+                    fechaBaja: FieldValue.delete(),
+                });
+            };
+
 
             // 7b. Update Altas, Activos & create new payments
             let totalAmount = 0;
@@ -164,27 +183,9 @@ export async function POST(request: Request) {
                     fechaDeCarga: Timestamp.now(),
                     batchId: newPaymentBatchId,
                 });
-
-                const participantDoc = participantDocsMap.get(dni);
-                const updateData: any = {};
-
-                if (altasDnis.includes(dni)) {
-                    updateData.estado = 'Ingresado';
-                    updateData.activo = true;
-                    updateData.motivoBaja = FieldValue.delete();
-                    updateData.fechaBaja = FieldValue.delete();
-                } else if (participantDoc?.data()?.estado !== 'Activo') {
-                    updateData.estado = 'Activo';
-                    updateData.activo = true;
-                    updateData.motivoBaja = FieldValue.delete();
-                    updateData.fechaBaja = FieldValue.delete();
-                }
                 
-                const currentPagos = participantDoc?.data()?.pagosPorPrograma || {};
-                const newPagosCount = (currentPagos[officialProgramName] || 0) + 1;
-                updateData[`pagosPorPrograma.${officialProgramName}`] = newPagosCount;
-                
-                transaction.update(participantRef, updateData);
+                await recalculateAndUpdatePayments(dni, officialProgramName, participantRef);
+
             }
 
             // 7c. Create new paymentHistory document

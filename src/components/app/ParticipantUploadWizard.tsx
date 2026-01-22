@@ -3,10 +3,17 @@ import React, { useState } from 'react';
 import type { Participant } from '@/lib/types';
 import { useFirebase, useUser } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp } from 'firebase/firestore';
+import { DEPARTAMENTOS } from '@/lib/constants';
 import { ArrowRight, FileSignature, AlertTriangle, FileUp, CheckCircle, XCircle, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+
+// Create a mapping for case-insensitive department lookup
+const departmentMap = DEPARTAMENTOS.reduce((acc, dep) => {
+  acc[dep.toLowerCase()] = dep;
+  return acc;
+}, {} as { [key: string]: string });
 
 const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants: Participant[], onClose: () => void }) => {
   const { firestore } = useFirebase();
@@ -17,25 +24,27 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   const [processing, setProcessing] = useState(false);
 
   const parseParticipantCSV = (text: string): Omit<Participant, 'id'>[] => {
-    let lines = text.split('\n').filter(line => line.trim() !== '');
+    if (!text) return [];
+    const lines = text.split(/\r\n|\r|\n/).filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
     
     const result: Omit<Participant, 'id'>[] = [];
     const separator = lines[0].includes(';') ? ';' : ',';
 
-    if (lines[0].toLowerCase().includes('dni')) {
-      lines.shift(); // Remove header line
+    const header = lines[0].toLowerCase();
+    if (header.includes('dni') || header.includes('nombre')) {
+      lines.shift();
     }
 
     const convertToISODate = (dateStr: string): string => {
-      if (!dateStr || !dateStr.includes('/')) return dateStr; 
+      if (!dateStr || !dateStr.includes('/')) return dateStr;
       const parts = dateStr.split('/');
-      if (parts.length !== 3) return dateStr; 
+      if (parts.length !== 3) return dateStr;
       const [day, month, year] = parts;
       if (year.length === 4) {
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
-      return dateStr; 
+      return dateStr;
     };
     
     lines.forEach(line => {
@@ -43,18 +52,21 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
             const values = line.split(separator).map(v => v.trim());
             if (values.length < 2) return;
 
+            const rawDepartamento = values[5] || '';
+            const normalizedDepartamento = departmentMap[rawDepartamento.toLowerCase()] || rawDepartamento;
+
             const participant = {
                 nombre: values[0] || '',
-                dni: String(values[1]?.replace(/\./g, '') || ''),
+                dni: String(values[1]?.replace(/[.\s]/g, '') || ''),
                 fechaNacimiento: convertToISODate(values[2] || ''),
                 programa: values[3] || '',
                 fechaIngreso: convertToISODate(values[4] || ''),
-                departamento: values[5] || '',
+                departamento: normalizedDepartamento,
                 lugarTrabajo: values[6] || '',
                 categoria: values[7] || 'N/A',
                 email: values[8] || '',
                 telefono: values[9] || '',
-                genero: values[10] || 'N/A', // <-- RESTAURADO
+                genero: values[10] || 'N/A',
                 pagosAcumulados: 0,
                 activo: true,
                 estado: 'Ingresado',
@@ -75,34 +87,41 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
   const handleAnalyze = () => {
     if (!selectedFile) return;
 
+    if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+        alert("Formato de archivo incorrecto. Por favor, suba un archivo .csv");
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target?.result as string;
-        if (!text) {
-            setAnalysis({ newParticipants: [], duplicates: [], totalCsv: 0 });
-            setStep(2);
-            return;
-        }
-
+        
         const records = parseParticipantCSV(text);
-        const existingDnis = new Set(allParticipants.map(p => String(p.dni)));
+        const existingDnis = new Set(allParticipants.map(p => String(p.dni).replace(/[.\s]/g, '')));
 
         const newParticipants: any[] = [];
         const duplicates: any[] = [];
 
         records.forEach(rec => {
-          if (existingDnis.has(rec.dni)) {
+          const cleanDni = String(rec.dni).replace(/[.\s]/g, '');
+          if (existingDnis.has(cleanDni)) {
             duplicates.push(rec);
           } else {
             newParticipants.push(rec);
-            existingDnis.add(rec.dni);
+            existingDnis.add(cleanDni);
           }
         });
 
         setAnalysis({ newParticipants, duplicates, totalCsv: records.length });
         setStep(2);
     };
-    reader.readAsText(selectedFile, 'UTF-8');
+
+    reader.onerror = () => {
+        console.error("Error reading file");
+        alert("Hubo un error al leer el archivo. Asegúrese de que sea un archivo de texto CSV válido.");
+    }
+
+    reader.readAsText(selectedFile, 'ISO-8859-1');
   };
 
   const handleExecute = async () => {
@@ -146,7 +165,6 @@ const ParticipantUploadWizard = ({ allParticipants, onClose }: { allParticipants
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 p-4 rounded text-sm text-blue-800">
             <p>Seleccione el archivo CSV para subir. El sistema detectará automáticamente el separador (`,` o `;`) y si tiene encabezado. Las columnas deben ser:</p>
-            {/* RESTAURADO */}
             <p className="font-mono text-xs mt-2 bg-blue-100 p-1 rounded">nombre, dni, fechaNacimiento, programa, fechaIngreso, departamento, lugarTrabajo, categoria, email, telefono, genero</p>
           </div>
 
