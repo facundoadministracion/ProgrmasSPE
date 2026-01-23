@@ -55,7 +55,7 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
         const participantsWithDetails = participants.map(p => ({
             ...p,
             payments: getParticipantPayments(p),
-            alert: getAlertStatus(p),
+            alert: getAlertStatus(p), // getAlertStatus likely adds the 'mesAusencia' field
         }));
 
         let filtered = participantsWithDetails.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || String(p.dni).includes(searchTerm));
@@ -101,6 +101,8 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
         finalization: 'A Finalizar (más de 12 pagos)',
     };
 
+    const isAttentionFilter = activeFilter === 'requiresAttention';
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4">
@@ -143,24 +145,33 @@ const ParticipantsTab = ({ participants, isLoading, onSelect, onOpenParticipantW
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Nombre</TableHead><TableHead>DNI</TableHead><TableHead>Programa</TableHead>
-                                <TableHead>Estado</TableHead><TableHead className="text-center">Pagos</TableHead><TableHead>Acciones</TableHead>
+                                <TableHead>Nombre</TableHead>
+                                <TableHead>DNI</TableHead>
+                                <TableHead>Programa</TableHead>
+                                <TableHead>Estado</TableHead>
+                                {isAttentionFilter && <TableHead>Liquidación Ausente</TableHead>}
+                                <TableHead className="text-center">Pagos</TableHead>
+                                <TableHead>Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {paginated.map(p => {
                                 const alert = p.alert;
+                                // Correct logic: Use 'mesAusencia' field, which is added by getAlertStatus
+                                const absenceDate = p.mesAusencia ? p.mesAusencia.replace('/', ' de ') : '-';
                                 return (
                                     <TableRow key={p.id}>
-                                        <TableCell className="font-medium">{p.nombre}</TableCell><TableCell>{p.dni}</TableCell>
+                                        <TableCell className="font-medium">{p.nombre}</TableCell>
+                                        <TableCell>{p.dni}</TableCell>
                                         <TableCell><Badge variant="outline">{p.programa}</Badge></TableCell>
                                         <TableCell><Badge variant={alert.type as any}>{alert.msg}</Badge></TableCell>
+                                        {isAttentionFilter && <TableCell className="text-center"><Badge variant="destructive">{absenceDate}</Badge></TableCell>}
                                         <TableCell className="text-center"><Badge>{p.payments}</Badge></TableCell>
                                         <TableCell><Button variant="link" size="sm" onClick={() => onSelect(p)}>Ver Legajo</Button></TableCell>
                                     </TableRow>
                                 )
                             })}
-                            {paginated.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron resultados para el filtro actual.</TableCell></TableRow>}
+                            {paginated.length === 0 && <TableRow><TableCell colSpan={isAttentionFilter ? 7 : 6} className="h-24 text-center">No se encontraron resultados para el filtro actual.</TableCell></TableRow>}
                         </TableBody>
                     </Table>
                     {totalPages > 1 && (

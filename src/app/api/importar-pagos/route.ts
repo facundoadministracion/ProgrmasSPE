@@ -139,8 +139,8 @@ export async function POST(request: Request) {
                     const participantRef = snapshot.docs[0].ref;
                     transaction.update(participantRef, {
                         estado: 'Requiere Atención',
-                        motivoBaja: `Posible baja: No incluido en liquidación ${settlementMonth}/${settlementYear}`,
-                        fechaBaja: FieldValue.delete(),
+                        motivoBaja: `Ausente en liquidación ${settlementMonth}/${settlementYear}`,
+                        fechaBaja: FieldValue.delete(), // Keep this to remove old irrelevant dates
                     });
                 }
             }
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
                     [`pagosPorPrograma.${program}`]: paymentCount,
                     estado: 'Activo',
                     activo: true,
-                    motivoBaja: FieldValue.delete(),
+                    motivoBaja: null, // Set to null instead of deleting
                     fechaBaja: FieldValue.delete(),
                 });
             };
