@@ -1,4 +1,3 @@
-'''
 'use client';
 
 import { useState } from 'react';
@@ -33,8 +32,7 @@ export default function ImportarHistorialPage() {
         formData.append('file', file);
 
         try {
-            // This API endpoint will need to be created in the backend
-            const res = await fetch('/api/importar-historial', {
+            const res = await fetch('/api/importar-pagos', {
                 method: 'POST',
                 body: formData,
             });
@@ -62,7 +60,7 @@ export default function ImportarHistorialPage() {
                 <CardHeader>
                     <CardTitle>Importar Historial de Pagos</CardTitle>
                     <CardDescription>
-                        Suba un archivo CSV para cargar pagos de períodos anteriores. El archivo debe tener las columnas: <strong>dni, programa, mes, anio</strong>.
+                        Suba un archivo CSV para cargar pagos de períodos anteriores. El archivo debe tener las columnas: <strong>dni, programa, mes, anio, monto</strong>.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -94,4 +92,3 @@ export default function ImportarHistorialPage() {
         </div>
     );
 }
-'''

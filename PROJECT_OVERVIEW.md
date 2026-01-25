@@ -8,10 +8,9 @@ Este documento proporciona una visión completa de la arquitectura, configuraci�
 ## 1. Arquitectura y Tecnologías
 
 - **Frontend:** Aplicación web construida con **Next.js** y **React**.
-- **Backend:** Funciones serverless de **Firebase Functions** (Node.js con TypeScript).
+- **Backend:** **Rutas de API de Next.js** para la lógica de negocio y **Cloud Functions** para tareas asíncronas o de mantenimiento.
 - **Base de Datos:** **Cloud Firestore** para el almacenamiento de datos principal.
 - **Autenticación:** **Firebase Authentication** para la gestión de usuarios.
-- **Almacenamiento de Archivos:** **Cloud Storage for Firebase** para la subida de archivos (ej. CSV de pagos).
 - **Hosting:** **Firebase Hosting** para servir la aplicación Next.js y las funciones.
 - **UI Framework:** **shadcn/ui** sobre **Tailwind CSS** para los componentes de la interfaz.
 
@@ -19,89 +18,80 @@ Este documento proporciona una visión completa de la arquitectura, configuraci�
 
 ## 2. Estructura de Archivos Clave
 
-- `src/app/`: Contiene la aplicación principal de Next.js (páginas y componentes de React).
-- `functions/src/`: Contiene el código fuente de las Cloud Functions personalizadas (archivos `.ts`).
-- `functions/lib/`: **Directorio de salida de compilación.** Contiene el código JavaScript (`.js`) que se despliega realmente en Firebase. **Se genera a partir de `functions/src`**.
-- `firebase.json`: Archivo de configuración principal de Firebase. Define el hosting, las funciones, las reglas de Firestore/Storage y la integración con el framework de Next.js.
+- `src/app/`: Contiene la aplicación principal de Next.js (páginas, componentes y Rutas de API).
+- `src/app/api/`: Específicamente, aquí residen los endpoints del backend construidos con Next.js.
+- `functions/src/`: Contiene el código fuente de las Cloud Functions complementarias.
+- `firebase.json`: Archivo de configuración principal de Firebase.
 - `firestore.rules`: Reglas de seguridad para la base de datos Firestore.
 - `storage.rules`: Reglas de seguridad para Cloud Storage.
-- `scripts/`: Contiene scripts de mantenimiento y corrección de datos. **No forman parte de la aplicación desplegada.**
 
 ---
 
-## 3. Configuración de Firebase (`firebase.json`)
+## 3. Lógica de Backend Principal
 
-- **Región Principal:** La región para todos los servicios de Firebase es **`southamerica-east1`**. Es crucial que todos los componentes (funciones, storage, etc.) se desplieguen en esta misma región para evitar conflictos.
-- **Hosting:**
-  - El `source` está configurado en `.` para indicar que se usa un framework web (Next.js).
-  - `frameworksBackend`: **Esta es una configuración CRÍTICA.** Se ha añadido para forzar a que la función autogenerada por Next.js se despliegue en la región correcta (`southamerica-east1`).
-- **Functions:**
-  - El `source` es `functions`, apuntando al directorio de las Cloud Functions.
-  - El `runtime` es `nodejs20`.
-  - La `region` está definida globalmente como `southamerica-east1`, pero **es una buena práctica especificarla también dentro de cada función en el código para mayor claridad**.
+### 3.1. Importación de Pagos (`/api/importar-pagos`)
+
+Este es el proceso central para registrar pagos masivos en el sistema.
+
+- **Endpoint:** `POST /api/importar-pagos`
+- **Componente:** `src/app/api/importar-pagos/route.ts`
+- **Activador:** Es una Ruta de API de Next.js que se invoca directamente desde la interfaz de usuario (`src/app/admin/importar-historial/page.tsx`).
+- **Flujo:**
+    1. El administrador sube un archivo CSV a través del formulario en la página "Importar Historial de Pagos".
+    2. La interfaz envía este archivo mediante una petición `POST` al endpoint.
+    3. El backend valida el archivo, las columnas (`dni`, `programa`, `mes`, `anio`, `monto`), y la consistencia de los datos.
+    4. Realiza una transacción compleja en Firestore para:
+        - Validar que todos los DNI existan.
+        - Prevenir la duplicación de lotes de pago.
+        - Registrar cada pago individual.
+        - Calcular y registrar "altas" (nuevos participantes en el pago) y "bajas" (participantes ausentes).
+        - Actualizar el estado de los participantes afectados.
+
+### 3.2. Otras Funciones y Endpoints
+
+- **Cloud Functions (`functions/src`):**
+    - `deleteParticipant`: Función `onCall` para eliminar participantes.
+    - `revertPaymentBatch`: Función `onCall` para revertir un lote de pagos.
+- **Endpoints de API de Next.js (`src/app/api`):**
+    - `create-user`, `delete-user`, `update-user-role`: Gestión de usuarios.
+    - `find-participant`, `correct-participant`: Búsqueda y corrección de datos de participantes.
+    - `cleanup-by-program`: Tareas de limpieza de datos.
 
 ---
 
-## 4. Cloud Functions
+## 4. Proceso de Despliegue (¡MUY IMPORTANTE!)
 
-Las funciones están escritas en TypeScript (`.ts`) en `functions/src`.
+El despliegue combina la aplicación Next.js y las Cloud Functions.
 
-- `processPaymentFile`: Se activa con la subida de archivos a Cloud Storage (`onObjectFinalized`). Procesa archivos CSV de pagos.
-- `deleteParticipant`: Función `onCall` (invocable desde el cliente) para eliminar participantes y sus datos asociados.
-- `revertPaymentBatch`: Función `onCall` para revertir un lote de pagos.
-- `simpleTest`: Función de ejemplo.
+1.  **Realizar Cambios:** Modificar el código fuente en `src/` (frontend/API Routes) o en `functions/src/` (Cloud Functions).
 
-**Importante:** Todas las funciones que interactúan con recursos de Firebase (como el bucket de Storage) deben tener su región explícitamente definida para coincidir con la del recurso (`southamerica-east1`).
-
----
-
-## 5. Proceso de Despliegue (¡MUY IMPORTANTE!)
-
-Este es el flujo de trabajo correcto para desplegar la aplicación. Omitir el segundo paso fue la causa de errores de despliegue recurrentes.
-
-1.  **Realizar Cambios:** Modificar el código fuente en `src/` (frontend) o en `functions/src/` (backend).
-
-2.  **Compilar las Funciones:** **Si se ha realizado cualquier cambio en la carpeta `functions/src/`, es OBLIGATORIO ejecutar este comando** desde la carpeta `functions`:
+2.  **Compilar las Funciones (Si es necesario):** **Si se ha realizado cualquier cambio en la carpeta `functions/src/`, es OBLIGATORIO compilar las funciones** desde su carpeta:
     ```bash
     cd functions
     npm run build
     cd ..
     ```
-    Esto compila los archivos TypeScript (`.ts`) a JavaScript (`.js`) y los coloca en `functions/lib/`, que es lo que Firebase realmente despliega.
+    Esto no es necesario si solo se han modificado archivos dentro de `src/app`.
 
 3.  **Desplegar en Firebase:** Ejecutar el comando de despliegue desde la raíz del proyecto:
     ```bash
     firebase deploy
     ```
 
-Este archivo servirá como nuestra guía para futuras interacciones. ¡Excelente iniciativa!
+---
+
+## 5. Arquitectura de Navegación (Sistema de Pestañas)
+
+La aplicación utiliza un sistema de navegación interno basado en el estado de React.
+
+- **Componente Central:** `src/app/MainAppClient.tsx`
+- **Mecanismo:** Un estado `activeTab` controla qué vista se muestra. Los botones del menú lateral actualizan este estado con `setActiveTab`, y una función `renderMainContent` renderiza el componente correspondiente a la pestaña activa sin cambiar la URL del navegador.
 
 ---
 
-## 6. Nuevas Funcionalidades y Tareas Pendientes
+## 6. Gestión de Legajos de Participantes
 
-### Filtros Avanzados y Exportación en el Dashboard
+- **Orquestador:** `src/app/MainAppClient.tsx` (gestiona el estado `selectedParticipant`).
+- **Vista de Detalle:** `src/components/app/ParticipantDetail.tsx` (muestra el perfil completo del participante).
+- **Vista de Continuidad:** `src/components/app/ContinuityView.tsx` (lista filtrada de participantes que requieren acción).
 
-*   **Objetivo:** Mejorar la usabilidad de las tarjetas del dashboard, específicamente la de "Requiere Continuidad".
-*   **Funcionalidad:**
-    1.  Al hacer clic en la tarjeta "Requiere Continuidad", se mostrará una vista detallada.
-    2.  Dentro de esta vista, agregar cuadros resumen que agrupen a los participantes por programa y número de pagos (e.g., "Empleo Joven - 6 pagos", "Tecnoempleo - 12 pagos").
-    3.  Implementar una función para exportar estas listas filtradas a un formato como CSV.
-
----
-
-## 7. Gestión de Legajos de Participantes
-
-Esta sección documenta la ubicación y el propósito de los componentes clave relacionados con la visualización y gestión de los perfiles de los participantes (legajos).
-
-*   **Orquestador Principal:** `src/app/MainAppClient.tsx`
-    *   **Función:** Este es el componente de nivel superior que gestiona el estado principal de la aplicación después del inicio de sesión. Controla qué vista se muestra en cada momento (Dashboard, Lista de Participantes, Perfil de Participante, etc.).
-    *   **Lógica Clave:** Contiene el estado `selectedParticipant`, que determina si se debe mostrar la lista de participantes o el detalle de uno solo. Es el responsable de renderizar `ParticipantDetail` cuando se selecciona un participante.
-
-*   **Vista de Detalle del Legajo:** `src/components/app/ParticipantDetail.tsx`
-    *   **Función:** Este componente renderiza toda la información de un único participante, incluyendo sus datos personales, historial de pagos, historial de novedades y las acciones que se pueden realizar sobre él.
-    *   **Acciones Implementadas:** Aquí se encuentra la lógica para editar el legajo, dar de baja, reactivar, realizar traspasos de programa y registrar la continuidad (a través del formulario de edición).
-
-*   **Vista de Continuidad:** `src/components/app/ContinuityView.tsx`
-    *   **Función:** Una vista especializada que muestra únicamente a los participantes que requieren una acción de continuidad (generalmente con 6 o 12 pagos). Facilita el acceso rápido a sus legajos.
-    *   **Flujo:** Desde esta vista, al hacer clic en "Gestionar", se invoca la función que actualiza el estado `selectedParticipant` en `MainAppClient.tsx`, lo que a su vez provoca que se muestre el componente `ParticipantDetail` para ese participante.

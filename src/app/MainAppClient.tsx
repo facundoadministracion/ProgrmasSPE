@@ -41,6 +41,7 @@ const Configuracion = dynamicImport(() => import('@/components/app/Configuracion
 const AttendanceSection = dynamicImport(() => import('@/components/app/AttendanceSection'), { ssr: false, loading: () => <LoadingComponent /> });
 const PaymentUploadWizard = dynamicImport(() => import('@/components/app/PaymentUploadWizard'), { ssr: false, loading: () => <LoadingComponent /> });
 const ParticipantUploadWizard = dynamicImport(() => import('@/components/app/ParticipantUploadWizard'), { ssr: false, loading: () => <LoadingComponent /> });
+const ImportHistorialWizard = dynamicImport(() => import('@/app/admin/importar-historial/page'), { ssr: false, loading: () => <LoadingComponent /> });
 const EditParticipantForm = dynamicImport(() => import('@/components/app/EditParticipantForm'), { ssr: false, loading: () => <LoadingComponent /> });
 
 function AppContent() {
@@ -147,7 +148,7 @@ function AppContent() {
             case 'usuarios': return <UserManagement users={userRoles || []} currentUser={user} isLoading={usersLoading} onUsersChange={() => {}} />; 
             case 'asistencia': return <AttendanceSection participants={participants || []} />;
             case 'carga-pagos': return <PaymentUploadWizard participants={participants || []} onClose={() => setActiveTab('resumen')} onFindDni={() => {}}/>;
-            case 'importar-historial': return <ParticipantUploadWizard allParticipants={participants || []} onClose={() => setActiveTab('resumen')} />;
+            case 'importar-historial': return <ImportHistorialWizard />;
             case 'configuracion': return <Configuracion />;
             default: return <div>Pestaña no encontrada</div>;
         }
