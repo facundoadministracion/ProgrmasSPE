@@ -1,4 +1,4 @@
-'''
+
 'use client';
 
 import { useState } from 'react';
@@ -122,7 +122,7 @@ export default function ImportarPagosPage() {
       }
   };
 
-  const hasPendingReactivations = analysis && analysis.reactivaciones.count > 0;
+  const hasPendingReactivations = !!(analysis && analysis.reactivaciones.count > 0);
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -215,4 +215,3 @@ export default function ImportarPagosPage() {
     </div>
   );
 }
-'''

@@ -88,13 +88,11 @@ export async function POST(request: Request) {
             // 3. DNI Validation (All or Nothing)
             const dnisInCsv = [...new Set(records.map(r => r.dni).filter(Boolean))];
             const participantRefsMap = new Map<string, FirebaseFirestore.DocumentReference>();
-            const participantDocsMap = new Map<string, FirebaseFirestore.DocumentSnapshot>();
 
             for (const chunk of chunkArray(dnisInCsv, 30)) {
                 const q = db.collection('participants').where('dni', 'in', chunk);
                 const snapshot = await transaction.get(q);
                 snapshot.forEach(doc => {
-                    participantDocsMap.set(doc.data().dni, doc);
                     participantRefsMap.set(doc.data().dni, doc.ref);
                 });
             }
@@ -133,42 +131,37 @@ export async function POST(request: Request) {
 
             //  7a. Update Bajas (participants who left)
             for (const dni of bajasDnis) {
-                const q = db.collection('participants').where('dni', '==', dni).limit(1);
-                const snapshot = await transaction.get(q);
-                if (!snapshot.empty) {
-                    const participantRef = snapshot.docs[0].ref;
+                const participantRef = participantRefsMap.get(dni);
+                if (participantRef) {
                     transaction.update(participantRef, {
                         estado: 'Requiere Atención',
                         motivoBaja: `Ausente en liquidación ${settlementMonth}/${settlementYear}`,
-                        fechaBaja: FieldValue.delete(), // Keep this to remove old irrelevant dates
+                        fechaBaja: Timestamp.now(),
                     });
                 }
             }
-            
-            // Recalculate payments for a participant
-            const recalculateAndUpdatePayments = async (dni: string, program: string, participantRef: FirebaseFirestore.DocumentReference) => {
-                const paymentsSnapshot = await db.collection('pagosRegistrados')
-                    .where('dni', '==', dni)
-                    .where('programa', '==', program)
-                    .get();
 
-                const paymentCount = paymentsSnapshot.size;
+            // 7b. Update Activos y Altas (participants who are in the new file)
+            for (const dni of dnisInCsv) {
+                const participantRef = participantRefsMap.get(dni);
+                if (participantRef) {
+                    transaction.update(participantRef, {
+                        [`pagosPorPrograma.${officialProgramName}`]: FieldValue.increment(1),
+                        estado: 'Activo',
+                        activo: true,
+                        motivoBaja: FieldValue.delete(),
+                        fechaBaja: FieldValue.delete(),
+                    });
+                }
+            }
 
-                transaction.update(participantRef, {
-                    [`pagosPorPrograma.${program}`]: paymentCount,
-                    estado: 'Activo',
-                    activo: true,
-                    motivoBaja: null, // Set to null instead of deleting
-                    fechaBaja: FieldValue.delete(),
-                });
-            };
-
-
-            // 7b. Update Altas, Activos & create new payments
+            // 7c. Create new payment records
             let totalAmount = 0;
             for (const record of records) {
                 const { dni, monto } = record;
-                const participantRef = participantRefsMap.get(dni)!;
+                const participantRef = participantRefsMap.get(dni);
+                if (!participantRef) continue;
+
                 const parsedMonto = parseFloat(monto.replace(/[^0-9,-]+/g, '').replace(',', '.'));
                 if (!isNaN(parsedMonto)) totalAmount += parsedMonto;
 
@@ -183,12 +176,9 @@ export async function POST(request: Request) {
                     fechaDeCarga: Timestamp.now(),
                     batchId: newPaymentBatchId,
                 });
-                
-                await recalculateAndUpdatePayments(dni, officialProgramName, participantRef);
-
             }
 
-            // 7c. Create new paymentHistory document
+            // 7d. Create new paymentHistory document
             transaction.create(newPaymentBatchRef, {
                 programa: officialProgramName,
                 mesLiquidacion: settlementMonth,

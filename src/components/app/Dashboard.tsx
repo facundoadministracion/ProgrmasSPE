@@ -3,16 +3,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, query, getDocs } from 'firebase/firestore';
-import { Users, DollarSign, AlertTriangle, UserCheck, UserPlus, UserX, Briefcase } from 'lucide-react';
+import { Users, DollarSign, AlertTriangle, UserCheck, UserPlus, UserX } from 'lucide-react';
 
 import type { Participant, ParticipantFilter } from '@/lib/types';
-import { PROGRAMAS, ALERT_MESSAGES, PROGRAM_LOGOS } from '@/lib/constants';
+import { PROGRAMAS, PROGRAM_LOGOS } from '@/lib/constants';
 import { getAlertStatus } from '@/lib/logic';
 
 import { DashboardCard } from '@/components/app/DashboardCard';
 import ProgramAnalytics from '@/components/app/ProgramAnalytics';
 import ContinuityView from './ContinuityView';
-import UpcomingRenewalView from './UpcomingRenewalView'; // 1. Importar el nuevo componente
+import UpcomingRenewalView from './UpcomingRenewalView';
 
 interface ProgramData {
     count: number;
@@ -56,7 +56,7 @@ const Dashboard = ({
     const firestore = useFirestore();
     const [selectedProgramDetail, setSelectedProgramDetail] = useState<string | null>(null);
     const [showContinuityView, setShowContinuityView] = useState(false);
-    const [showUpcomingRenewalView, setShowUpcomingRenewalView] = useState(false); // 2. Añadir nuevo estado
+    const [showUpcomingRenewalView, setShowUpcomingRenewalView] = useState(false);
     const [programData, setProgramData] = useState<{ [key: string]: ProgramData }>({});
     const [isProgramDataLoading, setIsProgramDataLoading] = useState(true);
 
@@ -205,7 +205,6 @@ const Dashboard = ({
                />;
     }
 
-    // 4. Renderizar la nueva vista condicionalmente
     if (showUpcomingRenewalView) {
         return <UpcomingRenewalView 
                    participants={participants || []} 
@@ -214,6 +213,7 @@ const Dashboard = ({
                />;
     }
     
+    // Lógica para la tarjeta "Total Padrón Liquidado"
     const totalParticipants = Object.values(programData).reduce((sum, data) => sum + (data?.count ?? 0), 0);
     const totalSettledAmount = Object.values(programData).reduce((sum, data) => sum + (data?.amount ?? 0), 0);
 
@@ -231,7 +231,6 @@ const Dashboard = ({
             <DashboardCard title="Requiere Atención" value={attentionRequiredCount} icon={AlertTriangle} color="red" subtitle="Participantes con alertas" isLoading={participantsLoading} onClick={() => onSetFilter('requiresAttention')} actionText="Ver Lista" />
             <DashboardCard title="Alerta de Edad" value={ageAlertCount} icon={UserCheck} color="yellow" subtitle="Límite de edad alcanzado" isLoading={participantsLoading} onClick={() => onSetFilter('ageAlert')} actionText="Ver Lista" />
             
-            {/* 3. Actualizar el onClick de la tarjeta */}
             <DashboardCard 
                 title="Próximos a Vencer" 
                 value={paymentDueCount} 

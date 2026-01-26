@@ -35,17 +35,17 @@ Este es el proceso central para registrar pagos masivos en el sistema.
 
 - **Endpoint:** `POST /api/importar-pagos`
 - **Componente:** `src/app/api/importar-pagos/route.ts`
-- **Activador:** Es una Ruta de API de Next.js que se invoca directamente desde la interfaz de usuario (`src/app/admin/importar-historial/page.tsx`).
+- **Activador:** Es una Ruta de API de Next.js que se invoca directamente desde la interfaz de usuario (`src/app/admin/importar-pagos/page.tsx`).
 - **Flujo:**
-    1. El administrador sube un archivo CSV a través del formulario en la página "Importar Historial de Pagos".
+    1. El administrador sube un archivo CSV a través del formulario en la página de importación.
     2. La interfaz envía este archivo mediante una petición `POST` al endpoint.
     3. El backend valida el archivo, las columnas (`dni`, `programa`, `mes`, `anio`, `monto`), y la consistencia de los datos.
     4. Realiza una transacción compleja en Firestore para:
-        - Validar que todos los DNI existan.
-        - Prevenir la duplicación de lotes de pago.
-        - Registrar cada pago individual.
-        - Calcular y registrar "altas" (nuevos participantes en el pago) y "bajas" (participantes ausentes).
-        - Actualizar el estado de los participantes afectados.
+        - Validar que todos los DNI de participantes existan en la base de datos.
+        - Prevenir la duplicación de lotes de pago para el mismo período.
+        - Registrar cada nuevo pago en la colección `pagosRegistrados`.
+        - **Incrementar atómicamente el contador `pagosPorPrograma` en 1** para cada participante incluido en el archivo.
+        - Actualizar el estado a "Requiere Atención" para los participantes que no están en el nuevo archivo (Bajas).
 
 ### 3.2. Otras Funciones y Endpoints
 
