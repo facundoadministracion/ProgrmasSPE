@@ -9,22 +9,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, ChevronDown, AlertCircle } from 'lucide-react';
+import { Loader2, User, ChevronDown, AlertCircle, Printer, ArrowLeft } from 'lucide-react';
 import DataQualityReportCard from './DataQualityReportCard';
+// El antiguo componente de impresión ya no es necesario aquí
+// import PrintableReport from './PrintableReport';
 
-// Tipos de datos para el informe
 interface DetailedParticipant extends Participant {
     montoPagado: number;
 }
-
-interface ReportsProps {
-    participants: Participant[];
-    participantsLoading: boolean;
-    onSelectParticipant: (participant: Participant) => void;
-}
-
 const formatCurrency = (num: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(num);
-
 const normalizeDepartmentName = (name: string | null | undefined): string => {
   const defaultName = 'No especificado';
   if (!name || !name.trim()) return defaultName;
@@ -53,13 +46,13 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     
-    // Filtros
+    // El estado isPrinting ya no es necesario
+    // const [isPrinting, setIsPrinting] = useState(false);
+    
     const [selectedProgram, setSelectedProgram] = useState('todos');
     const [selectedMonth, setSelectedMonth] = useState('todos');
     const [selectedYear, setSelectedYear] = useState('todos');
     const [selectedDepartment, setSelectedDepartment] = useState('Todos');
-
-    // Datos del informe
     const [detailedReportData, setDetailedReportData] = useState<DetailedParticipant[]>([]);
     const [showDetails, setShowDetails] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -84,7 +77,7 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
             const paymentsSnapshot = await getDocs(paymentsQuery);
             const payments = paymentsSnapshot.docs.map(doc => ({ 
                 dni: doc.data().dni,
-                monto: (doc.data().montoPagado || doc.data().monto) as number, // <-- CORRECCIÓN #1
+                monto: (doc.data().montoPagado || doc.data().monto) as number,
                 programa: doc.data().programa,
             }));
 
@@ -128,7 +121,7 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
                     nombre: participant?.nombre || 'Participante no encontrado',
                     departamento: participant?.departamento,
                     programa: payment.programa || participant?.programa,
-                    montoPagado: payment.monto || 0, // Asegurarse que montoPagado tenga un valor
+                    montoPagado: payment.monto || 0,
                 } as DetailedParticipant;
             }).filter(p => p.dni);
             
@@ -144,7 +137,8 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
     
     const filteredDetailedData = useMemo(() => {
         return detailedReportData.filter(p => {
-            if (selectedDepartment !== 'Todos' && normalizeDepartmentName(p.departamento) !== selectedDepartment) return false;
+            const normalizedDept = normalizeDepartmentName(p.departamento);
+            if (selectedDepartment !== 'Todos' && normalizedDept !== selectedDepartment) return false;
             if (selectedProgram !== 'todos' && p.programa !== selectedProgram) return false;
             return true;
         });
@@ -161,7 +155,6 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
         return Object.entries(data).map(([department, values]) => ({ department, ...values })).sort((a, b) => b.count - a.count);
     }, [filteredDetailedData]);
 
-    // --- CORRECCIÓN #2: Cálculo de totales generales ---
     const { grandTotalCount, grandTotalAmount } = useMemo(() => {
         return aggregatedReportData.reduce((totals, row) => {
             totals.grandTotalCount += row.count;
@@ -181,24 +174,46 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
         setHasSearched(false);
     };
 
+    // *** NUEVA FUNCIÓN PARA IMPRIMIR ***
+    const handlePrint = () => {
+        const dataToPrint = {
+            data: filteredDetailedData,
+            selectedProgram,
+            selectedDepartment,
+        };
+        sessionStorage.setItem('printableReportData', JSON.stringify(dataToPrint));
+        window.open('/print-report', '_blank');
+    };
+
     const renderContent = () => {
         if (activeReport === 'geo') {
             return (
                 <div className="space-y-6">
+                    {/* El modal de impresión ya no se renderiza aquí */}
                     <Card>
                         <CardHeader>
-                            <button onClick={() => { setActiveReport(null); handleResetFilters(); }} className="text-sm text-blue-600 hover:underline">&larr; Volver a Informes</button>
-                            <CardTitle className="mt-2">Informe de Distribución Geográfica</CardTitle>
+                            <Button variant="ghost" size="sm" onClick={() => { setActiveReport(null); handleResetFilters(); }} className="mb-2">
+                                <ArrowLeft className="h-4 w-4 mr-2" /> Volver a Informes
+                            </Button>
+                            <CardTitle>Informe de Distribución Geográfica</CardTitle>
                             <CardDescription>Análisis de liquidaciones por mes. Seleccione mes/año y genere el informe.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-wrap gap-4 p-4 border-b mb-4 bg-gray-50 rounded-lg items-end">
                                 <div className="flex-1 min-w-[150px]"><label className="text-sm font-medium">Mes</label><Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todos">Seleccionar</SelectItem>{MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent></Select></div>
                                 <div className="flex-1 min-w-[150px]"><label className="text-sm font-medium">Año</label><Select value={selectedYear} onValueChange={setSelectedYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todos">Seleccionar</SelectItem>{YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
+                                
                                 <Button onClick={handleGenerateReport} disabled={selectedMonth === 'todos' || selectedYear === 'todos' || isGeneratingReport}>
                                     {isGeneratingReport ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : null} Generar Informe
                                 </Button>
                                 <Button variant="outline" onClick={handleResetFilters}>Limpiar</Button>
+                                
+                                {aggregatedReportData.length > 0 && (
+                                    // El botón ahora llama a la nueva función handlePrint
+                                    <Button variant="secondary" onClick={handlePrint}>
+                                        <Printer className="h-4 w-4 mr-2" /> Imprimir
+                                    </Button>
+                                )}
                             </div>
 
                             {detailedReportData.length > 0 && (
@@ -218,7 +233,6 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Departamento</TableHead><TableHead className="text-right">N° Participantes</TableHead><TableHead className="text-right">Monto Liquidado</TableHead></TableRow></TableHeader>
                                     <TableBody>{aggregatedReportData.map(row => (<TableRow key={row.department}><TableCell className="font-medium">{row.department}</TableCell><TableCell className="text-right">{row.count}</TableCell><TableCell className="text-right">{formatCurrency(row.totalAmount)}</TableCell></TableRow>))}</TableBody>
-                                    {/* --- CORRECCIÓN #3: Fila de totales en el footer --- */}
                                     <TableFooter><TableRow className="bg-gray-100 hover:bg-gray-100/80"><TableCell className="font-bold">Total General</TableCell><TableCell className="font-bold text-right">{grandTotalCount}</TableCell><TableCell className="font-bold text-right">{formatCurrency(grandTotalAmount)}</TableCell></TableRow></TableFooter>
                                 </Table>
                             ) : detailedReportData.length > 0 && aggregatedReportData.length === 0 ? (

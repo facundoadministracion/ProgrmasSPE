@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -73,9 +73,6 @@ const SidebarProvider = React.forwardRef<
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
 
-    // Esta es la corrección definitiva. Usamos una ref para tener siempre el último
-    // valor de `open` sin tener que añadirlo como dependencia al useCallback,
-    // lo que nos garantiza una función `setOpen` estable que no causa bucles.
     const openRef = React.useRef(open);
     React.useEffect(() => {
         openRef.current = open;
@@ -84,16 +81,11 @@ const SidebarProvider = React.forwardRef<
 
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
-        // Caso: Componente controlado (el padre pasa `onOpenChange`)
         if (setOpenProp !== undefined) {
-          // Resolvemos el valor a un booleano usando la ref, que siempre está actualizada.
-          // Esto evita el error de tipos al llamar a `value` con `undefined`.
           const newOpenState = typeof value === 'function' ? value(openRef.current) : value;
           setOpenProp(newOpenState);
           document.cookie = `${SIDEBAR_COOKIE_NAME}=${newOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
         } else {
-          // Caso: Componente no controlado (usa su propio estado)
-          // Usamos la actualización funcional de `useState` que es el patrón correcto aquí.
           _setOpen(currentOpen => {
               const newOpenState = typeof value === 'function' ? value(currentOpen) : value;
               document.cookie = `${SIDEBAR_COOKIE_NAME}=${newOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
@@ -101,7 +93,7 @@ const SidebarProvider = React.forwardRef<
           });
         }
       },
-      [setOpenProp] // La única dependencia es `setOpenProp`, que es estable.
+      [setOpenProp]
     );
 
     const toggleSidebar = React.useCallback(() => {
@@ -217,6 +209,9 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Menú Principal</SheetTitle>
+            </SheetHeader>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
@@ -472,7 +467,6 @@ const SidebarGroupAction = React.forwardRef<
       data-sidebar="group-action"
       className={cn(
         "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "group-data-[collapsible=icon]:hidden",
         className
@@ -618,7 +612,6 @@ const SidebarMenuAction = React.forwardRef<
       data-sidebar="menu-action"
       className={cn(
         "absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
         "peer-data-[size=default]/menu-button:top-1.5",

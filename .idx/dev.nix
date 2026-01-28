@@ -9,7 +9,10 @@
     pkgs.zulu
   ];
   # Sets environment variables in the workspace
-  env = {};
+  env = {
+    # Esta variable de entorno ahora apunta al archivo de credenciales que creamos.
+    GOOGLE_APPLICATION_CREDENTIALS = "/home/user/programas-spe-nuevo/service-account.json";
+  };
   # This adds a file watcher to startup the firebase emulators. The emulators will only start if
   # a firebase.json file is written into the user's directory
   services.firebase.emulators = {

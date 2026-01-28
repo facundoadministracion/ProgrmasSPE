@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, Loader2, LayoutDashboard, Users, Cog, LogOut, FileUp, FileClock, Clipboard } from 'lucide-react';
+import { ArrowLeft, Loader2, LayoutDashboard, Users, Cog, LogOut, FileUp, FileClock, Clipboard, FileBarChart } from 'lucide-react';
 import type { Participant, ParticipantFilter, UserRole } from '@/lib/types';
 
 // --- Placeholders para Carga Dinámica ---
@@ -37,6 +37,7 @@ const Dashboard = dynamicImport(() => import('@/components/app/Dashboard'), { ss
 const ParticipantsTab = dynamicImport(() => import('@/components/app/ParticipantsTab'), { ssr: false, loading: () => <LoadingComponent /> });
 const ParticipantDetail = dynamicImport(() => import('@/components/app/ParticipantDetail'), { ssr: false, loading: () => <LoadingComponent /> });
 const UserManagement = dynamicImport(() => import('@/components/app/UserManagement'), { ssr: false, loading: () => <LoadingComponent /> });
+const Reports = dynamicImport(() => import('@/components/app/Reports'), { ssr: false, loading: () => <LoadingComponent /> });
 const Configuracion = dynamicImport(() => import('@/components/app/Configuracion'), { ssr: false, loading: () => <LoadingComponent /> });
 const AttendanceSection = dynamicImport(() => import('@/components/app/AttendanceSection'), { ssr: false, loading: () => <LoadingComponent /> });
 const PaymentUploadWizard = dynamicImport(() => import('@/components/app/PaymentUploadWizard'), { ssr: false, loading: () => <LoadingComponent /> });
@@ -146,6 +147,7 @@ function AppContent() {
             case 'resumen': return <Dashboard participants={participants || []} participantsLoading={participantsLoading} onSetFilter={handleSetFilter} onSelectParticipant={handleSelectParticipant} />;
             case 'participantes': return <ParticipantsTab participants={participants || []} isLoading={participantsLoading} onSelect={handleSelectParticipant} onOpenParticipantWizard={handleOpenParticipantWizard} initialSearchTerm={initialSearchTerm} onSearchHandled={() => setInitialSearchTerm(undefined)} activeFilter={activeFilter} onClearFilter={() => setActiveFilter(null)} onBackToDashboard={() => setActiveTab('dashboard')} />;
             case 'usuarios': return <UserManagement users={userRoles || []} currentUser={user} isLoading={usersLoading} onUsersChange={() => {}} />; 
+            case 'informes': return <Reports participants={participants || []} participantsLoading={participantsLoading} onSelectParticipant={handleSelectParticipant} />;
             case 'asistencia': return <AttendanceSection participants={participants || []} />;
             case 'carga-pagos': return <PaymentUploadWizard participants={participants || []} onClose={() => setActiveTab('resumen')} onFindDni={() => {}}/>;
             case 'importar-historial': return <ImportHistorialWizard />;
@@ -178,12 +180,20 @@ function AppContent() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             {isAdmin && (
+                                <>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton onClick={() => setActiveTab('usuarios')} isActive={activeTab === 'usuarios'}>
                                         <Users className="mr-2 h-4 w-4" />
                                         Usuarios
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                     <SidebarMenuButton onClick={() => setActiveTab('informes')} isActive={activeTab === 'informes'}>
+                                        <FileBarChart className="mr-2 h-4 w-4" />
+                                        Informes
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                                </>      
                             )}
                             <SidebarMenuItem>
                                  <SidebarMenuButton onClick={() => setActiveTab('asistencia')} isActive={activeTab === 'asistencia'}>

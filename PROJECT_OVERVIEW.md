@@ -95,3 +95,37 @@ La aplicación utiliza un sistema de navegación interno basado en el estado de 
 - **Vista de Detalle:** `src/components/app/ParticipantDetail.tsx` (muestra el perfil completo del participante).
 - **Vista de Continuidad:** `src/components/app/ContinuityView.tsx` (lista filtrada de participantes que requieren acción).
 
+---
+
+## 7. Módulo de Informes
+
+Este módulo está diseñado para ofrecer una visión analítica y agregada de los datos de los participantes, permitiendo a los administradores generar reportes y tomar decisiones informadas.
+
+### 7.1. Informe de Distribución Geográfica
+
+Es el primer reporte implementado en el módulo. Su objetivo es visualizar la distribución de los participantes y los recursos a través de los diferentes departamentos.
+
+##### Características Clave:
+
+-   **Tabla Agregada**: Muestra un resumen por departamento con el número total de participantes y el monto total desembolsado, calculado a partir de los pagos acumulados y el monto vigente del programa.
+-   **Filtros Combinables**: Permite un análisis granular gracias a un panel de filtros intuitivo. Se puede filtrar por:
+    -   **Departamento**: Un menú desplegable que utiliza la lista oficial y centralizada de departamentos de la aplicación, ordenada alfabéticamente para facilitar su uso.
+    -   **Programa**: Para aislar los datos de un programa específico.
+    -   **Mes y Año**: Basado en la fecha del último pago registrado.
+    -   Un botón **"Limpiar"** permite resetear todos los filtros a su estado inicial.
+-   **Detalle de Participantes**: Debajo del informe principal, un botón "Ver Detalle de Participantes" despliega una tabla con la lista completa de las personas que coinciden con los filtros aplicados. Esta tabla incluye el nombre, DNI, programa y un botón de acción para **"Gestionar Legajo"**, que lleva directamente al perfil del participante.
+
+#### 7.1.1. Reporte Imprimible
+
+Para facilitar la exportación y el archivado de la información, se ha implementado una funcionalidad de impresión profesional.
+
+-   **Activación**: Un botón "Imprimir" (con un icono de impresora) se activa en la interfaz principal del informe una vez que se han generado datos.
+-   **Vista Previa**: Al hacer clic, se abre una vista previa modal que aísla el contenido del reporte, optimizándolo para su impresión. Esta vista está gestionada por el componente `src/components/app/PrintableReport.tsx`.
+-   **Título Dinámico**: El título del reporte en la vista previa se ajusta automáticamente según los filtros aplicados (ej: "Informe de Distribución Geográfica de los Programas de Empleo en Capital").
+-   **Tabla Dinámica**: La estructura de la tabla se adapta de forma inteligente:
+    -   **Si se seleccionan "Todos" los programas**: La tabla discrimina la cantidad de participantes por cada programa principal (`Tutorías`, `Empleo Joven`, `Tecnoempleo`), mostrando estas como columnas individuales, además de una columna `TOTAL` y el porcentaje de participación.
+    -   **Si se filtra un programa específico**: La tabla se simplifica, mostrando solo las columnas `Departamento`, `Total Participantes` y `% Part.`.
+-   **Estilo Profesional**: La vista de impresión está diseñada para ser limpia, omitiendo botones de navegación y otros elementos de la UI que no son relevantes para un reporte en papel.
+-   **Resolución de Conflictos (Git)**: Durante su desarrollo, se resolvió un conflicto complejo con Git donde un nuevo archivo (`Reports.tsx`) no era detectado por el sistema de `build`, causando fallos en el despliegue (`Module not found`). La solución implicó forzar un `reset` del `staging area` de Git para resincronizar el estado del repositorio.
+
+---
