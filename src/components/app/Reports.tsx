@@ -9,14 +9,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, ChevronDown, AlertCircle, Printer, ArrowLeft } from 'lucide-react';
+import { Loader2, User, ChevronDown, AlertCircle, Printer, ArrowLeft, FileDown } from 'lucide-react';
 import DataQualityReportCard from './DataQualityReportCard';
-// El antiguo componente de impresión ya no es necesario aquí
-// import PrintableReport from './PrintableReport';
 
 interface DetailedParticipant extends Participant {
     montoPagado: number;
 }
+
 const formatCurrency = (num: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(num);
 const normalizeDepartmentName = (name: string | null | undefined): string => {
   const defaultName = 'No especificado';
@@ -45,9 +44,6 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
     const [activeReport, setActiveReport] = useState<string | null>(null);
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
-    
-    // El estado isPrinting ya no es necesario
-    // const [isPrinting, setIsPrinting] = useState(false);
     
     const [selectedProgram, setSelectedProgram] = useState('todos');
     const [selectedMonth, setSelectedMonth] = useState('todos');
@@ -174,7 +170,6 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
         setHasSearched(false);
     };
 
-    // *** NUEVA FUNCIÓN PARA IMPRIMIR ***
     const handlePrint = () => {
         const dataToPrint = {
             data: filteredDetailedData,
@@ -185,11 +180,37 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
         window.open('/print-report', '_blank');
     };
 
+    // *** FUNCIÓN PARA EXPORTAR A CSV (CORREGIDA) ***
+    const handleExportCSV = () => {
+        const headers = ['Nombre y Apellido', 'DNI', 'Programa', 'Departamento', 'Monto Pagado'];
+        const csvRows = [
+            headers.join(','),
+            ...filteredDetailedData.map(p => {
+                const row = [
+                    `"${p.nombre.replace(/"/g, '""')}"`, // Reemplaza comillas dobles con dos comillas dobles
+                    p.dni,
+                    p.programa || 'No especificado',
+                    normalizeDepartmentName(p.departamento),
+                    p.montoPagado
+                ];
+                return row.join(',');
+            })
+        ];
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'reporte-detallado.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const renderContent = () => {
         if (activeReport === 'geo') {
             return (
                 <div className="space-y-6">
-                    {/* El modal de impresión ya no se renderiza aquí */}
                     <Card>
                         <CardHeader>
                             <Button variant="ghost" size="sm" onClick={() => { setActiveReport(null); handleResetFilters(); }} className="mb-2">
@@ -209,7 +230,6 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
                                 <Button variant="outline" onClick={handleResetFilters}>Limpiar</Button>
                                 
                                 {aggregatedReportData.length > 0 && (
-                                    // El botón ahora llama a la nueva función handlePrint
                                     <Button variant="secondary" onClick={handlePrint}>
                                         <Printer className="h-4 w-4 mr-2" /> Imprimir
                                     </Button>
@@ -251,8 +271,41 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
                         )}
                     </Card>
 
+                    {/* *** SECCIÓN DE DETALLES MEJORADA *** */}
                     {showDetails && filteredDetailedData.length > 0 && (
-                        <Card>{/* ... Contenido del detalle ... */}</Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle>Detalle de Participantes ({filteredDetailedData.length})</CardTitle>
+                                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                                    <FileDown className="h-4 w-4 mr-2" />
+                                    Exportar a CSV
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Nombre y Apellido</TableHead>
+                                            <TableHead>DNI</TableHead>
+                                            <TableHead>Programa</TableHead>
+                                            <TableHead>Departamento</TableHead>
+                                            <TableHead className="text-right">Monto Pagado</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredDetailedData.map((p) => (
+                                            <TableRow key={p.id}>
+                                                <TableCell className="font-medium">{p.nombre}</TableCell>
+                                                <TableCell>{p.dni}</TableCell>
+                                                <TableCell>{p.programa || 'N/A'}</TableCell>
+                                                <TableCell>{normalizeDepartmentName(p.departamento)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(p.montoPagado)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
             );
