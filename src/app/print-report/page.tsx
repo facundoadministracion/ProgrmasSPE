@@ -12,15 +12,28 @@ interface ReportData {
   selectedDepartment: string;
 }
 
+// Tipo para la fila de datos de cada departamento
+interface ProcessedRow {
+    department: string;
+    total: number;
+    percentage: string;
+    [key: string]: any; // Para columnas de programas dinámicas
+}
+
+// *** SOLUCIÓN FINAL: Tipo para la fila de totales ***
+// Define una estructura que puede ser indexada por strings
+interface TotalsRow {
+    total: number;
+    [key: string]: number; // Permite acceder a `totals['Empleo Joven']` etc.
+}
+
 const PROGRAM_COLUMNS = ['Tutorías', 'Empleo Joven', 'Tecnoempleo'];
 
-// *** FUNCIÓN DE NORMALIZACIÓN DEFINITIVA ***
-// Elimina tildes, espacios y convierte a minúsculas.
 const normalizeText = (text: string | null | undefined): string => {
   if (!text) return '';
   return text
-    .normalize('NFD') // Descompone caracteres (ej: 'á' -> 'a' + '´')
-    .replace(/[\u0300-\u036f]/g, '') // Elimina los acentos
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
 };
@@ -62,7 +75,7 @@ const PrintReportPage = () => {
     return title;
   }, [reportData]);
 
-  const processedData = useMemo(() => {
+  const processedData: ProcessedRow[] = useMemo(() => {
     if (!reportData) return [];
     const departments: { [key: string]: { [key: string]: number } } = {};
     
@@ -73,8 +86,6 @@ const PrintReportPage = () => {
         PROGRAM_COLUMNS.forEach(prog => departments[department][prog] = 0);
       }
       
-      // *** LÓGICA DE CONTEO CORREGIDA ***
-      // Se usa la función de normalización para encontrar la columna correcta.
       const normalizedProgramName = normalizeText(p.programa);
       const programKey = PROGRAM_COLUMNS.find(col => normalizeText(col) === normalizedProgramName);
 
@@ -87,23 +98,31 @@ const PrintReportPage = () => {
     const totalParticipants = Object.values(departments).reduce((sum, dept) => sum + dept.total, 0);
 
     return Object.entries(departments)
-      .map(([department, values]) => ({
+      .map(([department, values]): ProcessedRow => ({
         department,
         ...values,
+        total: values.total,
         percentage: totalParticipants > 0 ? ((values.total / totalParticipants) * 100).toFixed(2) + '%' : '0.00%',
       }))
       .sort((a, b) => b.total - a.total);
   }, [reportData]);
 
-  const totals = useMemo(() => {
+  const totals: TotalsRow = useMemo(() => {
       if (!processedData) return { total: 0 };
-      return processedData.reduce((acc, currentRow) => {
+
+      // *** SOLUCIÓN FINAL: Se define un valor inicial con el tipo correcto ***
+      const initialTotals: TotalsRow = {
+          total: 0,
+          ...PROGRAM_COLUMNS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {})
+      };
+
+      return processedData.reduce((acc: TotalsRow, currentRow: ProcessedRow) => {
           acc.total += currentRow.total;
           PROGRAM_COLUMNS.forEach(prog => {
               acc[prog] = (acc[prog] || 0) + (currentRow[prog] || 0);
           });
           return acc;
-      }, { total: 0, ...PROGRAM_COLUMNS.reduce((acc, p) => ({...acc, [p]: 0}), {}) });
+      }, initialTotals);
   }, [processedData]);
 
   if (loading || !reportData) {
