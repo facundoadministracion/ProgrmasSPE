@@ -107,25 +107,53 @@ Es el primer reporte implementado en el módulo. Su objetivo es visualizar la di
 
 ##### Características Clave:
 
--   **Tabla Agregada**: Muestra un resumen por departamento con el número total de participantes y el monto total desembolsado, calculado a partir de los pagos acumulados y el monto vigente del programa.
--   **Filtros Combinables**: Permite un análisis granular gracias a un panel de filtros intuitivo. Se puede filtrar por:
-    -   **Departamento**: Un menú desplegable que utiliza la lista oficial y centralizada de departamentos de la aplicación, ordenada alfabéticamente para facilitar su uso.
-    -   **Programa**: Para aislar los datos de un programa específico.
-    -   **Mes y Año**: Basado en la fecha del último pago registrado.
-    -   Un botón **"Limpiar"** permite resetear todos los filtros a su estado inicial.
--   **Detalle de Participantes**: Debajo del informe principal, un botón "Ver Detalle de Participantes" despliega una tabla con la lista completa de las personas que coinciden con los filtros aplicados. Esta tabla incluye el nombre, DNI, programa y un botón de acción para **"Gestionar Legajo"**, que lleva directamente al perfil del participante.
+-   **Tabla Agregada**: Muestra un resumen por departamento con el número total de participantes y el monto total desembolsado.
+-   **Filtros Combinables**: Permite un análisis granular gracias a un panel de filtros intuitivo por Departamento, Programa, Mes y Año.
+-   **Detalle de Participantes**: Un botón "Ver Detalle de Participantes" despliega una tabla con la lista completa de las personas que coinciden con los filtros aplicados.
+-   **Exportación a CSV**: La vista de detalle incluye un botón para exportar la lista filtrada de participantes a un archivo CSV.
 
 #### 7.1.1. Reporte Imprimible
 
-Para facilitar la exportación y el archivado de la información, se ha implementado una funcionalidad de impresión profesional.
+Para facilitar la exportación y el archivado, se ha implementado una funcionalidad de impresión que se abre en una nueva pestaña del navegador.
 
--   **Activación**: Un botón "Imprimir" (con un icono de impresora) se activa en la interfaz principal del informe una vez que se han generado datos.
--   **Vista Previa**: Al hacer clic, se abre una vista previa modal que aísla el contenido del reporte, optimizándolo para su impresión. Esta vista está gestionada por el componente `src/components/app/PrintableReport.tsx`.
--   **Título Dinámico**: El título del reporte en la vista previa se ajusta automáticamente según los filtros aplicados (ej: "Informe de Distribución Geográfica de los Programas de Empleo en Capital").
--   **Tabla Dinámica**: La estructura de la tabla se adapta de forma inteligente:
-    -   **Si se seleccionan "Todos" los programas**: La tabla discrimina la cantidad de participantes por cada programa principal (`Tutorías`, `Empleo Joven`, `Tecnoempleo`), mostrando estas como columnas individuales, además de una columna `TOTAL` y el porcentaje de participación.
-    -   **Si se filtra un programa específico**: La tabla se simplifica, mostrando solo las columnas `Departamento`, `Total Participantes` y `% Part.`.
--   **Estilo Profesional**: La vista de impresión está diseñada para ser limpia, omitiendo botones de navegación y otros elementos de la UI que no son relevantes para un reporte en papel.
--   **Resolución de Conflictos (Git)**: Durante su desarrollo, se resolvió un conflicto complejo con Git donde un nuevo archivo (`Reports.tsx`) no era detectado por el sistema de `build`, causando fallos en el despliegue (`Module not found`). La solución implicó forzar un `reset` del `staging area` de Git para resincronizar el estado del repositorio.
+-   **Activación**: Un botón "Imprimir" se activa una vez que se han generado datos.
+-   **Nueva Ruta**: Al hacer clic, se abre la ruta `/print-report` en una nueva pestaña, pasando los datos a través de `sessionStorage` para aislar el entorno de impresión y garantizar la estabilidad.
+-   **Normalización de Datos**: Se implementó una lógica de normalización de texto para corregir bugs históricos en el conteo de programas y departamentos, asegurando que las comparaciones no sean sensibles a tildes o mayúsculas/minúsculas.
 
 ---
+
+## 8. Lógica Central y Flujo de Datos: Participantes y Pagos
+
+El núcleo de la aplicación gira en torno a dos colecciones fundamentales en Firestore: `participants` y `pagosRegistrados`. Entender su relación es clave para comprender cómo el sistema genera informes y rastrea la continuidad.
+
+### 8.1. Colección `participants`
+
+-   Funciona como el **registro maestro** de cada individuo en el sistema.
+-   Cada documento representa a una persona única y contiene sus **datos demográficos**: nombre completo, DNI, departamento, datos de contacto, etc.
+-   También almacena **información de estado**, como los programas en los que está inscrito y contadores como `pagosPorPrograma`, cruciales para el seguimiento.
+
+### 8.2. Colección `pagosRegistrados`
+
+-   Actúa como un **registro transaccional** de cada pago individual realizado.
+-   Cada documento representa un pago a un participante para un período específico (`mes` y `año`).
+-   Almacena el `dni` del participante, el `programa` por el cual se realizó el pago y el `montoPagado`.
+-   En su funcionamiento normal, esta colección es de **solo adición**, lo que significa que se agregan nuevos documentos pero no se modifican, creando un historial inmutable de todas las transacciones financieras.
+
+### 8.3. El Corazón del Sistema: Cómo se Generan los Informes
+
+La verdadera potencia de la aplicación proviene de la combinación de estas dos colecciones, especialmente en el "Informe de Distribución Geográfica":
+
+1.  **Consulta por Período**: El proceso se inicia cuando el administrador selecciona un mes y un año. El sistema consulta la colección `pagosRegistrados` para encontrar todos los documentos de pago que coincidan con ese período.
+
+2.  **Extracción de Identificadores**: De los pagos resultantes, el sistema recopila una lista única de números de DNI de los participantes.
+
+3.  **Enriquecimiento con Datos del Participante**: A continuación, la aplicación consulta la colección `participants` para recuperar los perfiles completos de todos los DNI recopilados en el paso anterior. Esto se realiza de manera eficiente en lotes para no afectar el rendimiento.
+
+4.  **Fusión y Creación del Conjunto de Datos Final**: El sistema fusiona los datos del pago (como `montoPagado` y el `programa` específico de ese pago) con los datos maestros del participante (como `nombre` y `departamento`).
+
+5.  **Renderizado de Informes**: Este conjunto de datos fusionado y en memoria se utiliza para generar todas las vistas:
+    -   **Informe Agregado**: Los datos se agrupan por departamento para calcular el número total de participantes y el monto total pagado.
+    -   **Informe Detallado**: La lista completa y detallada está disponible para ser visualizada y **exportada a CSV**, proporcionando una visión granular de cada individuo incluido en el informe.
+
+Esta arquitectura separa eficazmente el **"quién"** (`participants`) del **"qué y cuándo"** (`pagosRegistrados`), permitiendo una reportería flexible y potente mientras se mantiene una estructura de datos clara y auditable.
+
