@@ -16,6 +16,13 @@ interface DetailedParticipant extends Participant {
     montoPagado: number;
 }
 
+// *** SOLUCIÓN: Definición de la interfaz que faltaba ***
+interface ReportsProps {
+    participants: Participant[];
+    participantsLoading: boolean;
+    onSelectParticipant: (participant: Participant) => void;
+}
+
 const formatCurrency = (num: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(num);
 const normalizeDepartmentName = (name: string | null | undefined): string => {
   const defaultName = 'No especificado';
@@ -180,14 +187,13 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
         window.open('/print-report', '_blank');
     };
 
-    // *** FUNCIÓN PARA EXPORTAR A CSV (CORREGIDA) ***
     const handleExportCSV = () => {
         const headers = ['Nombre y Apellido', 'DNI', 'Programa', 'Departamento', 'Monto Pagado'];
         const csvRows = [
             headers.join(','),
             ...filteredDetailedData.map(p => {
                 const row = [
-                    `"${p.nombre.replace(/"/g, '""')}"`, // Reemplaza comillas dobles con dos comillas dobles
+                    `"${p.nombre.replace(/"/g, '""')}"`, 
                     p.dni,
                     p.programa || 'No especificado',
                     normalizeDepartmentName(p.departamento),
@@ -271,7 +277,6 @@ const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, on
                         )}
                     </Card>
 
-                    {/* *** SECCIÓN DE DETALLES MEJORADA *** */}
                     {showDetails && filteredDetailedData.length > 0 && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
