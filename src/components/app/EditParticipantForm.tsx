@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import type { Participant } from '@/lib/types';
-import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE, DEPARTAMENTOS, MONTHS, YEARS } from '@/lib/constants';
+import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE, DEPARTAMENTOS, MONTHS, YEARS, GENEROS } from '@/lib/constants';
 import MemoizedTextField from './edit-participant-form-parts/MemoizedTextField';
 import MemoizedSelectField from './edit-participant-form-parts/MemoizedSelectField';
 import MemoizedSwitchField from './edit-participant-form-parts/MemoizedSwitchField';
@@ -16,8 +16,22 @@ interface EditParticipantFormProps {
   requiresRenovation: boolean;
 }
 
+// Función para normalizar el género (primera letra mayúscula, resto minúscula)
+const capitalize = (s: string | undefined) => {
+  if (!s) return '';
+  const lower = s.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+};
+
+
 const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, onSave, formId, requiresRenovation }) => {
-  const [formData, setFormData] = useState(participant);
+  // Al inicializar el estado del formulario, nos aseguramos de que el género esté capitalizado
+  // para que coincida con las opciones del selector.
+  const [formData, setFormData] = useState(() => ({
+    ...participant,
+    genero: capitalize(participant.genero),
+  }));
+  
   const [newRenovationActo, setNewRenovationActo] = useState('');
 
   const isNewParticipant = !participant.id;
@@ -44,9 +58,20 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
         setFormData(prev => ({ ...prev, [id]: numericValue }));
       }
     } else {
-      setFormData(prev => ({ ...prev, [id]: value }));
+      // Si el campo es 'genero', lo capitalizamos al momento de actualizar el estado.
+      const finalValue = id === 'genero' ? capitalize(value as string) : value;
+      setFormData(prev => ({ ...prev, [id]: finalValue }));
     }
   }, []);
+
+  // Este efecto se asegura de que si el participante de entrada cambia, el formulario se reinicie
+  // con los datos nuevos, manteniendo la capitalización del género.
+  useEffect(() => {
+    setFormData({
+      ...participant,
+      genero: capitalize(participant.genero),
+    });
+  }, [participant]);
 
   useEffect(() => {
     const monthNumber = parseInt(ingresoMonth, 10) + 1;
@@ -70,9 +95,10 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
       const pKey = key as keyof Participant;
       if (pKey === 'renovaciones') continue;
       const formValue = currentData[pKey as keyof typeof currentData] || '';
-      const participantValue = participant[pKey] || '';
+      // Para la comparación, también capitalizamos el género del participante original.
+      const originalValue = pKey === 'genero' ? capitalize(participant[pKey]) : (participant[pKey] || '');
 
-      if (String(formValue) !== String(participantValue)) {
+      if (String(formValue) !== String(originalValue)) {
         (changes as any)[pKey] = formValue;
       }
     }
@@ -121,7 +147,8 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
             />
             <MemoizedTextField id="legajo" label="Legajo" value={formData.legajo || ''} onUpdate={handleUpdate} disabled={!isNewParticipant} />
             <MemoizedTextField id="fechaNacimiento" label="Fecha de Nacimiento" type="date" value={formData.fechaNacimiento || ''} onUpdate={handleUpdate} />
-            
+            <MemoizedSelectField id="genero" label="Género" value={formData.genero || ''} onUpdate={handleUpdate} options={GENEROS} />
+
             <div className="grid grid-cols-2 gap-2">
                 <MemoizedSelectField 
                     id="ingresoMonth" 

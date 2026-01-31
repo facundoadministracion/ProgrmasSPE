@@ -77,6 +77,7 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead className="hidden md:table-cell">Programa</TableHead>
+              <TableHead className="hidden md:table-cell">Género</TableHead>
               <TableHead className="hidden lg:table-cell">Contacto</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead><span className="sr-only">Actions</span></TableHead>
@@ -92,8 +93,10 @@ export const ParticipantsTable: React.FC<ParticipantsTableProps> = ({ participan
                   <TableCell className="font-medium">
                     <div>{p.nombre}</div>
                     <div className="text-sm text-gray-500 md:hidden">{p.programa}</div>
+                    <div className="text-sm text-gray-500 md:hidden">{p.genero}</div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{p.programa}</TableCell>
+                  <TableCell className="hidden md:table-cell">{p.genero}</TableCell>
                   <TableCell className="hidden lg:table-cell">
                       <div>{p.telefono}</div>
                       <div className="text-sm text-gray-500">{p.email}</div>

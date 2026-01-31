@@ -1,5 +1,5 @@
 export const DEPARTAMENTOS = [
-  "Ángel Vicente Peñaloza",
+  "Angel Vicente Peñaloza",
   "Arauco",
   "Capital",
   "Castro Barros",
@@ -11,7 +11,7 @@ export const DEPARTAMENTOS = [
   "General Belgrano",
   "General Lamadrid",
   "General Ocampo",
-  "General San Martín",
+  "General San Martin",
   "Independencia",
   "Rosario Vera Peñaloza",
   "San Blas de los Sauces",
@@ -34,6 +34,8 @@ export const PROGRAM_LOGOS: { [key: string]: string } = {
 export const CATEGORIAS_TUTORIAS = ['Senior', 'Estandar', 'Junior'];
 
 export const ESTADOS_PARTICIPANTE = ['Activo', 'Ingresado', 'Baja', 'Requiere Atención'] as const;
+
+export const GENEROS = ['Femenino', 'Masculino', 'No Binario', 'Prefiero no decirlo'];
 
 export const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 

@@ -143,7 +143,7 @@ El núcleo de la aplicación gira en torno a dos colecciones fundamentales en Fi
 
 La verdadera potencia de la aplicación proviene de la combinación de estas dos colecciones, especialmente en el "Informe de Distribución Geográfica":
 
-1.  **Consulta por Período**: El proceso se inicia cuando el administrador selecciona un mes y un año. El sistema consulta la colección `pagosRegistrados` para encontrar todos los documentos de pago que coincidan con ese período.
+1.  **Consulta por Período**: El proceso se inicia cuando el administrador selecciona un mes y un año. El sistema consulta la colección `pagosRegistrados` para encontrar todos los documentos de pago que coincidan con ese período. **(¡Atención! Ver Sección 9.2 para una regla crítica sobre los tipos de dato en esta consulta).**
 
 2.  **Extracción de Identificadores**: De los pagos resultantes, el sistema recopila una lista única de números de DNI de los participantes.
 
@@ -157,3 +157,37 @@ La verdadera potencia de la aplicación proviene de la combinación de estas dos
 
 Esta arquitectura separa eficazmente el **"quién"** (`participants`) del **"qué y cuándo"** (`pagosRegistrados`), permitiendo una reportería flexible y potente mientras se mantiene una estructura de datos clara y auditable.
 
+---
+
+## 9. Convenciones y Nomenclaturas de Datos
+
+Esta sección define las nomenclaturas estándar para valores de datos clave en toda la aplicación, asegurando consistencia y previniendo errores de normalización.
+
+### 9.1. Nombres de Departamentos
+
+Para evitar problemas con caracteres especiales y garantizar comparaciones de texto fiables, los nombres de los departamentos se almacenan y utilizan **sin acentos**. La lista oficial de nombres de departamentos es la siguiente, y se encuentra definida en `src/lib/constants.ts`:
+
+- "Angel Vicente Peñaloza"
+- "Arauco"
+- "Capital"
+- "Castro Barros"
+- "Chamical"
+- "Chilecito"
+- "Facundo Quiroga"
+- "Famatina"
+- "Felipe Varela"
+- "General Belgrano"
+- "General Lamadrid"
+- "General Ocampo"
+- "General San Martin"
+- "Independencia"
+- "Rosario Vera Peñaloza"
+- "San Blas de los Sauces"
+- "Sanagasta"
+- "Vinchina"
+
+### 9.2. Campos de Período en `pagosRegistrados` (¡REGLA CRÍTICA!)
+
+- **`mes`**: Almacenado como `string`. Ejemplo: "5", "11".
+- **`año`**: Almacenado como `string`. Ejemplo: "2023", "2024".
+- **Regla Fundamental**: Cualquier consulta a la colección `pagosRegistrados` que filtre por estos campos **DEBE** utilizar valores de tipo `string`. No se debe realizar ninguna conversión a `Number` antes de la consulta (ej: `where('mes', '==', Number(valor))`), ya que esto resultará en un **fallo silencioso** donde la consulta no devuelve datos ni errores, haciendo que los informes aparezcan vacíos.

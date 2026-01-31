@@ -192,3 +192,8 @@ export const calculateSeniority = (dateString: string | null | undefined): strin
   
   return yearText || monthText;
 };
+
+export const normalizeText = (text: string | null | undefined): string => {
+  if (!text) return '';
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+};
