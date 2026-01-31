@@ -21,7 +21,6 @@ const PROGRAM_COLUMNS = ['Tutorías', 'Empleo Joven', 'Tecnoempleo'];
 interface ProcessedRow { department: string; total: number; percentage: string; totalAmount: number; [key: string]: any; }
 interface TotalsRow { total: number; totalAmount: number; [key: string]: number; }
 
-// Componente para la nueva vista de Informe por Programa (marcador de posición)
 const ProgramReportView = ({ onBack }: { onBack: () => void }) => (
   <Card>
     <CardHeader>
@@ -141,24 +140,29 @@ const GeographicReportView = ({ onBack }: { onBack: () => void }) => {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="bg-gray-50 p-4 rounded-lg border mb-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+        <div className="bg-gray-50 p-4 rounded-lg border mb-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
                 <FilterSelect label="Año" value={filters.anio} onValueChange={handleFilterChange('anio')} options={YEARS.map(y => ({label: String(y), value: String(y)}))} placeholder="Seleccione Año" />
                 <FilterSelect label="Mes" value={filters.mes} onValueChange={handleFilterChange('mes')} options={MONTHS.map((m, i) => ({label: m, value: String(i+1)}))} placeholder="Seleccione Mes" />
-                <Button onClick={generateReport} disabled={isLoading || !filters.mes || !filters.anio} className="md:col-span-1">{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Generar</Button>
+                <Button onClick={generateReport} disabled={isLoading || !filters.mes || !filters.anio} className="self-end">{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Generar</Button>
+            </div>
+
+            {refinedData.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
                 <FilterSelect label="Programa" value={filters.programa} onValueChange={handleFilterChange('programa')} options={[{value: 'todos', label: 'Todos'}, ...Object.values(PROGRAM_NAMES).map(p => ({value: p, label: p}))]} />
                 <FilterSelect label="Departamento" value={filters.departamento} onValueChange={handleFilterChange('departamento')} options={[{value: 'Todos', label: 'Todos'}, ...DEPARTAMENTOS.map(d => ({value: d, label: d}))]} />
-            </div>
+                <div className="flex justify-end gap-2 self-end md:col-span-2">
+                    <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Imprimir</Button>
+                    <Button variant="outline" onClick={handleExportCSV}><FileDown className="mr-2 h-4 w-4"/> Exportar</Button>
+                </div>
+              </div>
+            )}
         </div>
         
         {isLoading && <div className="text-center p-8"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>}
         {!isLoading && baseData.length === 0 && <Alert className="mt-6"><Info className="h-4 w-4" /><AlertTitle>Informe Vacío</AlertTitle><AlertDescription>Seleccione Mes y Año, y haga clic en "Generar" para ver los resultados.</AlertDescription></Alert>}
         {!isLoading && refinedData.length > 0 && (
             <div>
-                <div className="flex justify-end gap-2 mb-4">
-                    <Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Imprimir / Vista Previa</Button>
-                    <Button variant="outline" onClick={handleExportCSV}><FileDown className="mr-2 h-4 w-4"/> Exportar Detalle</Button>
-                </div>
                 <Table>
                     <TableHeader><TableRow>
                         <TableHead>Departamento</TableHead>
