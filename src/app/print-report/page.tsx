@@ -5,26 +5,28 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
+import { MONTHS } from '@/lib/constants';
 
-interface ReportData {
+interface ReportPayload {
   data: any[];
-  selectedProgram: string;
-  selectedDepartment: string;
+  filters: {
+    mes: string;
+    anio: string;
+    programa: string;
+    departamento: string;
+  };
 }
 
-// Tipo para la fila de datos de cada departamento
 interface ProcessedRow {
     department: string;
     total: number;
     percentage: string;
-    [key: string]: any; // Para columnas de programas dinámicas
+    [key: string]: any; 
 }
 
-// *** SOLUCIÓN FINAL: Tipo para la fila de totales ***
-// Define una estructura que puede ser indexada por strings
 interface TotalsRow {
     total: number;
-    [key: string]: number; // Permite acceder a `totals['Empleo Joven']` etc.
+    [key: string]: number; 
 }
 
 const PROGRAM_COLUMNS = ['Tutorías', 'Empleo Joven', 'Tecnoempleo'];
@@ -39,7 +41,7 @@ const normalizeText = (text: string | null | undefined): string => {
 };
 
 const PrintReportPage = () => {
-  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [payload, setPayload] = useState<ReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -47,7 +49,7 @@ const PrintReportPage = () => {
     const storedData = sessionStorage.getItem('printableReportData');
     if (storedData) {
       try {
-        setReportData(JSON.parse(storedData));
+        setPayload(JSON.parse(storedData));
         sessionStorage.removeItem('printableReportData');
       } catch (error) {
         console.error("Error parsing report data:", error);
@@ -61,25 +63,11 @@ const PrintReportPage = () => {
     return () => clearTimeout(timeoutId);
   }, [router]);
 
-  const reportTitle = useMemo(() => {
-    if (!reportData) return 'Cargando informe...';
-    let title = 'Informe de Distribución Geográfica';
-    if (reportData.selectedProgram !== 'todos') {
-      title += ` del programa "${reportData.selectedProgram}"`;
-    } else {
-      title += ' de los Programas de Empleo';
-    }
-    if (reportData.selectedDepartment !== 'Todos') {
-      title += ` en ${reportData.selectedDepartment}`;
-    }
-    return title;
-  }, [reportData]);
-
   const processedData: ProcessedRow[] = useMemo(() => {
-    if (!reportData) return [];
+    if (!payload) return [];
     const departments: { [key: string]: { [key: string]: number } } = {};
     
-    reportData.data.forEach(p => {
+    payload.data.forEach(p => {
       const department = p.departamento ? p.departamento.trim() : 'No especificado';
       if (!departments[department]) {
         departments[department] = { total: 0 };
@@ -105,12 +93,10 @@ const PrintReportPage = () => {
         percentage: totalParticipants > 0 ? ((values.total / totalParticipants) * 100).toFixed(2) + '%' : '0.00%',
       }))
       .sort((a, b) => b.total - a.total);
-  }, [reportData]);
+  }, [payload]);
 
   const totals: TotalsRow = useMemo(() => {
       if (!processedData) return { total: 0 };
-
-      // *** SOLUCIÓN FINAL: Se define un valor inicial con el tipo correcto ***
       const initialTotals: TotalsRow = {
           total: 0,
           ...PROGRAM_COLUMNS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {})
@@ -125,9 +111,13 @@ const PrintReportPage = () => {
       }, initialTotals);
   }, [processedData]);
 
-  if (loading || !reportData) {
+  if (loading || !payload) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2">Cargando vista de impresión...</p></div>;
   }
+  
+  const { filters } = payload;
+  const selectedProgram = filters.programa !== 'todos' ? filters.programa.charAt(0).toUpperCase() + filters.programa.slice(1) : 'Todos los programas';
+  const selectedDepartment = filters.departamento !== 'Todos' ? filters.departamento : 'Toda la provincia';
 
   return (
     <div className="p-8">
@@ -135,22 +125,26 @@ const PrintReportPage = () => {
             @page { size: A4; margin: 1.5cm; }
             @media print { .no-print { display: none; } body { -webkit-print-color-adjust: exact; color-adjust: exact; } }
         `}</style>
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{reportTitle}</h1>
-          <p className="text-sm text-gray-500">Generado el: {new Date().toLocaleDateString('es-AR')}</p>
-        </div>
-        <div className="no-print">
-            <Button onClick={() => window.print()}>Imprimir de nuevo</Button>
-        </div>
+      <div className="mb-8">
+          <h1 className="text-2xl font-bold">Informe de Distribución Geográfica</h1>
+          <div className="text-sm text-gray-700 mt-2 border-b pb-2">
+            <div className="grid grid-cols-2 gap-x-4">
+              <p>Programa: <strong className="font-semibold">{selectedProgram}</strong></p>
+              <p>Departamento: <strong className="font-semibold">{selectedDepartment}</strong></p>
+              <p>Período: <strong className="font-semibold">{MONTHS[Number(filters.mes) - 1]} {filters.anio}</strong></p>
+              <p>Fecha de Emisión: <strong className="font-semibold">{new Date().toLocaleDateString('es-AR')}</strong></p>
+            </div>
+          </div>
       </div>
+      
+      <Button onClick={() => window.print()} className="no-print mb-4">Imprimir de nuevo</Button>
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Departamento</TableHead>
-            {reportData.selectedProgram === 'todos' && PROGRAM_COLUMNS.map(p => <TableHead key={p} className="text-right">{p}</TableHead>)}
-            <TableHead className="text-right font-bold">TOTAL</TableHead>
+            {filters.programa === 'todos' && PROGRAM_COLUMNS.map(p => <TableHead key={p} className="text-right">{p}</TableHead>)}
+            <TableHead className="text-right font-bold">Nº Part.</TableHead>
             <TableHead className="text-right">% Part.</TableHead>
           </TableRow>
         </TableHeader>
@@ -158,7 +152,7 @@ const PrintReportPage = () => {
           {processedData.map((row) => (
             <TableRow key={row.department}>
               <TableCell className="font-medium">{row.department}</TableCell>
-              {reportData.selectedProgram === 'todos' && PROGRAM_COLUMNS.map(p => <TableCell key={p} className="text-right">{row[p] || 0}</TableCell>)}
+              {filters.programa === 'todos' && PROGRAM_COLUMNS.map(p => <TableCell key={p} className="text-right">{row[p] || 0}</TableCell>)}
               <TableCell className="text-right font-bold">{row.total}</TableCell>
               <TableCell className="text-right">{row.percentage}</TableCell>
             </TableRow>
@@ -167,7 +161,7 @@ const PrintReportPage = () => {
         <TableFooter>
             <TableRow className="bg-gray-100 font-bold">
             <TableCell>TOTAL GENERAL</TableCell>
-            {reportData.selectedProgram === 'todos' && PROGRAM_COLUMNS.map(p => <TableCell key={p} className="text-right">{totals[p] || 0}</TableCell>)}
+            {filters.programa === 'todos' && PROGRAM_COLUMNS.map(p => <TableCell key={p} className="text-right">{totals[p] || 0}</TableCell>)}
             <TableCell className="text-right">{totals.total}</TableCell>
             <TableCell className="text-right">100.00%</TableCell>
             </TableRow>

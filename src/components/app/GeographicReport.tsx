@@ -18,7 +18,7 @@ const normalizeText = (text: string | null | undefined): string => {
   return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 };
 
-interface ProcessedRow { department: string; total: number; percentage: string; totalAmount: number; [key: string]: any; }
+interface ProcessedRow { department: string; total: number; percentage: string; totalAmount: number; [key:string]: any; }
 interface TotalsRow { total: number; totalAmount: number; [key: string]: number; }
 
 const GeographicReport = ({ onBack }: { onBack: () => void }) => {
@@ -30,7 +30,8 @@ const GeographicReport = ({ onBack }: { onBack: () => void }) => {
   const [baseData, setBaseData] = useState<any[]>([]);
 
   const handleFilterChange = (filterName: keyof typeof filters) => (value: string) => {
-    setFilters(prev => ({ ...prev, [filterName]: value }));
+    const safeValue = value || (filterName === 'programa' ? 'todos' : 'Todos');
+    setFilters(prev => ({ ...prev, [filterName]: safeValue }));
   };
 
   const generateReport = useCallback(async () => {
@@ -93,8 +94,12 @@ const GeographicReport = ({ onBack }: { onBack: () => void }) => {
       }, initialTotals);
   }, [processedData]);
   
-  const handlePrint = () => {
-    sessionStorage.setItem('printableReportData', JSON.stringify({ data: refinedData, selectedProgram: filters.programa, selectedDepartment: filters.departamento }));
+  // Se elimina la generación de título aquí. Solo se pasan los datos crudos.
+  const handlePrint = (currentData: any[], currentFilters: typeof filters) => {
+    sessionStorage.setItem('printableReportData', JSON.stringify({
+      data: currentData,
+      filters: currentFilters, // Pasamos el objeto de filtros completo
+    }));
     window.open('/print-report', '_blank');
   };
 
@@ -133,7 +138,7 @@ const GeographicReport = ({ onBack }: { onBack: () => void }) => {
         {!isLoading && baseData.length === 0 && <Alert className="mt-6"><Info className="h-4 w-4" /><AlertTitle>Informe Vacío</AlertTitle><AlertDescription>Seleccione Mes y Año, y haga clic en "Generar".</AlertDescription></Alert>}
         {!isLoading && baseData.length > 0 && (
             <div>
-                <div className="flex justify-end gap-2 mb-4"><Button variant="outline" onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Imprimir</Button><Button variant="outline" onClick={handleExportCSV}><FileDown className="mr-2 h-4 w-4"/> Exportar Detalle</Button></div>
+                <div className="flex justify-end gap-2 mb-4"><Button variant="outline" onClick={() => handlePrint(refinedData, filters)}><Printer className="mr-2 h-4 w-4"/> Imprimir</Button><Button variant="outline" onClick={handleExportCSV}><FileDown className="mr-2 h-4 w-4"/> Exportar Detalle</Button></div>
                 <Table>
                     <TableHeader><TableRow><TableHead>Departamento</TableHead><TableHead className="text-right">Nº Part.</TableHead><TableHead className="text-right">Monto Total</TableHead><TableHead className="text-right">% Part.</TableHead></TableRow></TableHeader>
                     <TableBody>{processedData.map((row) => (<TableRow key={row.department}><TableCell className="font-medium">{row.department}</TableCell><TableCell className="text-right font-bold">{row.total}</TableCell><TableCell className="text-right">${(row.totalAmount || 0).toLocaleString('es-AR')}</TableCell><TableCell className="text-right">{row.percentage}</TableCell></TableRow>))}</TableBody>
