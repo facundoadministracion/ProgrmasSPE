@@ -11,6 +11,12 @@ service cloud.firestore {
       return request.auth != null && getUserRole(request.auth.uid) == 'admin';
     }
 
+    // NUEVA FUNCIÓN: Verifica si el usuario puede ingresar datos.
+    function canWriteData() {
+      let userRole = getUserRole(request.auth.uid);
+      return request.auth != null && (userRole == 'admin' || userRole == 'data-entry');
+    }
+
     // Regla para la colección 'users'
     match /users/{userId} {
       allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
@@ -52,6 +58,18 @@ service cloud.firestore {
     // Reglas para la colección 'pagosRegistrados'
     match /pagosRegistrados/{document=**} {
       allow read, write: if isAdmin();
+    }
+
+    // REGLAS CORREGIDAS Y GRANULARES PARA 'asistencias'
+    match /asistencias/{docId} {
+      // Permite a cualquier usuario autenticado hacer consultas (verificar duplicados).
+      allow list: if request.auth != null;
+      // Solo los admins pueden leer un documento específico por su ID.
+      allow get: if isAdmin();
+      // Permite a 'admin' y 'data-entry' crear nuevos registros.
+      allow create: if canWriteData();
+      // Solo los admins pueden modificar o borrar.
+      allow update, delete: if isAdmin();
     }
   }
 }

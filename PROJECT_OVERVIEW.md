@@ -119,6 +119,7 @@ Para facilitar la exportación y el archivado, se ha implementado una funcionali
 -   **Activación**: Un botón "Imprimir" se activa una vez que se han generado datos.
 -   **Nueva Ruta**: Al hacer clic, se abre la ruta `/print-report` en una nueva pestaña, pasando los datos a través de `sessionStorage` para aislar el entorno de impresión y garantizar la estabilidad.
 -   **Normalización de Datos**: Se implementó una lógica de normalización de texto para corregir bugs históricos en el conteo de programas y departamentos, asegurando que las comparaciones no sean sensibles a tildes o mayúsculas/minúsculas.
+-   **Lógica de Encabezado Robusta**: Para solucionar un bug persistente donde el título del informe impreso no se actualizaba con los filtros seleccionados (estado obsoleto), la lógica fue refactorizada. Ahora, el componente principal (`GeographicReport.tsx`) no pre-calcula ningún título. En su lugar, pasa el objeto de filtros crudo (`mes`, `año`, `programa`, `departamento`) al componente de impresión (`/print-report`). Este último se convierte en la **única fuente de verdad** y construye dinámicamente el encabezado del informe a partir de los filtros recibidos, garantizando que la información mostrada sea siempre precisa.
 
 ---
 

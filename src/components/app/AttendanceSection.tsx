@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { CreatableCombobox } from '@/components/ui/creatable-combobox'; // <-- ¡NUEVO COMPONENTE IMPORTADO!
 
 const AttendanceSection = ({ participants }: { participants: Participant[] }) => {
   const { firestore } = useFirebase();
@@ -23,6 +24,24 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
   const [selectedPerson, setSelectedPerson] = useState<Participant | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [lugaresDeTrabajo, setLugaresDeTrabajo] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchLugares = async () => {
+      try {
+        const response = await fetch('/api/get-lugares-trabajo');
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setLugaresDeTrabajo(data);
+      } catch (error) { 
+        console.error("Error fetching work locations:", error);
+        toast({ variant: "destructive", title: "Error de Red", description: "No se pudo cargar la lista de lugares de trabajo." });
+      }
+    };
+    fetchLugares();
+  }, [toast]);
   
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -300,7 +319,18 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                       
                       <div className={`p-3 rounded border ${isAreaChanged ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
                           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Lugar de Trabajo (Según Planilla)</label>
-                          <Input className="bg-white" value={formData.lugarTrabajo} onChange={e => setFormData({...formData, lugarTrabajo: e.target.value})} />
+                          {/* --- INICIO DEL CAMBIO -- */}
+                           <CreatableCombobox
+                                className="bg-white"
+                                options={lugaresDeTrabajo}
+                                value={formData.lugarTrabajo}
+                                onChange={v => setFormData({ ...formData, lugarTrabajo: v })}
+                                placeholder="Seleccione o cree un lugar"
+                                searchPlaceholder="Buscar lugar..."
+                                emptyText="No se encontraron lugares."
+                                createText={value => `Crear nuevo lugar: "${value}"`}
+                           />
+                          {/* --- FIN DEL CAMBIO -- */}
                           {isAreaChanged && (
                               <div className="mt-2 flex items-start gap-2">
                                   <Checkbox id="updateArea" checked={formData.actualizarArea} onCheckedChange={c => setFormData({...formData, actualizarArea: !!c})} />

@@ -4,7 +4,7 @@ import React, { DependencyList, createContext, useContext, ReactNode, useMemo, u
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { Functions } from 'firebase/functions'; // <-- AÑADIDO
+import { Functions } from 'firebase/functions';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 interface FirebaseProviderProps {
@@ -12,7 +12,7 @@ interface FirebaseProviderProps {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  functions: Functions; // <-- AÑADIDO
+  functions: Functions;
 }
 
 interface UserAuthState {
@@ -26,7 +26,7 @@ export interface FirebaseContextState {
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
   auth: Auth | null;
-  functions: Functions | null; // <-- AÑADIDO
+  functions: Functions | null;
   signOut: () => Promise<void>;
   user: User | null;
   isUserLoading: boolean;
@@ -37,7 +37,7 @@ export interface FirebaseServicesAndUser extends Omit<FirebaseContextState, 'are
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  functions: Functions; // <-- AÑADIDO
+  functions: Functions;
 }
 
 export interface UserHookResult {
@@ -54,7 +54,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firebaseApp,
   firestore,
   auth,
-  functions, // <-- AÑADIDO
+  functions,
 }) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     user: null,
@@ -62,7 +62,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     userError: null,
   });
 
-  const servicesAvailable = !!(firebaseApp && firestore && auth && functions); // <-- AÑADIDO
+  const servicesAvailable = !!(firebaseApp && firestore && auth && functions);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -79,7 +79,17 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     const unsubscribe = onAuthStateChanged(
       auth,
-      (firebaseUser) => {
+      async (firebaseUser) => {
+        if (firebaseUser) {
+          // **LA SOLUCIÓN: Forzar el refresco del token**
+          // Esto garantiza que el cliente tenga los roles (claims) más actualizados del usuario,
+          // resolviendo los errores de permisos causados por un estado de autenticación caducado.
+          try {
+            await firebaseUser.getIdToken(true);
+          } catch (tokenError) {
+            console.error("Error refreshing auth token:", tokenError);
+          }
+        }
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
       },
       (error) => {
@@ -107,12 +117,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     firebaseApp: servicesAvailable ? firebaseApp : null,
     firestore: servicesAvailable ? firestore : null,
     auth: servicesAvailable ? auth : null,
-    functions: servicesAvailable ? functions : null, // <-- AÑADIDO
+    functions: servicesAvailable ? functions : null,
     signOut: handleSignOut,
     user: userAuthState.user,
     isUserLoading: userAuthState.isUserLoading,
     userError: userAuthState.userError,
-  }), [firebaseApp, firestore, auth, functions, userAuthState, servicesAvailable, handleSignOut]); // <-- AÑADIDO
+  }), [firebaseApp, firestore, auth, functions, userAuthState, servicesAvailable, handleSignOut]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -129,7 +139,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.functions) { // <-- AÑADIDO
+  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.functions) {
     throw new Error('Firebase core services not available. Check FirebaseProvider props.');
   }
 
@@ -137,7 +147,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,
     auth: context.auth,
-    functions: context.functions, // <-- AÑADIDO
+    functions: context.functions,
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
@@ -155,7 +165,7 @@ export const useFirestore = (): Firestore => {
   return firestore;
 };
 
-export const useFunctions = (): Functions => { // <-- AÑADIDO
+export const useFunctions = (): Functions => {
   const { functions } = useFirebase();
   return functions;
 };
