@@ -7,10 +7,18 @@ import { useUser, useCollection, useFirebase } from '@/firebase';
 import { writeBatch, doc, collection, serverTimestamp, query } from 'firebase/firestore';
 import { useForceRefreshStore } from '@/store/force-refresh-store';
 
-// --- PROVEEDOR ESTÁTICO (CORRECCIÓN DEL ERROR DE CARGA INFINITA) ---
-import { SidebarProvider } from '@/components/ui/sidebar';
-
 // --- Componentes UI & Iconos (Estáticos) ---
+import {
+    SidebarProvider,
+    Sidebar,
+    SidebarHeader,
+    SidebarContent,
+    SidebarMenu,
+    SidebarMenuItem,
+    SidebarMenuButton,
+    SidebarFooter,
+    SidebarTrigger
+} from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -24,15 +32,6 @@ const LoadingComponent = () => <div className="flex h-full w-full items-center j
 const FullScreenLoader = () => <div className="flex h-screen w-full items-center justify-center bg-gray-100"><Loader2 className="h-8 w-8 animate-spin text-gray-500" /><p className="ml-4 text-gray-700">Cargando...</p></div>;
 
 // --- Componentes Visuales Cargados Dinámicamente ---
-const Sidebar = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.Sidebar), { ssr: false });
-const SidebarHeader = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarHeader), { ssr: false });
-const SidebarContent = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarContent), { ssr: false });
-const SidebarMenu = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarMenu), { ssr: false });
-const SidebarMenuItem = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarMenuItem), { ssr: false });
-const SidebarMenuButton = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarMenuButton), { ssr: false });
-const SidebarFooter = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarFooter), { ssr: false });
-const SidebarTrigger = dynamicImport(() => import('@/components/ui/sidebar').then(mod => mod.SidebarTrigger), { ssr: false });
-
 const Dashboard = dynamicImport(() => import('@/components/app/Dashboard'), { ssr: false, loading: () => <LoadingComponent /> });
 const ParticipantsTab = dynamicImport(() => import('@/components/app/ParticipantsTab'), { ssr: false, loading: () => <LoadingComponent /> });
 const ParticipantDetail = dynamicImport(() => import('@/components/app/ParticipantDetail'), { ssr: false, loading: () => <LoadingComponent /> });
