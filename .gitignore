@@ -1,13 +1,2 @@
-# Firebase
+
 .firebase/
-firebase-debug.log
-
-# Dependencies
-/node_modules
-
-# Next.js
-/.next/
-/out/
-
-# Log files
-*.log
