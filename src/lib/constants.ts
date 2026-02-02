@@ -42,8 +42,9 @@ export const MONTHS = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-// Genera una lista de años desde 2025 para los próximos 10 años.
-export const YEARS = Array.from({ length: 10 }, (_, i) => 2025 + i);
+// --- CORREGIDO: Rango de años dinámico ---
+const currentYear = new Date().getFullYear();
+export const YEARS = Array.from({ length: 7 }, (_, i) => currentYear - 1 + i); // Desde el año pasado hasta 5 años en el futuro
 
 export const ROLES = {
   ADMIN: 'admin',

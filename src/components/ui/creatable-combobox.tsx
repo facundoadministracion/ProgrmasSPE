@@ -89,7 +89,7 @@ export function CreatableCombobox({
           <CommandInput
             placeholder={searchPlaceholder}
             value={inputValue}
-            onValueCodeChange={setInputValue}
+            onValueChange={setInputValue} /* <-- CORREGIDO */
           />
           <CommandList>
             {filteredOptions.length === 0 && !showCreateOption && (

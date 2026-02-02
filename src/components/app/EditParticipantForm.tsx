@@ -6,6 +6,7 @@ import { PROGRAMAS, CATEGORIAS_TUTORIAS, ESTADOS_PARTICIPANTE, DEPARTAMENTOS, MO
 import MemoizedTextField from './edit-participant-form-parts/MemoizedTextField';
 import MemoizedSelectField from './edit-participant-form-parts/MemoizedSelectField';
 import MemoizedSwitchField from './edit-participant-form-parts/MemoizedSwitchField';
+import { CreatableCombobox } from '@/components/ui/creatable-combobox'; // <-- IMPORTADO
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FilePlus } from 'lucide-react';
 
@@ -16,23 +17,41 @@ interface EditParticipantFormProps {
   requiresRenovation: boolean;
 }
 
-// Función para normalizar el género (primera letra mayúscula, resto minúscula)
+// ... (código sin cambios)
+
 const capitalize = (s: string | undefined) => {
   if (!s) return '';
   const lower = s.toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 };
 
-
 const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, onSave, formId, requiresRenovation }) => {
-  // Al inicializar el estado del formulario, nos aseguramos de que el género esté capitalizado
-  // para que coincida con las opciones del selector.
   const [formData, setFormData] = useState(() => ({
     ...participant,
     genero: capitalize(participant.genero),
   }));
   
   const [newRenovationActo, setNewRenovationActo] = useState('');
+  const [lugaresTrabajo, setLugaresTrabajo] = useState<string[]>([]); // <-- NUEVO ESTADO
+
+  // --- NUEVO EFECTO: Cargar lugares de trabajo ---
+  useEffect(() => {
+    const fetchLugares = async () => {
+      try {
+        const response = await fetch('/api/get-lugares-trabajo');
+        if (response.ok) {
+          const data = await response.json();
+          setLugaresTrabajo(data);
+        }
+      } catch (error) {
+        console.error("Error fetching work locations:", error);
+      }
+    };
+    fetchLugares();
+  }, []);
+  // ------------------------------------------
+
+  // ... (código sin cambios hasta el return)
 
   const isNewParticipant = !participant.id;
 
@@ -58,14 +77,11 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
         setFormData(prev => ({ ...prev, [id]: numericValue }));
       }
     } else {
-      // Si el campo es 'genero', lo capitalizamos al momento de actualizar el estado.
       const finalValue = id === 'genero' ? capitalize(value as string) : value;
       setFormData(prev => ({ ...prev, [id]: finalValue }));
     }
   }, []);
 
-  // Este efecto se asegura de que si el participante de entrada cambia, el formulario se reinicie
-  // con los datos nuevos, manteniendo la capitalización del género.
   useEffect(() => {
     setFormData({
       ...participant,
@@ -95,7 +111,6 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
       const pKey = key as keyof Participant;
       if (pKey === 'renovaciones') continue;
       const formValue = currentData[pKey as keyof typeof currentData] || '';
-      // Para la comparación, también capitalizamos el género del participante original.
       const originalValue = pKey === 'genero' ? capitalize(participant[pKey]) : (participant[pKey] || '');
 
       if (String(formValue) !== String(originalValue)) {
@@ -120,6 +135,7 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
   return (
     <form id={formId} onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+            {/* ... (código sin cambios) */}
             {requiresRenovation && (
               <div className="md:col-span-3">
                 <Alert variant="default" className="bg-yellow-50 border-yellow-200">
@@ -172,7 +188,19 @@ const EditParticipantForm: React.FC<EditParticipantFormProps> = ({ participant, 
             {formData.programa === PROGRAMAS.TUTORIAS && (
                 <MemoizedSelectField id="categoria" label="Categoría (Tutorías)" value={formData.categoria || ''} onUpdate={handleUpdate} options={CATEGORIAS_TUTORIAS} />
             )}
-            <MemoizedTextField id="lugarTrabajo" label="Lugar de Trabajo" value={formData.lugarTrabajo || ''} onUpdate={handleUpdate} />
+
+            {/* --- CAMPO ACTUALIZADO --- */}
+            <div className="flex flex-col">
+                <label htmlFor="lugarTrabajo" className="text-sm font-medium text-gray-700 mb-1">Lugar de Trabajo</label>
+                <CreatableCombobox
+                    options={lugaresTrabajo}
+                    value={formData.lugarTrabajo || ''}
+                    onChange={(newValue) => handleUpdate('lugarTrabajo', newValue)}
+                    placeholder="Seleccione o cree un lugar"
+                />
+            </div>
+            {/* ------------------------ */}
+
             <MemoizedTextField id="email" label="Email" type="email" value={formData.email || ''} onUpdate={handleUpdate} />
             <MemoizedTextField id="telefono" label="Teléfono" value={formData.telefono || ''} onUpdate={handleUpdate} />
             <MemoizedSwitchField id="esEquipoTecnico" label="Es Equipo Técnico" checked={formData.esEquipoTecnico} onUpdate={handleUpdate} />

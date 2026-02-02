@@ -1,3 +1,4 @@
+
 export type UserRole = {
   uid: string;
   name: string;
@@ -9,7 +10,7 @@ export type UserRole = {
 export type Renovacion = {
   tipoActo: 'decreto' | 'resolucion';
   numeroActo: string;
-  fechaCarga: any; // Debería ser un Timestamp de servidor
+  fechaCarga: any; 
   ownerId: string;
 };
 
@@ -29,18 +30,18 @@ export type Participant = {
   categoria?: string;
   email?: string;
   telefono?: string;
-  genero?: string; // <-- AÑADIDO
+  genero?: string; 
   esEquipoTecnico: boolean;
   pagosAcumulados?: number;
   pagosPorPrograma: { [key: string]: number };
   activo: boolean;
   ownerId: string;
   fechaAlta: string;
-  ultimoPago?: string; // Format "MM/YYYY"
+  ultimoPago?: string; 
   estado?: 'Activo' | 'Ingresado' | 'Baja' | 'Requiere Atención';
-  mesAusencia?: string; // Format "MM/YYYY", registra el mes de la ausencia que disparó "Requiere Atención"
-  historialPagos?: string[]; // Array of "YYYY-MM"
-  renovaciones?: string[]; // Array de actos de renovación
+  mesAusencia?: string; 
+  historialPagos?: string[];
+  renovaciones?: string[];
   historialProgramas?: { [key: string]: { fechaInicio: string; fechaFin: string; motivo?: string; actoAdministrativoBaja?: string; } };
   motivoBaja?: string;
   fechaBaja?: string;
@@ -54,7 +55,7 @@ export type Payment = {
     mes: string;
     anio: string;
     programa: string;
-    fechaCarga: any; // serverTimestamp
+    fechaCarga: any; 
     ownerId: string;
     paymentRecordId: string;
 };
@@ -66,7 +67,7 @@ export type PaymentRecord = {
     anio: string;
     participantes: { id: string, dni: string, nombre: string, pagosAcumuladosPrev: number, estadoPrev: string }[];
     ausentes: { id: string, dni: string, nombre: string, estadoPrev: string }[];
-    fechaCarga: any; // serverTimestamp
+    fechaCarga: any; 
     ownerId: string;
     ownerName: string;
 }
@@ -75,18 +76,14 @@ export type Novedad = {
     id: string;
     participantId: string;
     descripcion: string;
-    fechaRealCarga: any; // serverTimestamp
+    fechaRealCarga: any; 
     ownerId: string;
     type: 'GENERAL' | 'BAJA' | 'POSIBLE_BAJA' | 'ALTA' | 'REACTIVACION' | 'BAJA_DEFINITIVA' | 'RENOVACION' | 'TRASPASO';
-
-    // Optional fields that may or may not be present
     participantName?: string;
     dni?: string;
     programa?: string;
-    fecha?: string; // YYYY-MM-DD
-    fechaEvento?: string; // Formato YYYY-MM-DD
-
-    // Fields from Baja/Reactivacion forms
+    fecha?: string; 
+    fechaEvento?: string; 
     mesEvento?: string;
     anoEvento?: string;
     actoAdministrativo?: string;
@@ -115,7 +112,7 @@ export type MontoPrograma = {
     id: string; 
     programa: string;
     monto: number;
-    fechaVigencia: string; // YYYY-MM-DD
+    fechaVigencia: string; 
     ownerId: string;
     createdAt: any;
 }
@@ -127,6 +124,8 @@ export type PagoRegistrado = {
   anio: string;
   programa: string;
   fechaDeCarga: any;
+  dni: string; // <-- CORREGIDO
+  montoPagado: number; // <-- CORREGIDO
 }
 
 export type ParticipantFilter = 'requiresAttention' | 'paymentAlert' | 'ageAlert' | 'paymentDue' | 'renewalRequired' | 'finalization' | null;

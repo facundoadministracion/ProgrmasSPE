@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Participant } from '@/lib/types';
-import { MONTHS, PROGRAMAS } from '@/lib/constants';
+import { MONTHS, PROGRAMAS, YEARS } from '@/lib/constants'; // Import YEARS
 import { getPaymentStatus } from '@/lib/logic';
 import { useFirebase, useUser } from '@/firebase';
 import { writeBatch, collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CreatableCombobox } from '@/components/ui/creatable-combobox'; // <-- ¡NUEVO COMPONENTE IMPORTADO!
+import { CreatableCombobox } from '@/components/ui/creatable-combobox';
 
 const AttendanceSection = ({ participants }: { participants: Participant[] }) => {
   const { firestore } = useFirebase();
@@ -63,7 +63,7 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
       if(searchTerm.length < 3) return [];
       const lower = searchTerm.toLowerCase();
       return participants.filter(p => 
-          p.programa === PROGRAMAS.TUTORIAS && 
+          p.programa === PROGRAMAS.TUTORIAS && // <-- Vuelve a filtrar solo por Tutorías
           (p.nombre.toLowerCase().includes(lower) || p.dni.includes(lower))
       );
   }, [searchTerm, participants]);
@@ -173,9 +173,10 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                 </div>
                 <div>
                     <label className="text-sm font-medium text-gray-600 block mb-1 text-left">Año</label>
+                    {/* --- AÑO DINÁMICO --- */}
                     <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(parseInt(v))}>
                       <SelectTrigger><SelectValue/></SelectTrigger>
-                      <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                      <SelectContent>{YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
               </div>
@@ -283,9 +284,10 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                           </div>
                           <div>
                               <label className="text-sm font-medium text-gray-600 block mb-1">Año</label>
+                              {/* --- AÑO DINÁMICO (en el formulario de detalles) --- */}
                               <Select value={String(formData.anio)} onValueChange={v => setFormData({...formData, anio: parseInt(v)})} disabled={true}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>{[2023, 2024, 2025].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                                <SelectContent>{YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                               </Select>
                           </div>
                       </div>
@@ -319,7 +321,6 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                       
                       <div className={`p-3 rounded border ${isAreaChanged ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
                           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Lugar de Trabajo (Según Planilla)</label>
-                          {/* --- INICIO DEL CAMBIO -- */}
                            <CreatableCombobox
                                 className="bg-white"
                                 options={lugaresDeTrabajo}
@@ -330,12 +331,11 @@ const AttendanceSection = ({ participants }: { participants: Participant[] }) =>
                                 emptyText="No se encontraron lugares."
                                 createText={value => `Crear nuevo lugar: "${value}"`}
                            />
-                          {/* --- FIN DEL CAMBIO -- */}
                           {isAreaChanged && (
                               <div className="mt-2 flex items-start gap-2">
                                   <Checkbox id="updateArea" checked={formData.actualizarArea} onCheckedChange={c => setFormData({...formData, actualizarArea: !!c})} />
                                   <label htmlFor="updateArea" className="text-xs text-orange-800 cursor-pointer">
-                                      <strong>Difiere del sistema ({selectedPerson.lugarTrabajo}).</strong><br/>
+                                      <strong>Difiere del sistema ({selectedPerson.lugarTrabajo || 'S/D'}).</strong><br/>
                                       ¿Actualizar el legajo con este nuevo lugar?
                                   </label>
                               </div>

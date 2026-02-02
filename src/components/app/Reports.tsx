@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Map as MapIcon, User, ArrowLeft, Printer, FileDown, Info, BarChart2, Briefcase, UserCheck } from 'lucide-react';
+import { Loader2, Map as MapIcon, ArrowLeft, Printer, FileDown, Info, BarChart2, Briefcase, UserCheck } from 'lucide-react';
 import Papa from 'papaparse';
 import { DEPARTAMENTOS, PROGRAMAS as PROGRAM_NAMES, YEARS, MONTHS } from '@/lib/constants';
 import { normalizeText } from '@/lib/utils';
@@ -111,7 +111,12 @@ const GeographicReportView = ({ onBack }: { onBack: () => void }) => {
           acc.totalAmount += row.totalAmount;
           PROGRAM_COLUMNS.forEach(p => { acc[p] = (acc[p] || 0) + (row[p] || 0); });
           return acc;
-      }, { total: 0, totalAmount: 0, ...PROGRAM_COLUMNS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {}) });
+      }, {
+        total: 0,
+        totalAmount: 0,
+        // --- CORRECCIÓN: Aserción de tipo para el acumulador ---
+        ...PROGRAM_COLUMNS.reduce((acc, p) => ({ ...acc, [p]: 0 }), {} as {[key: string]: number})
+    } as TotalsRow );
   }, [processedData]);
   
   const handlePrint = () => {
@@ -202,7 +207,13 @@ const FilterSelect = ({ label, value, onValueChange, options, placeholder }: any
 
 type ReportView = 'overview' | 'geographic-report' | 'program-report';
 
-const Reports: React.FC = () => {
+interface ReportsProps {
+  participants: Participant[];
+  participantsLoading: boolean;
+  onSelectParticipant: (participant: Participant | "new" | null) => void;
+}
+
+const Reports: React.FC<ReportsProps> = ({ participants, participantsLoading, onSelectParticipant }) => {
   const [view, setView] = useState<ReportView>('overview');
 
   if (view === 'geographic-report') {

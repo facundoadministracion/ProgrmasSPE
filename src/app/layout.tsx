@@ -1,8 +1,10 @@
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import ClientProviders from '@/components/app/ClientProviders';
+import AppLoader from './AppLoader'; // Importa el nuevo AppLoader
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -11,15 +13,13 @@ export const metadata: Metadata = {
   description: 'Gestión de programas y participantes',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout() {
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <ClientProviders>{children}</ClientProviders>
+        <ClientProviders>
+            <AppLoader />
+        </ClientProviders>
         <Toaster />
       </body>
     </html>
